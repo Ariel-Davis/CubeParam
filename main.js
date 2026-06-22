@@ -71,15 +71,6 @@ function paramDiag(z) {
   );
 }
 
-// Scale vectors so s = 1  (unit-cube normalization for Mode B)
-// Closed-form norms: s = (1+|z₀|²)/√12  (diagonal), s = (1+|z₀|²)/2  (u₃)
-// z₀ is the mathematical parameter after the c→z map, not the control point c.
-function normalizeToUnit(vecs, z) {
-  const r2 = z.re * z.re + z.im * z.im;
-  const s  = paramMode === 'diag' ? (1 + r2) / SQRT12 : (1 + r2) / 2;
-  return s < 1e-10 ? vecs : vecs.map(u => u.scale(1 / s));
-}
-
 // ─── Height (depth) functions ─────────────────────────────────────────────────
 //
 // Each hₖ is the coordinate of the k-th cube edge vector along the axis
@@ -92,7 +83,7 @@ function normalizeToUnit(vecs, z) {
 // Diagonal-mode:
 //   hₖ = (1−|z₀|²)/6  +  (√2/3)·Im(ζ^(1−k)·z₀)   for k = 1,2,3
 //
-// In Mode B, divide by the same s used in normalizeToUnit to keep aspect ratio.
+// In Mode B, divide by the same s used for the projection vectors.
 
 function heightsU3(z) {
   const r2 = z.re * z.re + z.im * z.im;
@@ -106,6 +97,27 @@ function heightsDiag(z) {
   return [1, 2, 3].map(k => A + B * zetaPow(1 - k).mul(z).im);
 }
 
+// ─── Projection state ─────────────────────────────────────────────────────────
+//
+// Returns the current projection vectors and heights together so normalization
+// is applied once and both are scaled by the same factor.
+// Closed-form norms: s = (1+|z₀|²)/√12  (diagonal), s = (1+|z₀|²)/2  (u₃)
+
+function getProjectionState() {
+  const z     = (displayMode === 'B') ? cToZ(controlPt) : controlPt;
+  let vecs    = (paramMode === 'u3') ? paramU3(z)   : paramDiag(z);
+  let heights = (paramMode === 'u3') ? heightsU3(z) : heightsDiag(z);
+  if (displayMode === 'B') {
+    const r2 = z.re * z.re + z.im * z.im;
+    const s  = paramMode === 'diag' ? (1 + r2) / SQRT12 : (1 + r2) / 2;
+    if (s > 1e-10) {
+      vecs    = vecs.map(u => u.scale(1 / s));
+      heights = heights.map(h => h / s);
+    }
+  }
+  return { vecs, heights };
+}
+
 // ─── Application state ────────────────────────────────────────────────────────
 
 let paramMode   = 'u3';           // 'u3' | 'diag'
@@ -113,6 +125,22 @@ let displayMode = 'A';            // 'A' (free z) | 'B' (disk c)
 let controlPt   = new C(0.5, 0.3);
 let dragging    = false;
 let userScale   = 1.0;
+
+// ─── Vertex object system ─────────────────────────────────────────────────────
+//
+// Each vertex stores a 3D coordinate triple (a₁, a₂, a₃) and is projected via
+//   pt    = a₁·u₁ + a₂·u₂ + a₃·u₃   (the 2D canvas position)
+//   depth = a₁·h₁ + a₂·h₂ + a₃·h₃   (for future depth shading / perspective)
+
+let vertices    = [];
+let nextVertexId = 0;
+
+function projectPoint(coords, vecs, heights) {
+  const [a1, a2, a3] = coords;
+  const pt    = vecs[0].scale(a1).add(vecs[1].scale(a2)).add(vecs[2].scale(a3));
+  const depth = a1 * heights[0] + a2 * heights[1] + a3 * heights[2];
+  return { pt, depth };
+}
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
 
@@ -136,7 +164,7 @@ function getBaseScale() {
     : Math.min(canvas.width, canvas.height) * 0.30;
 }
 
-// Display scale: governs wireframe size. Affected by userScale.
+// Display scale: governs wireframe and object sizes. Affected by userScale.
 function getDisplayScale() {
   return getBaseScale() * userScale;
 }
@@ -149,15 +177,6 @@ function toScreen(c, scale) {
 // Canvas pixel → complex
 function fromScreen(px, py, scale) {
   return new C((px - cx()) / scale, -(py - cy()) / scale);
-}
-
-// ─── Compute current projection vectors ───────────────────────────────────────
-
-function getVectors() {
-  const z = (displayMode === 'B') ? cToZ(controlPt) : controlPt;
-  let vecs = (paramMode === 'u3') ? paramU3(z) : paramDiag(z);
-  if (displayMode === 'B') vecs = normalizeToUnit(vecs, z);
-  return vecs;
 }
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
@@ -210,6 +229,23 @@ function drawWireframe(vecs, scale) {
   ctx.restore();
 }
 
+function drawVertices(vecs, heights, scale) {
+  for (const v of vertices) {
+    if (!v.visible) continue;
+    const { pt } = projectPoint(v.coords, vecs, heights);
+    const s = toScreen(pt, scale);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = v.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.50)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawControlPoint(scale) {
   const pt = toScreen(controlPt, scale);
   ctx.save();
@@ -225,10 +261,12 @@ function drawControlPoint(scale) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const base    = getBaseScale();
-  const display = getDisplayScale();
+  const base              = getBaseScale();
+  const display           = getDisplayScale();
+  const { vecs, heights } = getProjectionState();
   if (displayMode === 'B') drawDiskBoundary(base);
-  drawWireframe(getVectors(), display);
+  drawWireframe(vecs, display);
+  drawVertices(vecs, heights, display);
   drawControlPoint(base);
 }
 
@@ -314,6 +352,66 @@ sliderScale.addEventListener('input', () => applyScale(parseFloat(sliderScale.va
 inputScale.addEventListener('change', () => {
   const v = parseFloat(inputScale.value);
   if (!isNaN(v) && v > 0) applyScale(v);
+});
+
+// ─── Vertex controls ──────────────────────────────────────────────────────────
+
+function renderVertexList() {
+  const list = document.getElementById('vertex-list');
+  list.innerHTML = '';
+  for (const v of vertices) {
+    const entry = document.createElement('div');
+    entry.className = 'vertex-entry';
+
+    const swatch = document.createElement('span');
+    swatch.className = 'v-swatch';
+    swatch.style.background = v.color;
+
+    const coords = document.createElement('span');
+    coords.className = 'v-coords';
+    coords.textContent = v.coords.map(x => +x.toFixed(2)).join(', ');
+
+    const toggle = document.createElement('button');
+    toggle.className = 'v-toggle';
+    toggle.textContent = v.visible ? '●' : '○';
+    toggle.title = v.visible ? 'Hide' : 'Show';
+    toggle.addEventListener('click', () => {
+      v.visible = !v.visible;
+      renderVertexList();
+      draw();
+    });
+
+    const del = document.createElement('button');
+    del.className = 'v-delete';
+    del.textContent = '×';
+    del.title = 'Delete';
+    del.addEventListener('click', () => {
+      vertices = vertices.filter(u => u.id !== v.id);
+      renderVertexList();
+      draw();
+    });
+
+    entry.append(swatch, coords, toggle, del);
+    list.appendChild(entry);
+  }
+}
+
+function addVertexFromInputs() {
+  const a1    = parseFloat(document.getElementById('v-a1').value)    || 0;
+  const a2    = parseFloat(document.getElementById('v-a2').value)    || 0;
+  const a3    = parseFloat(document.getElementById('v-a3').value)    || 0;
+  const color = document.getElementById('v-color').value;
+  vertices.push({ id: nextVertexId++, coords: [a1, a2, a3], color, visible: true });
+  renderVertexList();
+  draw();
+}
+
+document.getElementById('btn-add-vertex').addEventListener('click', addVertexFromInputs);
+
+['v-a1', 'v-a2', 'v-a3'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addVertexFromInputs();
+  });
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

@@ -91,3 +91,66 @@ button.active {
     display: none;
   }
 }
+
+.section-divider {
+  border-top: 1px solid rgba(255,255,255,0.12);
+  margin: 2px 0;
+}
+
+.v-coord {
+  width: 42px;
+  padding: 4px;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.90);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  font-family: sans-serif;
+  font-size: 12px;
+  text-align: right;
+}
+
+#v-color {
+  width: 26px;
+  height: 26px;
+  padding: 1px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#vertex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-left: 49px;
+}
+
+.vertex-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.v-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.v-coords {
+  flex: 1;
+  font-family: monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.65);
+  white-space: nowrap;
+}
+
+.v-toggle, .v-delete {
+  padding: 2px 6px;
+  font-size: 11px;
+  min-width: 0;
+}
