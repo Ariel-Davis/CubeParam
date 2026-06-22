@@ -15,6 +15,7 @@ class C {
 const ALPHA = new C(0, -1 / Math.SQRT2);       // -i/√2
 const ZETA  = new C(-0.5,  Math.sqrt(3) / 2);  // e^(2πi/3), primitive cube root of unity
 const ZETA2 = new C(-0.5, -Math.sqrt(3) / 2);  // e^(4πi/3) = ZETA²
+const SQRT12 = Math.sqrt(12);
 
 function zetaPow(n) {
   switch (((n % 3) + 3) % 3) {
@@ -70,10 +71,12 @@ function paramDiag(z) {
   );
 }
 
-// Scale vectors so s = √(½ Σ|uₖ|²) = 1  (unit-cube normalization for Mode B)
-function normalizeToUnit(vecs) {
-  const s2 = 0.5 * vecs.reduce((sum, u) => sum + u.abs() ** 2, 0);
-  const s  = Math.sqrt(s2);
+// Scale vectors so s = 1  (unit-cube normalization for Mode B)
+// Closed-form norms: s = (1+|z₀|²)/√12  (diagonal), s = (1+|z₀|²)/2  (u₃)
+// z₀ is the mathematical parameter after the c→z map, not the control point c.
+function normalizeToUnit(vecs, z) {
+  const r2 = z.re * z.re + z.im * z.im;
+  const s  = paramMode === 'diag' ? (1 + r2) / SQRT12 : (1 + r2) / 2;
   return s < 1e-10 ? vecs : vecs.map(u => u.scale(1 / s));
 }
 
@@ -125,9 +128,9 @@ function fromScreen(px, py, scale) {
 // ─── Compute current projection vectors ───────────────────────────────────────
 
 function getVectors() {
-  let z = (displayMode === 'B') ? cToZ(controlPt) : controlPt;
+  const z = (displayMode === 'B') ? cToZ(controlPt) : controlPt;
   let vecs = (paramMode === 'u3') ? paramU3(z) : paramDiag(z);
-  if (displayMode === 'B') vecs = normalizeToUnit(vecs);
+  if (displayMode === 'B') vecs = normalizeToUnit(vecs, z);
   return vecs;
 }
 
