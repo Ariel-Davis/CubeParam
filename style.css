@@ -51,6 +51,16 @@ button {
   transition: background 0.15s, color 0.15s;
 }
 
+button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+button:disabled:hover {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.70);
+}
+
 button:hover {
   background: rgba(255, 255, 255, 0.14);
   color: white;
@@ -171,4 +181,40 @@ button.active {
   padding: 2px 6px;
   font-size: 11px;
   min-width: 0;
+}
+
+button.active-loop {
+  background: rgba(100, 255, 180, 0.20);
+  border-color: rgba(100, 255, 180, 0.55);
+  color: rgba(160, 255, 210, 1.0);
+}
+
+#segment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding-left: 49px;
+}
+
+.segment-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.s-swatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.s-name {
+  flex: 1;
+  font-family: monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.80);
+  white-space: nowrap;
 }

@@ -51,8 +51,8 @@ function zToC(z) {
 function paramU3(z) {
   const z2 = z.sq();
   return [
-    new C(1, 0).sub(z2).scale(0.5),                   // (1 − z²) / 2
-    new C(0, 1).mul(z2.add(new C(1, 0))).scale(0.5),  // i(z² + 1) / 2
+    new C(1, 0).sub(z2).scale(0.5),
+    new C(0, 1).mul(z2.add(new C(1, 0))).scale(0.5),
     z,
   ];
 }
@@ -74,8 +74,7 @@ function paramDiag(z) {
 // ─── Height (depth) functions ─────────────────────────────────────────────────
 //
 // Each hₖ is the coordinate of the k-th cube edge vector along the axis
-// orthogonal to the projection plane.  These satisfy the same norm as the
-// projected 2D vectors, so the full 3D vectors are orthogonal with equal length.
+// orthogonal to the projection plane.
 //
 // u₃-mode:
 //   h'₁ = −Re(z₀),  h'₂ = −Im(z₀),  h'₃ = (1−|z₀|²)/2
@@ -99,7 +98,7 @@ function heightsDiag(z) {
 
 // ─── Projection state ─────────────────────────────────────────────────────────
 //
-// Returns the current projection vectors and heights together so normalization
+// Returns current projection vectors and heights together so normalization
 // is applied once and both are scaled by the same factor.
 // Closed-form norms: s = (1+|z₀|²)/√12  (diagonal), s = (1+|z₀|²)/2  (u₃)
 
@@ -120,20 +119,75 @@ function getProjectionState() {
 
 // ─── Application state ────────────────────────────────────────────────────────
 
-let paramMode   = 'u3';           // 'u3' | 'diag'
-let displayMode = 'A';            // 'A' (free z) | 'B' (disk c)
+let paramMode   = 'u3';
+let displayMode = 'A';
 let controlPt   = new C(0.5, 0.3);
 let dragging    = false;
 let userScale   = 1.0;
 
-// ─── Vertex object system ─────────────────────────────────────────────────────
-//
-// Each vertex stores a 3D coordinate triple (a₁, a₂, a₃) and is projected via
-//   pt    = a₁·u₁ + a₂·u₂ + a₃·u₃   (the 2D canvas position)
-//   depth = a₁·h₁ + a₂·h₂ + a₃·h₃   (for future depth shading / perspective)
+// ─── Object system state ──────────────────────────────────────────────────────
 
-let vertices    = [];
-let nextVertexId = 0;
+let vertices         = [];
+let nextVertexId     = 0;
+let segments         = [];
+let nextSegmentId    = 0;
+let selectedVertexIds = new Set();
+let segmentMode      = 'off';     // 'off' | 'on' | 'on++'
+
+// ─── Undo / redo ──────────────────────────────────────────────────────────────
+//
+// Tracks mutations to the object system only (vertices, segments, selection).
+// Control point, anchor mode, display mode, and scale are excluded — they are
+// continuous or non-destructive parameters, not editing steps.
+
+const HISTORY_LIMIT = 8;
+let undoStack = [];
+let redoStack = [];
+
+function captureState() {
+  return {
+    vertices:         vertices.map(v => ({ ...v, coords: [...v.coords] })),
+    segments:         segments.map(s => ({ ...s, vertexIds: [...s.vertexIds] })),
+    selectedVertexIds: new Set(selectedVertexIds),
+  };
+}
+
+function snapshot() {
+  undoStack.push(captureState());
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack = [];
+  updateUndoButtons();
+}
+
+function restoreState(state) {
+  vertices          = state.vertices;
+  segments          = state.segments;
+  selectedVertexIds = state.selectedVertexIds;
+  renderVertexList();
+  renderSegmentList();
+  draw();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(captureState());
+  restoreState(undoStack.pop());
+  updateUndoButtons();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(captureState());
+  restoreState(redoStack.pop());
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  document.getElementById('btn-undo').disabled = undoStack.length === 0;
+  document.getElementById('btn-redo').disabled = redoStack.length === 0;
+}
+
+// ─── Object math ──────────────────────────────────────────────────────────────
 
 function projectPoint(coords, vecs, heights) {
   const [a1, a2, a3] = coords;
@@ -157,24 +211,18 @@ window.addEventListener('resize', resize);
 function cx() { return canvas.width  / 2; }
 function cy() { return canvas.height / 2; }
 
-// Base scale: governs control point position and disk boundary. Unaffected by userScale.
 function getBaseScale() {
   return displayMode === 'A'
     ? 150
     : Math.min(canvas.width, canvas.height) * 0.30;
 }
 
-// Display scale: governs wireframe and object sizes. Affected by userScale.
-function getDisplayScale() {
-  return getBaseScale() * userScale;
-}
+function getDisplayScale() { return getBaseScale() * userScale; }
 
-// Complex → canvas pixel  (note: canvas y-axis points down, math y-axis points up)
 function toScreen(c, scale) {
   return { x: cx() + c.re * scale, y: cy() - c.im * scale };
 }
 
-// Canvas pixel → complex
 function fromScreen(px, py, scale) {
   return new C((px - cx()) / scale, -(py - cy()) / scale);
 }
@@ -193,7 +241,6 @@ function drawDiskBoundary(scale) {
 }
 
 function drawWireframe(vecs, scale) {
-  // The 8 vertices of the parallelepiped are all subset-sums Σ_{k∈S} uₖ
   const vx = [];
   for (let mask = 0; mask < 8; mask++) {
     let v = new C(0, 0);
@@ -202,8 +249,6 @@ function drawWireframe(vecs, scale) {
     }
     vx.push(toScreen(v, scale));
   }
-
-  // 12 edges: pairs of vertices whose bitmasks differ by exactly one bit
   ctx.save();
   ctx.strokeStyle = 'rgba(100, 200, 255, 0.85)';
   ctx.lineWidth = 1.5;
@@ -218,8 +263,6 @@ function drawWireframe(vecs, scale) {
       }
     }
   }
-
-  // Vertices
   ctx.fillStyle = 'rgba(130, 215, 255, 0.80)';
   for (const v of vx) {
     ctx.beginPath();
@@ -229,11 +272,41 @@ function drawWireframe(vecs, scale) {
   ctx.restore();
 }
 
+function drawSegments(vecs, heights, scale) {
+  for (const seg of segments) {
+    if (!seg.visible) continue;
+    const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
+    const v2 = vertices.find(v => v.id === seg.vertexIds[1]);
+    if (!v1 || !v2) continue;
+    const p1 = toScreen(projectPoint(v1.coords, vecs, heights).pt, scale);
+    const p2 = toScreen(projectPoint(v2.coords, vecs, heights).pt, scale);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = seg.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawVertices(vecs, heights, scale) {
   for (const v of vertices) {
     if (!v.visible) continue;
     const { pt } = projectPoint(v.coords, vecs, heights);
     const s = toScreen(pt, scale);
+
+    if (selectedVertexIds.has(v.id)) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 9, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(255, 240, 80, 0.95)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.beginPath();
     ctx.arc(s.x, s.y, 5, 0, 2 * Math.PI);
@@ -274,40 +347,103 @@ function draw() {
   const { vecs, heights } = getProjectionState();
   if (displayMode === 'B') drawDiskBoundary(base);
   drawWireframe(vecs, display);
+  drawSegments(vecs, heights, display);
   drawVertices(vecs, heights, display);
   drawControlPoint(base);
 }
 
 // ─── Pointer interaction ──────────────────────────────────────────────────────
+//
+// Near the control point  → drag (moves the projection parameter)
+// Elsewhere, segment mode → tap (selects a vertex); cancelled if pointer
+//                           travels > 8px, so dragging never affects selection.
+
+let pointerDownData = null;
 
 function updateFromPointer(e) {
   const rect = canvas.getBoundingClientRect();
   let pt = fromScreen(e.clientX - rect.left, e.clientY - rect.top, getBaseScale());
-
   if (displayMode === 'B') {
     const r = pt.abs();
-    if (r >= 1) pt = pt.scale(0.999 / r);  // keep c strictly inside the open disk
+    if (r >= 1) pt = pt.scale(0.999 / r);
   }
-
   controlPt = pt;
   draw();
 }
 
 canvas.addEventListener('pointerdown', e => {
   if (e.target !== canvas) return;
-  const rect     = canvas.getBoundingClientRect();
-  const px       = e.clientX - rect.left;
-  const py       = e.clientY - rect.top;
-  const pt       = toScreen(controlPt, getBaseScale());
+  const rect      = canvas.getBoundingClientRect();
+  const px        = e.clientX - rect.left;
+  const py        = e.clientY - rect.top;
+  const ctrlPt    = toScreen(controlPt, getBaseScale());
   const hitRadius = e.pointerType === 'touch' ? 40 : 20;
-  if (Math.hypot(px - pt.x, py - pt.y) <= hitRadius) {
+
+  if (Math.hypot(px - ctrlPt.x, py - ctrlPt.y) <= hitRadius) {
     dragging = true;
+  } else if (segmentMode !== 'off') {
+    pointerDownData = { px, py, pointerType: e.pointerType };
   }
 });
 
-window.addEventListener('pointermove',   e => { if (dragging) updateFromPointer(e); });
-window.addEventListener('pointerup',     ()  => { dragging = false; });
-window.addEventListener('pointercancel', ()  => { dragging = false; });
+window.addEventListener('pointermove', e => {
+  if (dragging) {
+    updateFromPointer(e);
+  } else if (pointerDownData) {
+    const rect = canvas.getBoundingClientRect();
+    const dx   = e.clientX - rect.left - pointerDownData.px;
+    const dy   = e.clientY - rect.top  - pointerDownData.py;
+    if (Math.hypot(dx, dy) > 8) pointerDownData = null;
+  }
+});
+
+window.addEventListener('pointerup', () => {
+  dragging = false;
+  if (pointerDownData) handleCanvasClick(pointerDownData.px, pointerDownData.py, pointerDownData.pointerType);
+  pointerDownData = null;
+});
+
+window.addEventListener('pointercancel', () => {
+  dragging        = false;
+  pointerDownData = null;
+});
+
+// ─── Canvas click → vertex selection ─────────────────────────────────────────
+
+function handleCanvasClick(px, py, pointerType) {
+  const display           = getDisplayScale();
+  const { vecs, heights } = getProjectionState();
+  const hitR = pointerType === 'touch' ? 28 : 14;
+
+  for (const v of vertices) {
+    if (!v.visible) continue;
+    const { pt } = projectPoint(v.coords, vecs, heights);
+    const s = toScreen(pt, display);
+    if (Math.hypot(px - s.x, py - s.y) <= hitR) {
+      if (selectedVertexIds.has(v.id)) {
+        selectedVertexIds.delete(v.id);
+      } else {
+        selectedVertexIds.add(v.id);
+      }
+      checkSelectionComplete();
+      draw();
+      return;
+    }
+  }
+}
+
+function checkSelectionComplete() {
+  if (selectedVertexIds.size < 2) return;
+  const [id1, id2] = [...selectedVertexIds];
+  const v1    = vertices.find(v => v.id === id1);
+  const color = v1 ? v1.color : 'rgba(200,200,200,0.85)';
+  snapshot();
+  segments.push({ id: nextSegmentId++, vertexIds: [id1, id2], color, visible: true });
+  selectedVertexIds.clear();
+  if (segmentMode === 'on') segmentMode = 'off';
+  updateSegmentButton();
+  renderSegmentList();
+}
 
 // ─── Toggle buttons ───────────────────────────────────────────────────────────
 
@@ -330,14 +466,14 @@ document.getElementById('btn-diag').addEventListener('click', () => {
 });
 
 document.getElementById('btn-modeA').addEventListener('click', () => {
-  if (displayMode === 'B') controlPt = cToZ(controlPt);  // convert c → z on switch
+  if (displayMode === 'B') controlPt = cToZ(controlPt);
   displayMode = 'A';
   setActive(['btn-modeA', 'btn-modeB'], 'btn-modeA');
   draw();
 });
 
 document.getElementById('btn-modeB').addEventListener('click', () => {
-  if (displayMode === 'A') controlPt = zToC(controlPt);  // convert z → c on switch
+  if (displayMode === 'A') controlPt = zToC(controlPt);
   displayMode = 'B';
   setActive(['btn-modeA', 'btn-modeB'], 'btn-modeB');
   draw();
@@ -350,13 +486,12 @@ const inputScale  = document.getElementById('input-scale');
 
 function applyScale(value) {
   userScale = Math.max(0.01, value);
-  sliderScale.value = Math.min(Math.max(userScale, 0.25), 4);  // clamp slider to its range
+  sliderScale.value = Math.min(Math.max(userScale, 0.25), 4);
   inputScale.value  = +userScale.toFixed(3);
   draw();
 }
 
-sliderScale.addEventListener('input', () => applyScale(parseFloat(sliderScale.value)));
-
+sliderScale.addEventListener('input',  () => applyScale(parseFloat(sliderScale.value)));
 inputScale.addEventListener('change', () => {
   const v = parseFloat(inputScale.value);
   if (!isNaN(v) && v > 0) applyScale(v);
@@ -389,6 +524,7 @@ function renderVertexList() {
     labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
     labelToggle.style.opacity = v.showLabel ? '1' : '0.3';
     labelToggle.addEventListener('click', () => {
+      snapshot();
       v.showLabel = !v.showLabel;
       renderVertexList();
       draw();
@@ -399,6 +535,7 @@ function renderVertexList() {
     toggle.textContent = v.visible ? '●' : '○';
     toggle.title = v.visible ? 'Hide' : 'Show';
     toggle.addEventListener('click', () => {
+      snapshot();
       v.visible = !v.visible;
       renderVertexList();
       draw();
@@ -409,8 +546,12 @@ function renderVertexList() {
     del.textContent = '×';
     del.title = 'Delete';
     del.addEventListener('click', () => {
+      snapshot();
+      segments = segments.filter(s => !s.vertexIds.includes(v.id));
       vertices = vertices.filter(u => u.id !== v.id);
+      selectedVertexIds.delete(v.id);
       renderVertexList();
+      renderSegmentList();
       draw();
     });
 
@@ -426,6 +567,7 @@ function addVertexFromInputs() {
   const a2    = parseFloat(document.getElementById('v-a2').value) || 0;
   const a3    = parseFloat(document.getElementById('v-a3').value) || 0;
   const color = document.getElementById('v-color').value;
+  snapshot();
   vertices.push({ id: nextVertexId++, name, coords: [a1, a2, a3], color, visible: true, showLabel: true });
   nameInput.value = '';
   renderVertexList();
@@ -440,6 +582,83 @@ document.getElementById('btn-add-vertex').addEventListener('click', addVertexFro
   });
 });
 
+// ─── Segment controls ─────────────────────────────────────────────────────────
+
+function updateSegmentButton() {
+  const btn = document.getElementById('btn-segment');
+  btn.classList.toggle('active',      segmentMode === 'on');
+  btn.classList.toggle('active-loop', segmentMode === 'on++');
+  btn.textContent = segmentMode === 'on++' ? 'segment +' : 'segment';
+}
+
+function renderSegmentList() {
+  const list = document.getElementById('segment-list');
+  list.innerHTML = '';
+  for (const seg of segments) {
+    const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
+    const v2 = vertices.find(v => v.id === seg.vertexIds[1]);
+
+    const entry = document.createElement('div');
+    entry.className = 'segment-entry';
+
+    const swatch = document.createElement('span');
+    swatch.className = 's-swatch';
+    swatch.style.background = seg.color;
+
+    const label = document.createElement('span');
+    label.className = 's-name';
+    label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
+
+    const toggle = document.createElement('button');
+    toggle.className = 'v-toggle';
+    toggle.textContent = seg.visible ? '●' : '○';
+    toggle.title = seg.visible ? 'Hide' : 'Show';
+    toggle.addEventListener('click', () => {
+      snapshot();
+      seg.visible = !seg.visible;
+      renderSegmentList();
+      draw();
+    });
+
+    const del = document.createElement('button');
+    del.className = 'v-delete';
+    del.textContent = '×';
+    del.title = 'Delete';
+    del.addEventListener('click', () => {
+      snapshot();
+      segments = segments.filter(s => s.id !== seg.id);
+      renderSegmentList();
+      draw();
+    });
+
+    entry.append(swatch, label, toggle, del);
+    list.appendChild(entry);
+  }
+}
+
+document.getElementById('btn-segment').addEventListener('click', () => {
+  if      (segmentMode === 'off')  segmentMode = 'on';
+  else if (segmentMode === 'on')   segmentMode = 'on++';
+  else                             segmentMode = 'off';
+  if (segmentMode === 'off') selectedVertexIds.clear();
+  updateSegmentButton();
+  draw();
+});
+
+// ─── Undo / redo controls ─────────────────────────────────────────────────────
+
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    if (e.key === 'z' &&  e.shiftKey) { e.preventDefault(); redo(); }
+    if (e.key === 'y')                { e.preventDefault(); redo(); }
+  }
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+updateUndoButtons();
 resize();

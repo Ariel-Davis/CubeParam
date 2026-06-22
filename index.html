@@ -27,6 +27,12 @@
     </div>
     <div class="section-divider"></div>
     <div class="toggle-group">
+      <span class="label"></span>
+      <button id="btn-undo" disabled>undo</button>
+      <button id="btn-redo" disabled>redo</button>
+    </div>
+    <div class="section-divider"></div>
+    <div class="toggle-group">
       <span class="label">vertex</span>
       <input type="text"   id="v-name" class="v-name-input" placeholder="name">
       <input type="number" id="v-a1" class="v-coord" value="0" step="any">
@@ -36,6 +42,12 @@
       <button id="btn-add-vertex">+</button>
     </div>
     <div id="vertex-list"></div>
+    <div class="section-divider"></div>
+    <div class="toggle-group">
+      <span class="label">create</span>
+      <button id="btn-segment">segment</button>
+    </div>
+    <div id="segment-list"></div>
   </div>
 
   <script src="main.js"></script>
