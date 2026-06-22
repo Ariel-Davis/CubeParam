@@ -231,9 +231,15 @@ function updateFromPointer(e) {
 }
 
 canvas.addEventListener('pointerdown', e => {
-  if (e.target !== canvas) return;  // ignore events that bubbled up from controls
-  dragging = true;
-  updateFromPointer(e);
+  if (e.target !== canvas) return;
+  const rect     = canvas.getBoundingClientRect();
+  const px       = e.clientX - rect.left;
+  const py       = e.clientY - rect.top;
+  const pt       = toScreen(controlPt, getBaseScale());
+  const hitRadius = e.pointerType === 'touch' ? 40 : 20;
+  if (Math.hypot(px - pt.x, py - pt.y) <= hitRadius) {
+    dragging = true;
+  }
 });
 
 window.addEventListener('pointermove',   e => { if (dragging) updateFromPointer(e); });
