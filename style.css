@@ -97,6 +97,17 @@ button.active {
   margin: 2px 0;
 }
 
+.v-name-input {
+  width: 52px;
+  padding: 4px;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.90);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  font-family: sans-serif;
+  font-size: 12px;
+}
+
 .v-coord {
   width: 42px;
   padding: 4px;
@@ -139,6 +150,13 @@ button.active {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.v-name {
+  font-family: monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.90);
+  min-width: 28px;
 }
 
 .v-coords {

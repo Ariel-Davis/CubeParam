@@ -243,6 +243,14 @@ function drawVertices(vecs, heights, scale) {
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
+
+    if (v.showLabel) {
+      ctx.save();
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = v.color;
+      ctx.fillText(v.name, s.x + 9, s.y - 7);
+      ctx.restore();
+    }
   }
 }
 
@@ -367,9 +375,24 @@ function renderVertexList() {
     swatch.className = 'v-swatch';
     swatch.style.background = v.color;
 
+    const name = document.createElement('span');
+    name.className = 'v-name';
+    name.textContent = v.name;
+
     const coords = document.createElement('span');
     coords.className = 'v-coords';
     coords.textContent = v.coords.map(x => +x.toFixed(2)).join(', ');
+
+    const labelToggle = document.createElement('button');
+    labelToggle.className = 'v-toggle';
+    labelToggle.textContent = 'A';
+    labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
+    labelToggle.style.opacity = v.showLabel ? '1' : '0.3';
+    labelToggle.addEventListener('click', () => {
+      v.showLabel = !v.showLabel;
+      renderVertexList();
+      draw();
+    });
 
     const toggle = document.createElement('button');
     toggle.className = 'v-toggle';
@@ -391,24 +414,27 @@ function renderVertexList() {
       draw();
     });
 
-    entry.append(swatch, coords, toggle, del);
+    entry.append(swatch, name, coords, labelToggle, toggle, del);
     list.appendChild(entry);
   }
 }
 
 function addVertexFromInputs() {
-  const a1    = parseFloat(document.getElementById('v-a1').value)    || 0;
-  const a2    = parseFloat(document.getElementById('v-a2').value)    || 0;
-  const a3    = parseFloat(document.getElementById('v-a3').value)    || 0;
+  const nameInput = document.getElementById('v-name');
+  const name  = nameInput.value.trim() || `P${nextVertexId}`;
+  const a1    = parseFloat(document.getElementById('v-a1').value) || 0;
+  const a2    = parseFloat(document.getElementById('v-a2').value) || 0;
+  const a3    = parseFloat(document.getElementById('v-a3').value) || 0;
   const color = document.getElementById('v-color').value;
-  vertices.push({ id: nextVertexId++, coords: [a1, a2, a3], color, visible: true });
+  vertices.push({ id: nextVertexId++, name, coords: [a1, a2, a3], color, visible: true, showLabel: true });
+  nameInput.value = '';
   renderVertexList();
   draw();
 }
 
 document.getElementById('btn-add-vertex').addEventListener('click', addVertexFromInputs);
 
-['v-a1', 'v-a2', 'v-a3'].forEach(id => {
+['v-name', 'v-a1', 'v-a2', 'v-a3'].forEach(id => {
   document.getElementById(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') addVertexFromInputs();
   });
