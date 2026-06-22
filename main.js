@@ -83,6 +83,7 @@ let paramMode   = 'u3';           // 'u3' | 'diag'
 let displayMode = 'A';            // 'A' (free z) | 'B' (disk c)
 let controlPt   = new C(0.5, 0.3);
 let dragging    = false;
+let userScale   = 1.0;
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
 
@@ -99,11 +100,16 @@ window.addEventListener('resize', resize);
 function cx() { return canvas.width  / 2; }
 function cy() { return canvas.height / 2; }
 
-// Pixels per unit. Mode B: unit disk occupies 30% of the shorter screen dimension.
-function getScale() {
+// Base scale: governs control point position and disk boundary. Unaffected by userScale.
+function getBaseScale() {
   return displayMode === 'A'
     ? 150
     : Math.min(canvas.width, canvas.height) * 0.30;
+}
+
+// Display scale: governs wireframe size. Affected by userScale.
+function getDisplayScale() {
+  return getBaseScale() * userScale;
 }
 
 // Complex → canvas pixel  (note: canvas y-axis points down, math y-axis points up)
@@ -201,19 +207,19 @@ function drawControlPoint(scale) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const scale = getScale();
-  drawAxes(scale);
-  if (displayMode === 'B') drawDiskBoundary(scale);
-  drawWireframe(getVectors(), scale);
-  drawControlPoint(scale);
+  const base    = getBaseScale();
+  const display = getDisplayScale();
+  drawAxes(base);
+  if (displayMode === 'B') drawDiskBoundary(base);
+  drawWireframe(getVectors(), display);
+  drawControlPoint(base);
 }
 
 // ─── Pointer interaction ──────────────────────────────────────────────────────
 
 function updateFromPointer(e) {
-  const rect  = canvas.getBoundingClientRect();
-  const scale = getScale();
-  let pt = fromScreen(e.clientX - rect.left, e.clientY - rect.top, scale);
+  const rect = canvas.getBoundingClientRect();
+  let pt = fromScreen(e.clientX - rect.left, e.clientY - rect.top, getBaseScale());
 
   if (displayMode === 'B') {
     const r = pt.abs();
@@ -225,14 +231,14 @@ function updateFromPointer(e) {
 }
 
 canvas.addEventListener('pointerdown', e => {
+  if (e.target !== canvas) return;  // ignore events that bubbled up from controls
   dragging = true;
-  canvas.setPointerCapture(e.pointerId);
   updateFromPointer(e);
 });
 
-canvas.addEventListener('pointermove',   e => { if (dragging) updateFromPointer(e); });
-canvas.addEventListener('pointerup',     ()  => { dragging = false; });
-canvas.addEventListener('pointercancel', ()  => { dragging = false; });
+window.addEventListener('pointermove',   e => { if (dragging) updateFromPointer(e); });
+window.addEventListener('pointerup',     ()  => { dragging = false; });
+window.addEventListener('pointercancel', ()  => { dragging = false; });
 
 // ─── Toggle buttons ───────────────────────────────────────────────────────────
 
@@ -266,6 +272,25 @@ document.getElementById('btn-modeB').addEventListener('click', () => {
   displayMode = 'B';
   setActive(['btn-modeA', 'btn-modeB'], 'btn-modeB');
   draw();
+});
+
+// ─── Scale controls ───────────────────────────────────────────────────────────
+
+const sliderScale = document.getElementById('slider-scale');
+const inputScale  = document.getElementById('input-scale');
+
+function applyScale(value) {
+  userScale = Math.max(0.01, value);
+  sliderScale.value = Math.min(Math.max(userScale, 0.25), 4);  // clamp slider to its range
+  inputScale.value  = +userScale.toFixed(3);
+  draw();
+}
+
+sliderScale.addEventListener('input', () => applyScale(parseFloat(sliderScale.value)));
+
+inputScale.addEventListener('change', () => {
+  const v = parseFloat(inputScale.value);
+  if (!isNaN(v) && v > 0) applyScale(v);
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ canvas {
   position: fixed;
   top: 16px;
   right: 16px;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -59,4 +60,34 @@ button.active {
   background: rgba(100, 180, 255, 0.25);
   border-color: rgba(100, 180, 255, 0.60);
   color: rgba(160, 210, 255, 1.0);
+}
+
+#scale-label {
+  width: auto;
+  white-space: nowrap;
+}
+
+#slider-scale {
+  width: 120px;
+  accent-color: rgba(100, 180, 255, 0.80);
+  cursor: pointer;
+}
+
+#input-scale {
+  width: 62px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  font-family: sans-serif;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* Hide slider on phone-sized screens */
+@media (max-width: 767px) {
+  #slider-scale {
+    display: none;
+  }
 }
