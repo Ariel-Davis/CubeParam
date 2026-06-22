@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cube Projection</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="controls">
+    <div class="toggle-group">
+      <span class="label">Anchor</span>
+      <button id="btn-u3"  class="active">u₃ = z</button>
+      <button id="btn-diag">diag = z</button>
+    </div>
+    <div class="toggle-group">
+      <span class="label">Domain</span>
+      <button id="btn-modeA" class="active">A — free</button>
+      <button id="btn-modeB">B — disk</button>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
