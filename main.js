@@ -80,6 +80,32 @@ function normalizeToUnit(vecs, z) {
   return s < 1e-10 ? vecs : vecs.map(u => u.scale(1 / s));
 }
 
+// ─── Height (depth) functions ─────────────────────────────────────────────────
+//
+// Each hₖ is the coordinate of the k-th cube edge vector along the axis
+// orthogonal to the projection plane.  These satisfy the same norm as the
+// projected 2D vectors, so the full 3D vectors are orthogonal with equal length.
+//
+// u₃-mode:
+//   h'₁ = −Re(z₀),  h'₂ = −Im(z₀),  h'₃ = (1−|z₀|²)/2
+//
+// Diagonal-mode:
+//   hₖ = (1−|z₀|²)/6  +  (√2/3)·Im(ζ^(1−k)·z₀)   for k = 1,2,3
+//
+// In Mode B, divide by the same s used in normalizeToUnit to keep aspect ratio.
+
+function heightsU3(z) {
+  const r2 = z.re * z.re + z.im * z.im;
+  return [-z.re, -z.im, (1 - r2) / 2];
+}
+
+function heightsDiag(z) {
+  const r2 = z.re * z.re + z.im * z.im;
+  const A = (1 - r2) / 6;
+  const B = Math.SQRT2 / 3;
+  return [1, 2, 3].map(k => A + B * zetaPow(1 - k).mul(z).im);
+}
+
 // ─── Application state ────────────────────────────────────────────────────────
 
 let paramMode   = 'u3';           // 'u3' | 'diag'
