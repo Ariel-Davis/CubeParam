@@ -133,17 +133,6 @@ function getVectors() {
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 
-function drawAxes(scale) {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, cy());         ctx.lineTo(canvas.width, cy());
-  ctx.moveTo(cx(), 0);         ctx.lineTo(cx(), canvas.height);
-  ctx.stroke();
-  ctx.restore();
-}
-
 function drawDiskBoundary(scale) {
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,0.18)';
@@ -209,7 +198,6 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const base    = getBaseScale();
   const display = getDisplayScale();
-  drawAxes(base);
   if (displayMode === 'B') drawDiskBoundary(base);
   drawWireframe(getVectors(), display);
   drawControlPoint(base);
