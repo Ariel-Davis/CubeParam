@@ -5,13 +5,14 @@
 }
 
 body {
-  background: #0f0f1a;
+  background: #ffffff;
   overflow: hidden;
 }
 
 canvas {
   display: block;
   touch-action: none; /* prevent browser scroll/zoom interfering with pointer events */
+  background: #ffffff;
 }
 
 #controls {
@@ -21,8 +22,25 @@ canvas {
   z-index: 100;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
   user-select: none;
+}
+
+#btn-toggle-controls {
+  padding: 5px 10px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+#controls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#controls-body.collapsed {
+  display: none;
 }
 
 .toggle-group {
@@ -32,7 +50,7 @@ canvas {
 }
 
 .label {
-  color: rgba(255, 255, 255, 0.40);
+  color: rgba(0, 0, 0, 0.45);
   font-family: sans-serif;
   font-size: 11px;
   width: 44px;
@@ -41,9 +59,9 @@ canvas {
 
 button {
   padding: 5px 11px;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.70);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #e8e8e8;
+  color: rgba(0, 0, 0, 0.70);
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   cursor: pointer;
   font-family: sans-serif;
@@ -57,19 +75,25 @@ button:disabled {
 }
 
 button:disabled:hover {
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.70);
+  background: #e8e8e8;
+  color: rgba(0, 0, 0, 0.70);
 }
 
 button:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: white;
+  background: #d4d4d4;
+  color: #000000;
 }
 
 button.active {
-  background: rgba(100, 180, 255, 0.25);
-  border-color: rgba(100, 180, 255, 0.60);
-  color: rgba(160, 210, 255, 1.0);
+  background: rgba(60, 130, 255, 0.15);
+  border-color: rgba(60, 130, 255, 0.55);
+  color: rgba(20, 80, 200, 1.0);
+}
+
+button.active-loop {
+  background: rgba(0, 170, 80, 0.12);
+  border-color: rgba(0, 170, 80, 0.50);
+  color: rgba(0, 120, 50, 1.0);
 }
 
 #scale-label {
@@ -79,16 +103,16 @@ button.active {
 
 #slider-scale {
   width: 120px;
-  accent-color: rgba(100, 180, 255, 0.80);
+  accent-color: rgba(60, 130, 255, 0.80);
   cursor: pointer;
 }
 
 #input-scale {
   width: 62px;
   padding: 4px 6px;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.90);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #f0f0f0;
+  color: rgba(0, 0, 0, 0.90);
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   font-family: sans-serif;
   font-size: 12px;
@@ -103,16 +127,16 @@ button.active {
 }
 
 .section-divider {
-  border-top: 1px solid rgba(255,255,255,0.12);
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
   margin: 2px 0;
 }
 
 .v-name-input {
   width: 52px;
   padding: 4px;
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.90);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: #f0f0f0;
+  color: rgba(0, 0, 0, 0.90);
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   font-family: sans-serif;
   font-size: 12px;
@@ -121,9 +145,9 @@ button.active {
 .v-coord {
   width: 42px;
   padding: 4px;
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.90);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: #f0f0f0;
+  color: rgba(0, 0, 0, 0.90);
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   font-family: sans-serif;
   font-size: 12px;
@@ -134,8 +158,8 @@ button.active {
   width: 26px;
   height: 26px;
   padding: 1px;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: #f0f0f0;
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   cursor: pointer;
 }
@@ -165,7 +189,7 @@ button.active {
 .v-name {
   font-family: monospace;
   font-size: 11px;
-  color: rgba(255,255,255,0.90);
+  color: rgba(0, 0, 0, 0.90);
   min-width: 28px;
 }
 
@@ -173,7 +197,7 @@ button.active {
   flex: 1;
   font-family: monospace;
   font-size: 11px;
-  color: rgba(255,255,255,0.65);
+  color: rgba(0, 0, 0, 0.55);
   white-space: nowrap;
 }
 
@@ -181,12 +205,6 @@ button.active {
   padding: 2px 6px;
   font-size: 11px;
   min-width: 0;
-}
-
-button.active-loop {
-  background: rgba(100, 255, 180, 0.20);
-  border-color: rgba(100, 255, 180, 0.55);
-  color: rgba(160, 255, 210, 1.0);
 }
 
 #segment-list {
@@ -215,6 +233,6 @@ button.active-loop {
   flex: 1;
   font-family: monospace;
   font-size: 11px;
-  color: rgba(255,255,255,0.80);
+  color: rgba(0, 0, 0, 0.75);
   white-space: nowrap;
 }

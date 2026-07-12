@@ -4,52 +4,59 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <canvas id="canvas"></canvas>
 
   <div id="controls">
-    <div class="toggle-group">
-      <span class="label">Anchor</span>
-      <button id="btn-u3"  class="active">u₃ = z</button>
-      <button id="btn-diag">diag = z</button>
+    <button id="btn-toggle-controls" class="active">☰</button>
+    <div id="controls-body">
+      <div class="toggle-group">
+        <span class="label">Anchor</span>
+        <button id="btn-u3"  class="active">u₃ = z</button>
+        <button id="btn-diag">diag = z</button>
+      </div>
+      <div class="toggle-group">
+        <span class="label">Domain</span>
+        <button id="btn-modeA" class="active">A — free</button>
+        <button id="btn-modeB">B — disk</button>
+      </div>
+      <div class="toggle-group" id="scale-row">
+        <input type="range"  id="slider-scale" min="0.25" max="4" step="0.01" value="1">
+        <span class="label" id="scale-label">scale =</span>
+        <input type="number" id="input-scale"  value="1" step="0.01">
+      </div>
+      <div class="toggle-group">
+        <span class="label">axes</span>
+        <button id="btn-axes" class="active">show</button>
+      </div>
+      <div class="section-divider"></div>
+      <div class="toggle-group">
+        <span class="label"></span>
+        <button id="btn-undo" disabled>undo</button>
+        <button id="btn-redo" disabled>redo</button>
+      </div>
+      <div class="section-divider"></div>
+      <div class="toggle-group">
+        <span class="label">vertex</span>
+        <input type="text"   id="v-name" class="v-name-input" placeholder="name">
+        <input type="number" id="v-a1" class="v-coord" value="0" step="any">
+        <input type="number" id="v-a2" class="v-coord" value="0" step="any">
+        <input type="number" id="v-a3" class="v-coord" value="0" step="any">
+        <input type="color"  id="v-color" value="#ff6644">
+        <button id="btn-add-vertex">+</button>
+      </div>
+      <div id="vertex-list"></div>
+      <div class="section-divider"></div>
+      <div class="toggle-group">
+        <span class="label">create</span>
+        <button id="btn-segment">segment</button>
+      </div>
+      <div id="segment-list"></div>
     </div>
-    <div class="toggle-group">
-      <span class="label">Domain</span>
-      <button id="btn-modeA" class="active">A — free</button>
-      <button id="btn-modeB">B — disk</button>
-    </div>
-    <div class="toggle-group" id="scale-row">
-      <input type="range"  id="slider-scale" min="0.25" max="4" step="0.01" value="1">
-      <span class="label" id="scale-label">scale =</span>
-      <input type="number" id="input-scale"  value="1" step="0.01">
-    </div>
-    <div class="section-divider"></div>
-    <div class="toggle-group">
-      <span class="label"></span>
-      <button id="btn-undo" disabled>undo</button>
-      <button id="btn-redo" disabled>redo</button>
-    </div>
-    <div class="section-divider"></div>
-    <div class="toggle-group">
-      <span class="label">vertex</span>
-      <input type="text"   id="v-name" class="v-name-input" placeholder="name">
-      <input type="number" id="v-a1" class="v-coord" value="0" step="any">
-      <input type="number" id="v-a2" class="v-coord" value="0" step="any">
-      <input type="number" id="v-a3" class="v-coord" value="0" step="any">
-      <input type="color"  id="v-color" value="#ff6644">
-      <button id="btn-add-vertex">+</button>
-    </div>
-    <div id="vertex-list"></div>
-    <div class="section-divider"></div>
-    <div class="toggle-group">
-      <span class="label">create</span>
-      <button id="btn-segment">segment</button>
-    </div>
-    <div id="segment-list"></div>
   </div>
 
-  <script src="main.js"></script>
+  <script src="main.js?v=3"></script>
 </body>
 </html>

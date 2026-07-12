@@ -124,6 +124,7 @@ let displayMode = 'A';
 let controlPt   = new C(0.5, 0.3);
 let dragging    = false;
 let userScale   = 1.0;
+let showAxes    = true;
 
 // ─── Object system state ──────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ function fromScreen(px, py, scale) {
 
 function drawDiskBoundary(scale) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
   ctx.setLineDash([4, 6]);
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -240,36 +241,64 @@ function drawDiskBoundary(scale) {
   ctx.restore();
 }
 
-function drawWireframe(vecs, scale) {
-  const vx = [];
-  for (let mask = 0; mask < 8; mask++) {
-    let v = new C(0, 0);
-    for (let k = 0; k < 3; k++) {
-      if (mask & (1 << k)) v = v.add(vecs[k]);
-    }
-    vx.push(toScreen(v, scale));
-  }
+const AXIS_COLORS  = ['#cc3333', '#228822', '#2255cc'];  // x, y, z
+const AXIS_LABELS  = ['x', 'y', 'z'];
+const ARROW_HEAD   = 12;  // arrowhead length in pixels
+
+function drawAxes(vecs, scale) {
+  const ox = cx(), oy = cy();
+
+  // Small origin dot
   ctx.save();
-  ctx.strokeStyle = 'rgba(100, 200, 255, 0.85)';
-  ctx.lineWidth = 1.5;
-  for (let a = 0; a < 8; a++) {
-    for (let b = a + 1; b < 8; b++) {
-      const diff = a ^ b;
-      if (diff && !(diff & (diff - 1))) {
-        ctx.beginPath();
-        ctx.moveTo(vx[a].x, vx[a].y);
-        ctx.lineTo(vx[b].x, vx[b].y);
-        ctx.stroke();
-      }
-    }
-  }
-  ctx.fillStyle = 'rgba(130, 215, 255, 0.80)';
-  for (const v of vx) {
-    ctx.beginPath();
-    ctx.arc(v.x, v.y, 3, 0, 2 * Math.PI);
-    ctx.fill();
-  }
+  ctx.beginPath();
+  ctx.arc(ox, oy, 3, 0, 2 * Math.PI);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fill();
   ctx.restore();
+
+  for (let k = 0; k < 3; k++) {
+    const tip   = toScreen(vecs[k], scale);
+    const dx    = tip.x - ox;
+    const dy    = tip.y - oy;
+    const len   = Math.hypot(dx, dy);
+    const color = AXIS_COLORS[k];
+    if (len < 1) continue;
+
+    const ux = dx / len, uy = dy / len;   // unit vector toward tip
+    const angle = Math.atan2(dy, dx);
+    const a1 = angle + Math.PI * 5 / 6;   // arrowhead wing angles (150° back)
+    const a2 = angle - Math.PI * 5 / 6;
+
+    // Shaft — stops just before arrowhead base so they don't overlap
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(tip.x - ux * ARROW_HEAD, tip.y - uy * ARROW_HEAD);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Filled arrowhead triangle
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(tip.x + ARROW_HEAD * Math.cos(a1), tip.y + ARROW_HEAD * Math.sin(a1));
+    ctx.lineTo(tip.x + ARROW_HEAD * Math.cos(a2), tip.y + ARROW_HEAD * Math.sin(a2));
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+
+    // Label just beyond the tip
+    ctx.save();
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(AXIS_LABELS[k], tip.x + ux * 16, tip.y + uy * 16);
+    ctx.restore();
+  }
 }
 
 function drawSegments(vecs, heights, scale) {
@@ -301,7 +330,7 @@ function drawVertices(vecs, heights, scale) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(s.x, s.y, 9, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(255, 240, 80, 0.95)';
+      ctx.strokeStyle = 'rgba(30, 100, 220, 0.90)';
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.restore();
@@ -312,7 +341,7 @@ function drawVertices(vecs, heights, scale) {
     ctx.arc(s.x, s.y, 5, 0, 2 * Math.PI);
     ctx.fillStyle = v.color;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.50)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
@@ -334,7 +363,7 @@ function drawControlPoint(scale) {
   ctx.arc(pt.x, pt.y, 8, 0, 2 * Math.PI);
   ctx.fillStyle = 'rgba(255, 200, 60, 0.95)';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.80)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.50)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
@@ -346,7 +375,7 @@ function draw() {
   const display           = getDisplayScale();
   const { vecs, heights } = getProjectionState();
   if (displayMode === 'B') drawDiskBoundary(base);
-  drawWireframe(vecs, display);
+  if (showAxes) drawAxes(vecs, display);
   drawSegments(vecs, heights, display);
   drawVertices(vecs, heights, display);
   drawControlPoint(base);
@@ -491,10 +520,18 @@ function applyScale(value) {
   draw();
 }
 
-sliderScale.addEventListener('input',  () => applyScale(parseFloat(sliderScale.value)));
+sliderScale.addEventListener('input', () => applyScale(parseFloat(sliderScale.value)));
 inputScale.addEventListener('change', () => {
   const v = parseFloat(inputScale.value);
   if (!isNaN(v) && v > 0) applyScale(v);
+});
+
+// ─── Axes button ──────────────────────────────────────────────────────────────
+
+document.getElementById('btn-axes').addEventListener('click', () => {
+  showAxes = !showAxes;
+  document.getElementById('btn-axes').classList.toggle('active', showAxes);
+  draw();
 });
 
 // ─── Vertex controls ──────────────────────────────────────────────────────────
@@ -643,6 +680,15 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   if (segmentMode === 'off') selectedVertexIds.clear();
   updateSegmentButton();
   draw();
+});
+
+// ─── Controls panel toggle ────────────────────────────────────────────────────
+
+document.getElementById('btn-toggle-controls').addEventListener('click', () => {
+  const body = document.getElementById('controls-body');
+  const btn  = document.getElementById('btn-toggle-controls');
+  body.classList.toggle('collapsed');
+  btn.classList.toggle('active', !body.classList.contains('collapsed'));
 });
 
 // ─── Undo / redo controls ─────────────────────────────────────────────────────
