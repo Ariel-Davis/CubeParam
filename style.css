@@ -96,18 +96,21 @@ button.active-loop {
   color: rgba(0, 120, 50, 1.0);
 }
 
-#scale-label {
+#scale-label,
+#persp-label {
   width: auto;
   white-space: nowrap;
 }
 
-#slider-scale {
+#slider-scale,
+#slider-persp {
   width: 120px;
   accent-color: rgba(60, 130, 255, 0.80);
   cursor: pointer;
 }
 
-#input-scale {
+#input-scale,
+#input-persp {
   width: 62px;
   padding: 4px 6px;
   background: #f0f0f0;
@@ -119,9 +122,10 @@ button.active-loop {
   text-align: right;
 }
 
-/* Hide slider on phone-sized screens */
+/* Hide sliders on phone-sized screens */
 @media (max-width: 767px) {
-  #slider-scale {
+  #slider-scale,
+  #slider-persp {
     display: none;
   }
 }
@@ -154,7 +158,8 @@ button.active-loop {
   text-align: right;
 }
 
-#v-color {
+#v-color,
+#seg-color {
   width: 26px;
   height: 26px;
   padding: 1px;
@@ -213,6 +218,11 @@ button.active-loop {
   border-radius: 5px;
   padding: 2px 4px;
   margin: -2px -4px;
+}
+
+.list-selected {
+  background: rgba(60, 130, 255, 0.12);
+  border-radius: 4px;
 }
 
 .v-edit-color {

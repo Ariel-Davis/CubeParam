@@ -106,15 +106,13 @@ function getProjectionState() {
   const z     = (displayMode === 'B') ? cToZ(controlPt) : controlPt;
   let vecs    = (paramMode === 'u3') ? paramU3(z)   : paramDiag(z);
   let heights = (paramMode === 'u3') ? heightsU3(z) : heightsDiag(z);
-  if (displayMode === 'B') {
-    const r2 = z.re * z.re + z.im * z.im;
-    const s  = paramMode === 'diag' ? (1 + r2) / SQRT12 : (1 + r2) / 2;
-    if (s > 1e-10) {
-      vecs    = vecs.map(u => u.scale(1 / s));
-      heights = heights.map(h => h / s);
-    }
+  const r2    = z.re * z.re + z.im * z.im;
+  const s     = paramMode === 'diag' ? (1 + r2) / SQRT12 : (1 + r2) / 2;
+  if (displayMode === 'B' && s > 1e-10) {
+    vecs    = vecs.map(u => u.scale(1 / s));
+    heights = heights.map(h => h / s);
   }
-  return { vecs, heights };
+  return { vecs, heights, s };
 }
 
 // ─── Application state ────────────────────────────────────────────────────────
@@ -123,8 +121,11 @@ let paramMode   = 'u3';
 let displayMode = 'A';
 let controlPt   = new C(0.5, 0.3);
 let dragging    = false;
-let userScale   = 1.0;
-let showAxes    = true;
+let userScale      = 1.0;
+let showAxes       = true;
+let perspectiveOn  = false;
+let perspectiveP   = 0;      // p = 1/F ∈ [0, 1]; 0 = orthographic, 1 = F at distance 1
+let clipBehind     = true;   // skip vertices/segments beyond the focal plane
 
 // ─── Object system state ──────────────────────────────────────────────────────
 
@@ -133,7 +134,9 @@ let nextVertexId     = 0;
 let segments         = [];
 let nextSegmentId    = 0;
 let selectedVertexIds = new Set();
-let segmentMode      = 'off';     // 'off' | 'on' | 'on++'
+let segmentMode       = 'off';     // 'off' | 'on' | 'on++'
+let focusedVertexId   = null;      // vertex id highlighted in the list (canvas click)
+let selectedSegmentId = null;      // segment id highlighted in the list (canvas click)
 let editingVertexId        = null;  // id of vertex currently in edit mode, or null
 let editingOriginal        = null;  // captureState() snapshot taken on vertex edit entry
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
@@ -168,6 +171,8 @@ function restoreState(state) {
   vertices          = state.vertices;
   segments          = state.segments;
   selectedVertexIds = state.selectedVertexIds;
+  focusedVertexId   = null;
+  selectedSegmentId = null;
   renderVertexList();
   renderSegmentList();
   draw();
@@ -309,44 +314,94 @@ function drawAxes(vecs, scale) {
   }
 }
 
-function drawSegments(vecs, heights, scale) {
+// Maps the slider parameter p ∈ [0,1] to focal distance F > 0.
+// p=0 → F=∞ (orthographic); p=1 → F=1 (most extreme).
+// Replace this function if a different p↦F curve is preferred.
+function perspPtoF(p) {
+  return 1 / p;   // current mapping: p = 1/F
+}
+
+// Applies perspective correction to a projected 2D point.
+// normS is the frame normalization factor s from getProjectionState().
+// Returns { pt: corrected C, ok: bool }; ok=false means skip this point.
+function applyPerspective(pt, depth, normS) {
+  if (!perspectiveOn) return { pt, ok: true };
+  const h = displayMode === 'A' ? depth / normS : depth;
+  const F = perspPtoF(perspectiveP);
+  const d = 1 - h / F;   // = 1 - p·h when F=1/p; Infinity case: h/∞=0 → d=1
+  if (clipBehind && d <= 0) return { pt: null, ok: false };
+  return { pt: pt.scale(1 / d), ok: true };
+}
+
+function drawSegments(vecs, heights, scale, normS) {
   for (const seg of segments) {
     if (!seg.visible) continue;
     const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
     const v2 = vertices.find(v => v.id === seg.vertexIds[1]);
     if (!v1 || !v2) continue;
-    const p1 = toScreen(projectPoint(v1.coords, vecs, heights).pt, scale);
-    const p2 = toScreen(projectPoint(v2.coords, vecs, heights).pt, scale);
+    const r1 = projectPoint(v1.coords, vecs, heights);
+    const r2 = projectPoint(v2.coords, vecs, heights);
+    const a1 = applyPerspective(r1.pt, r1.depth, normS);
+    const a2 = applyPerspective(r2.pt, r2.depth, normS);
+    if (!a1.ok || !a2.ok) continue;
+    const p1 = toScreen(a1.pt, scale);
+    const p2 = toScreen(a2.pt, scale);
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
+    if (seg.id === selectedSegmentId) {
+      ctx.strokeStyle = 'rgba(30,100,220,0.28)';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
     ctx.strokeStyle = seg.color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = seg.id === selectedSegmentId ? 2.5 : 1.5;
     ctx.stroke();
     ctx.restore();
   }
 }
 
-function drawVertices(vecs, heights, scale) {
+function drawVertices(vecs, heights, scale, normS) {
   for (const v of vertices) {
     if (!v.visible) continue;
-    const { pt } = projectPoint(v.coords, vecs, heights);
-    const s = toScreen(pt, scale);
+    const { pt, depth } = projectPoint(v.coords, vecs, heights);
+    const { pt: ppt, ok } = applyPerspective(pt, depth, normS);
+    if (!ok) continue;
+    const scr = toScreen(ppt, scale);
 
-    if (selectedVertexIds.has(v.id)) {
+    if (selectedVertexIds.has(v.id) && segmentMode !== 'off') {
+      // Rim: crisp ring(s) to signal segment-creation selection
       ctx.save();
       ctx.beginPath();
-      ctx.arc(s.x, s.y, 9, 0, 2 * Math.PI);
+      ctx.arc(scr.x, scr.y, 9, 0, 2 * Math.PI);
       ctx.strokeStyle = 'rgba(30, 100, 220, 0.90)';
       ctx.lineWidth = 2;
       ctx.stroke();
+      if (segmentMode === 'on++') {
+        ctx.beginPath();
+        ctx.arc(scr.x, scr.y, 14, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(30, 100, 220, 0.50)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (selectedVertexIds.has(v.id) || v.id === focusedVertexId) {
+      // No rim: soft filled glow — either primed selection in off mode, or passive focus
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(scr.x, scr.y, 11, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(60, 130, 255, 0.20)';
+      ctx.fill();
       ctx.restore();
     }
 
     ctx.save();
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 5, 0, 2 * Math.PI);
+    ctx.arc(scr.x, scr.y, 5, 0, 2 * Math.PI);
     ctx.fillStyle = v.color;
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.25)';
@@ -358,7 +413,7 @@ function drawVertices(vecs, heights, scale) {
       ctx.save();
       ctx.font = '11px sans-serif';
       ctx.fillStyle = v.color;
-      ctx.fillText(v.name, s.x + 9, s.y - 7);
+      ctx.fillText(v.name, scr.x + 9, scr.y - 7);
       ctx.restore();
     }
   }
@@ -379,13 +434,13 @@ function drawControlPoint(scale) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const base              = getBaseScale();
-  const display           = getDisplayScale();
-  const { vecs, heights } = getProjectionState();
+  const base                 = getBaseScale();
+  const display              = getDisplayScale();
+  const { vecs, heights, s } = getProjectionState();
   if (displayMode === 'B') drawDiskBoundary(base);
   if (showAxes) drawAxes(vecs, display);
-  drawSegments(vecs, heights, display);
-  drawVertices(vecs, heights, display);
+  drawSegments(vecs, heights, display, s);
+  drawVertices(vecs, heights, display, s);
   drawControlPoint(base);
 }
 
@@ -418,7 +473,7 @@ canvas.addEventListener('pointerdown', e => {
 
   if (Math.hypot(px - ctrlPt.x, py - ctrlPt.y) <= hitRadius) {
     dragging = true;
-  } else if (segmentMode !== 'off') {
+  } else {
     pointerDownData = { px, py, pointerType: e.pointerType };
   }
 });
@@ -445,34 +500,84 @@ window.addEventListener('pointercancel', () => {
   pointerDownData = null;
 });
 
-// ─── Canvas click → vertex selection ─────────────────────────────────────────
+// ─── Canvas click → vertex / segment focus and selection ─────────────────────
+
+function distToSegmentPx(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq === 0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+  return Math.hypot(px - (ax + t*dx), py - (ay + t*dy));
+}
 
 function handleCanvasClick(px, py, pointerType) {
-  const display           = getDisplayScale();
-  const { vecs, heights } = getProjectionState();
+  const display              = getDisplayScale();
+  const { vecs, heights, s } = getProjectionState();
   const hitR = pointerType === 'touch' ? 28 : 14;
 
+  // Vertex hit test (perspective-corrected)
   for (const v of vertices) {
     if (!v.visible) continue;
-    const { pt } = projectPoint(v.coords, vecs, heights);
-    const s = toScreen(pt, display);
-    if (Math.hypot(px - s.x, py - s.y) <= hitR) {
-      if (selectedVertexIds.has(v.id)) {
-        selectedVertexIds.delete(v.id);
+    const { pt, depth } = projectPoint(v.coords, vecs, heights);
+    const { pt: ppt, ok } = applyPerspective(pt, depth, s);
+    if (!ok) continue;
+    const scr = toScreen(ppt, display);
+    if (Math.hypot(px - scr.x, py - scr.y) <= hitR) {
+      if (segmentMode !== 'off') {
+        if (selectedVertexIds.has(v.id)) selectedVertexIds.delete(v.id);
+        else selectedVertexIds.add(v.id);
+        checkSelectionComplete();
       } else {
-        selectedVertexIds.add(v.id);
+        // Off mode: single-vertex priming — replace any prior selection
+        if (selectedVertexIds.has(v.id)) selectedVertexIds.delete(v.id);
+        else { selectedVertexIds.clear(); selectedVertexIds.add(v.id); }
       }
-      checkSelectionComplete();
+      focusedVertexId   = v.id;
+      selectedSegmentId = null;
+      renderVertexList();
+      renderSegmentList();
       draw();
       return;
     }
   }
+
+  // Segment hit test (perpendicular distance to screen-space line)
+  for (const seg of segments) {
+    if (!seg.visible) continue;
+    const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
+    const v2 = vertices.find(v => v.id === seg.vertexIds[1]);
+    if (!v1 || !v2) continue;
+    const r1 = projectPoint(v1.coords, vecs, heights);
+    const r2 = projectPoint(v2.coords, vecs, heights);
+    const a1 = applyPerspective(r1.pt, r1.depth, s);
+    const a2 = applyPerspective(r2.pt, r2.depth, s);
+    if (!a1.ok || !a2.ok) continue;
+    const p1 = toScreen(a1.pt, display);
+    const p2 = toScreen(a2.pt, display);
+    if (distToSegmentPx(px, py, p1.x, p1.y, p2.x, p2.y) <= hitR) {
+      if (segmentMode !== 'off') return;  // give user another shot at a vertex
+      selectedSegmentId = seg.id === selectedSegmentId ? null : seg.id;
+      focusedVertexId   = null;
+      renderVertexList();
+      renderSegmentList();
+      draw();
+      return;
+    }
+  }
+
+  // Empty space: clear all focus; also clear primed vertex selection in off mode
+  focusedVertexId   = null;
+  selectedSegmentId = null;
+  if (segmentMode === 'off') selectedVertexIds.clear();
+  renderVertexList();
+  renderSegmentList();
+  draw();
 }
 
 function checkSelectionComplete() {
   if (selectedVertexIds.size < 2) return;
   const [id1, id2] = [...selectedVertexIds];
-  const color = DEFAULT_COLOR;
+  const color = document.getElementById('seg-color').value;
   snapshot();
   segments.push({ id: nextSegmentId++, vertexIds: [id1, id2], color, visible: true });
   selectedVertexIds.clear();
@@ -638,6 +743,10 @@ function renderVertexList() {
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
+      if (selectedVertexIds.has(v.id) || v.id === focusedVertexId) {
+        entry.classList.add('list-selected');
+      }
+
       const swatch = document.createElement('span');
       swatch.className = 'v-swatch';
       swatch.style.background = v.color;
@@ -692,6 +801,8 @@ function renderVertexList() {
         segments = segments.filter(s => !s.vertexIds.includes(v.id));
         vertices = vertices.filter(u => u.id !== v.id);
         selectedVertexIds.delete(v.id);
+        if (focusedVertexId === v.id) focusedVertexId = null;
+        if (segments.every(s => s.id !== selectedSegmentId)) selectedSegmentId = null;
         renderVertexList();
         renderSegmentList();
         draw();
@@ -701,6 +812,7 @@ function renderVertexList() {
     }
 
     list.appendChild(entry);
+    if (v.id === focusedVertexId) entry.scrollIntoView({ block: 'nearest' });
   }
 }
 
@@ -810,6 +922,8 @@ function renderSegmentList() {
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
+      if (seg.id === selectedSegmentId) entry.classList.add('list-selected');
+
       const swatch = document.createElement('span');
       swatch.className = 's-swatch';
       swatch.style.background = seg.color;
@@ -845,6 +959,7 @@ function renderSegmentList() {
       del.addEventListener('click', () => {
         snapshot();
         segments = segments.filter(s => s.id !== seg.id);
+        if (selectedSegmentId === seg.id) selectedSegmentId = null;
         renderSegmentList();
         draw();
       });
@@ -853,6 +968,7 @@ function renderSegmentList() {
     }
 
     list.appendChild(entry);
+    if (seg.id === selectedSegmentId) entry.scrollIntoView({ block: 'nearest' });
   }
 }
 
@@ -860,8 +976,10 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   if      (segmentMode === 'off')  segmentMode = 'on';
   else if (segmentMode === 'on')   segmentMode = 'on++';
   else                             segmentMode = 'off';
-  if (segmentMode === 'off') selectedVertexIds.clear();
+  if (segmentMode !== 'off') selectedSegmentId = null;
   updateSegmentButton();
+  renderVertexList();
+  renderSegmentList();
   draw();
 });
 
@@ -885,6 +1003,43 @@ window.addEventListener('keydown', e => {
     if (e.key === 'z' &&  e.shiftKey) { e.preventDefault(); redo(); }
     if (e.key === 'y')                { e.preventDefault(); redo(); }
   }
+});
+
+// ─── Perspective controls ─────────────────────────────────────────────────────
+
+function updatePerspectiveUI() {
+  document.getElementById('btn-perspective').classList.toggle('active', perspectiveOn);
+  const show = perspectiveOn ? '' : 'none';
+  document.getElementById('persp-row').style.display = show;
+  document.getElementById('clip-row').style.display  = show;
+}
+
+document.getElementById('btn-perspective').addEventListener('click', () => {
+  perspectiveOn = !perspectiveOn;
+  updatePerspectiveUI();
+  draw();
+});
+
+const sliderPersp = document.getElementById('slider-persp');
+const inputPersp  = document.getElementById('input-persp');
+
+function applyPerspParam(value) {
+  perspectiveP      = Math.max(0, Math.min(1, value));
+  sliderPersp.value = perspectiveP;
+  inputPersp.value  = +perspectiveP.toFixed(4);
+  draw();
+}
+
+sliderPersp.addEventListener('input',  () => applyPerspParam(parseFloat(sliderPersp.value)));
+inputPersp.addEventListener('change',  () => {
+  const v = parseFloat(inputPersp.value);
+  if (!isNaN(v)) applyPerspParam(v);
+});
+
+document.getElementById('btn-clip').addEventListener('click', () => {
+  clipBehind = !clipBehind;
+  document.getElementById('btn-clip').classList.toggle('active', clipBehind);
+  draw();
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

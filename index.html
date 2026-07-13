@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -31,6 +31,19 @@
         <span class="label">axes</span>
         <button id="btn-axes" class="active">show</button>
       </div>
+      <div class="toggle-group">
+        <span class="label">persp</span>
+        <button id="btn-perspective">on</button>
+      </div>
+      <div class="toggle-group" id="persp-row" style="display:none">
+        <input type="range"  id="slider-persp" min="0" max="1" step="0.001" value="0">
+        <span class="label" id="persp-label">1/F =</span>
+        <input type="number" id="input-persp"  value="0" step="0.001" min="0" max="1">
+      </div>
+      <div class="toggle-group" id="clip-row" style="display:none">
+        <span class="label">clip</span>
+        <button id="btn-clip" class="active">behind</button>
+      </div>
       <div class="section-divider"></div>
       <div class="toggle-group">
         <span class="label"></span>
@@ -51,12 +64,13 @@
       <div class="section-divider"></div>
       <div class="toggle-group">
         <span class="label">create</span>
+        <input type="color" id="seg-color" value="#4d4d4d">
         <button id="btn-segment">segment</button>
       </div>
       <div id="segment-list"></div>
     </div>
   </div>
 
-  <script src="main.js?v=5"></script>
+  <script src="main.js?v=8"></script>
 </body>
 </html>
