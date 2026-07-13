@@ -127,6 +127,7 @@ let perspectiveOn  = false;
 let perspectiveP   = 0;      // p = 1/F ∈ [0, 1]; 0 = orthographic, 1 = F at distance 1
 let clipBehind     = true;   // skip vertices/segments beyond the focal plane
 let perspScaleNodes = false; // scale vertex radius by perspective depth factor
+let perspScaleSegs  = false; // taper segment width by perspective depth factor
 
 // ─── Object system state ──────────────────────────────────────────────────────
 
@@ -355,20 +356,48 @@ function drawSegments(vecs, heights, scale, normS) {
     const p2 = toScreen(a2.pt, scale);
     const w = seg.lineWidth ?? 1.5;
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    if (seg.id === selectedSegmentId) {
-      ctx.strokeStyle = 'rgba(30,100,220,0.28)';
-      ctx.lineWidth = w + 6;
-      ctx.stroke();
+    if (perspScaleSegs) {
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.5) { ctx.restore(); continue; }
+      const px = -dy / len, py = dx / len;   // unit perpendicular
+      const hw1 = Math.min(w * a1.factor / 2, 10);
+      const hw2 = Math.min(w * a2.factor / 2, 10);
+      if (seg.id === selectedSegmentId) {
+        const e = 3;
+        ctx.beginPath();
+        ctx.moveTo(p1.x + px*(hw1+e), p1.y + py*(hw1+e));
+        ctx.lineTo(p2.x + px*(hw2+e), p2.y + py*(hw2+e));
+        ctx.lineTo(p2.x - px*(hw2+e), p2.y - py*(hw2+e));
+        ctx.lineTo(p1.x - px*(hw1+e), p1.y - py*(hw1+e));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(30,100,220,0.28)';
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.moveTo(p1.x + px*hw1, p1.y + py*hw1);
+      ctx.lineTo(p2.x + px*hw2, p2.y + py*hw2);
+      ctx.lineTo(p2.x - px*hw2, p2.y - py*hw2);
+      ctx.lineTo(p1.x - px*hw1, p1.y - py*hw1);
+      ctx.closePath();
+      ctx.fillStyle = seg.color;
+      ctx.fill();
+    } else {
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
+      if (seg.id === selectedSegmentId) {
+        ctx.strokeStyle = 'rgba(30,100,220,0.28)';
+        ctx.lineWidth = w + 6;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = seg.id === selectedSegmentId ? w + 1 : w;
+      ctx.stroke();
     }
-    ctx.strokeStyle = seg.color;
-    ctx.lineWidth = seg.id === selectedSegmentId ? w + 1 : w;
-    ctx.stroke();
     ctx.restore();
   }
 }
@@ -1056,6 +1085,7 @@ function updatePerspectiveUI() {
   document.getElementById('persp-row').style.display        = show;
   document.getElementById('clip-row').style.display         = show;
   document.getElementById('scale-nodes-row').style.display  = show;
+  document.getElementById('scale-segs-row').style.display   = show;
 }
 
 document.getElementById('btn-perspective').addEventListener('click', () => {
@@ -1089,6 +1119,12 @@ document.getElementById('btn-clip').addEventListener('click', () => {
 document.getElementById('btn-scale-nodes').addEventListener('click', () => {
   perspScaleNodes = !perspScaleNodes;
   document.getElementById('btn-scale-nodes').classList.toggle('active', perspScaleNodes);
+  draw();
+});
+
+document.getElementById('btn-scale-segs').addEventListener('click', () => {
+  perspScaleSegs = !perspScaleSegs;
+  document.getElementById('btn-scale-segs').classList.toggle('active', perspScaleSegs);
   draw();
 });
 
