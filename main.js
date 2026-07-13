@@ -353,20 +353,21 @@ function drawSegments(vecs, heights, scale, normS) {
     if (!a1.ok || !a2.ok) continue;
     const p1 = toScreen(a1.pt, scale);
     const p2 = toScreen(a2.pt, scale);
+    const w = seg.lineWidth ?? 1.5;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     if (seg.id === selectedSegmentId) {
       ctx.strokeStyle = 'rgba(30,100,220,0.28)';
-      ctx.lineWidth = 8;
+      ctx.lineWidth = w + 6;
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
     }
     ctx.strokeStyle = seg.color;
-    ctx.lineWidth = seg.id === selectedSegmentId ? 2.5 : 1.5;
+    ctx.lineWidth = seg.id === selectedSegmentId ? w + 1 : w;
     ctx.stroke();
     ctx.restore();
   }
@@ -587,9 +588,10 @@ function handleCanvasClick(px, py, pointerType) {
 function checkSelectionComplete() {
   if (selectedVertexIds.size < 2) return;
   const [id1, id2] = [...selectedVertexIds];
-  const color = document.getElementById('seg-color').value;
+  const color     = document.getElementById('seg-color').value;
+  const lineWidth = Math.max(0.5, parseFloat(document.getElementById('seg-width').value) || 1.5);
   snapshot();
-  segments.push({ id: nextSegmentId++, vertexIds: [id1, id2], color, visible: true });
+  segments.push({ id: nextSegmentId++, vertexIds: [id1, id2], color, lineWidth, visible: true });
   selectedVertexIds.clear();
   if (segmentMode === 'on') segmentMode = 'off';
   updateSegmentButton();
@@ -888,7 +890,7 @@ function cancelSegmentEdit() {
   if (editingSegmentOriginal) {
     const orig = editingSegmentOriginal.segments.find(s => s.id === editingSegmentId);
     const seg  = segments.find(s => s.id === editingSegmentId);
-    if (orig && seg) seg.color = orig.color;
+    if (orig && seg) { seg.color = orig.color; seg.lineWidth = orig.lineWidth ?? 1.5; }
   }
   editingSegmentId       = null;
   editingSegmentOriginal = null;
@@ -932,6 +934,20 @@ function renderSegmentList() {
       label.className = 's-name';
       label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
 
+      const widthInp = document.createElement('input');
+      widthInp.type = 'number';
+      widthInp.value = seg.lineWidth ?? 1.5;
+      widthInp.className = 'v-coord';
+      widthInp.style.width = '38px';
+      widthInp.min = '0.5';
+      widthInp.step = '0.5';
+      widthInp.title = 'Line width';
+      widthInp.addEventListener('blur', () => {
+        const n = parseFloat(widthInp.value);
+        if (!isNaN(n) && n >= 0.5) { seg.lineWidth = n; draw(); }
+      });
+      widthInp.addEventListener('keydown', e => { if (e.key === 'Enter') commitSegmentEdit(); });
+
       const commitBtn = document.createElement('button');
       commitBtn.textContent = '✓';
       commitBtn.className = 'v-toggle';
@@ -944,7 +960,7 @@ function renderSegmentList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelSegmentEdit);
 
-      entry.append(colorInput, label, commitBtn, cancelBtn);
+      entry.append(colorInput, label, widthInp, commitBtn, cancelBtn);
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
@@ -953,6 +969,7 @@ function renderSegmentList() {
       const swatch = document.createElement('span');
       swatch.className = 's-swatch';
       swatch.style.background = seg.color;
+      swatch.style.height = `${Math.min(Math.max(seg.lineWidth ?? 1.5, 1), 8)}px`;
 
       const label = document.createElement('span');
       label.className = 's-name';
@@ -1074,6 +1091,7 @@ document.getElementById('btn-scale-nodes').addEventListener('click', () => {
   document.getElementById('btn-scale-nodes').classList.toggle('active', perspScaleNodes);
   draw();
 });
+
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 

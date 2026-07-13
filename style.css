@@ -158,7 +158,8 @@ button.active-loop {
   text-align: right;
 }
 
-#v-radius {
+#v-radius,
+#seg-width {
   width: 38px;
 }
 
