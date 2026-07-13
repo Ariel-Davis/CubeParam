@@ -158,6 +158,10 @@ button.active-loop {
   text-align: right;
 }
 
+#v-radius {
+  width: 38px;
+}
+
 #v-color,
 #seg-color {
   width: 26px;

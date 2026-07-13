@@ -126,6 +126,7 @@ let showAxes       = true;
 let perspectiveOn  = false;
 let perspectiveP   = 0;      // p = 1/F ∈ [0, 1]; 0 = orthographic, 1 = F at distance 1
 let clipBehind     = true;   // skip vertices/segments beyond the focal plane
+let perspScaleNodes = false; // scale vertex radius by perspective depth factor
 
 // ─── Object system state ──────────────────────────────────────────────────────
 
@@ -168,17 +169,22 @@ function snapshot() {
 }
 
 function restoreState(state) {
-  vertices          = state.vertices;
-  segments          = state.segments;
-  selectedVertexIds = state.selectedVertexIds;
-  focusedVertexId   = null;
-  selectedSegmentId = null;
+  vertices               = state.vertices;
+  segments               = state.segments;
+  selectedVertexIds      = state.selectedVertexIds;
+  editingVertexId        = null;
+  editingOriginal        = null;
+  editingSegmentId       = null;
+  editingSegmentOriginal = null;
+  focusedVertexId        = null;
+  selectedSegmentId      = null;
   renderVertexList();
   renderSegmentList();
   draw();
 }
 
 function undo() {
+  if (editingVertexId !== null || editingSegmentId !== null) return;
   if (undoStack.length === 0) return;
   redoStack.push(captureState());
   restoreState(undoStack.pop());
@@ -186,6 +192,7 @@ function undo() {
 }
 
 function redo() {
+  if (editingVertexId !== null || editingSegmentId !== null) return;
   if (redoStack.length === 0) return;
   undoStack.push(captureState());
   restoreState(redoStack.pop());
@@ -325,12 +332,12 @@ function perspPtoF(p) {
 // normS is the frame normalization factor s from getProjectionState().
 // Returns { pt: corrected C, ok: bool }; ok=false means skip this point.
 function applyPerspective(pt, depth, normS) {
-  if (!perspectiveOn) return { pt, ok: true };
+  if (!perspectiveOn) return { pt, ok: true, factor: 1 };
   const h = displayMode === 'A' ? depth / normS : depth;
   const F = perspPtoF(perspectiveP);
   const d = 1 - h / F;   // = 1 - p·h when F=1/p; Infinity case: h/∞=0 → d=1
-  if (clipBehind && d <= 0) return { pt: null, ok: false };
-  return { pt: pt.scale(1 / d), ok: true };
+  if (clipBehind && d <= 0) return { pt: null, ok: false, factor: 1 };
+  return { pt: pt.scale(1 / d), ok: true, factor: 1 / d };
 }
 
 function drawSegments(vecs, heights, scale, normS) {
@@ -369,21 +376,24 @@ function drawVertices(vecs, heights, scale, normS) {
   for (const v of vertices) {
     if (!v.visible) continue;
     const { pt, depth } = projectPoint(v.coords, vecs, heights);
-    const { pt: ppt, ok } = applyPerspective(pt, depth, normS);
+    const { pt: ppt, ok, factor } = applyPerspective(pt, depth, normS);
     if (!ok) continue;
     const scr = toScreen(ppt, scale);
+
+    const baseR = v.radius ?? 5;
+    const r     = perspScaleNodes ? Math.min(baseR * factor, 30) : baseR;
 
     if (selectedVertexIds.has(v.id) && segmentMode !== 'off') {
       // Rim: crisp ring(s) to signal segment-creation selection
       ctx.save();
       ctx.beginPath();
-      ctx.arc(scr.x, scr.y, 9, 0, 2 * Math.PI);
+      ctx.arc(scr.x, scr.y, r + 4, 0, 2 * Math.PI);
       ctx.strokeStyle = 'rgba(30, 100, 220, 0.90)';
       ctx.lineWidth = 2;
       ctx.stroke();
       if (segmentMode === 'on++') {
         ctx.beginPath();
-        ctx.arc(scr.x, scr.y, 14, 0, 2 * Math.PI);
+        ctx.arc(scr.x, scr.y, r + 9, 0, 2 * Math.PI);
         ctx.strokeStyle = 'rgba(30, 100, 220, 0.50)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
@@ -393,7 +403,7 @@ function drawVertices(vecs, heights, scale, normS) {
       // No rim: soft filled glow — either primed selection in off mode, or passive focus
       ctx.save();
       ctx.beginPath();
-      ctx.arc(scr.x, scr.y, 11, 0, 2 * Math.PI);
+      ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
       ctx.fillStyle = 'rgba(60, 130, 255, 0.20)';
       ctx.fill();
       ctx.restore();
@@ -401,7 +411,7 @@ function drawVertices(vecs, heights, scale, normS) {
 
     ctx.save();
     ctx.beginPath();
-    ctx.arc(scr.x, scr.y, 5, 0, 2 * Math.PI);
+    ctx.arc(scr.x, scr.y, r, 0, 2 * Math.PI);
     ctx.fillStyle = v.color;
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.25)';
@@ -413,7 +423,7 @@ function drawVertices(vecs, heights, scale, normS) {
       ctx.save();
       ctx.font = '11px sans-serif';
       ctx.fillStyle = v.color;
-      ctx.fillText(v.name, scr.x + 9, scr.y - 7);
+      ctx.fillText(v.name, scr.x + r + 4, scr.y - 7);
       ctx.restore();
     }
   }
@@ -674,6 +684,7 @@ function cancelEdit() {
       v.name      = orig.name;
       v.coords    = [...orig.coords];
       v.color     = orig.color;
+      v.radius    = orig.radius ?? 5;
       v.visible   = orig.visible;
       v.showLabel = orig.showLabel;
     }
@@ -727,6 +738,20 @@ function renderVertexList() {
         return inp;
       });
 
+      const radiusInp = document.createElement('input');
+      radiusInp.type = 'number';
+      radiusInp.value = v.radius ?? 5;
+      radiusInp.className = 'v-coord';
+      radiusInp.style.width = '38px';
+      radiusInp.min = '1';
+      radiusInp.step = '0.5';
+      radiusInp.title = 'Node radius';
+      radiusInp.addEventListener('blur', () => {
+        const n = parseFloat(radiusInp.value);
+        if (!isNaN(n) && n >= 1) { v.radius = n; draw(); }
+      });
+      radiusInp.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
+
       const commitBtn = document.createElement('button');
       commitBtn.textContent = '✓';
       commitBtn.className = 'v-toggle';
@@ -739,7 +764,7 @@ function renderVertexList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelEdit);
 
-      entry.append(colorInput, nameInput, ...coordInputs, commitBtn, cancelBtn);
+      entry.append(colorInput, nameInput, ...coordInputs, radiusInp, commitBtn, cancelBtn);
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
@@ -819,12 +844,13 @@ function renderVertexList() {
 function addVertexFromInputs() {
   const nameInput = document.getElementById('v-name');
   const name  = nameInput.value.trim() || `P${nextVertexId}`;
-  const a1    = parseFloat(document.getElementById('v-a1').value) || 0;
-  const a2    = parseFloat(document.getElementById('v-a2').value) || 0;
-  const a3    = parseFloat(document.getElementById('v-a3').value) || 0;
-  const color = document.getElementById('v-color').value;
+  const a1     = parseFloat(document.getElementById('v-a1').value) || 0;
+  const a2     = parseFloat(document.getElementById('v-a2').value) || 0;
+  const a3     = parseFloat(document.getElementById('v-a3').value) || 0;
+  const color  = document.getElementById('v-color').value;
+  const radius = Math.max(1, parseFloat(document.getElementById('v-radius').value) || 5);
   snapshot();
-  vertices.push({ id: nextVertexId++, name, coords: [a1, a2, a3], color, visible: true, showLabel: true });
+  vertices.push({ id: nextVertexId++, name, coords: [a1, a2, a3], color, radius, visible: true, showLabel: true });
   nameInput.value = '';
   renderVertexList();
   draw();
@@ -1010,8 +1036,9 @@ window.addEventListener('keydown', e => {
 function updatePerspectiveUI() {
   document.getElementById('btn-perspective').classList.toggle('active', perspectiveOn);
   const show = perspectiveOn ? '' : 'none';
-  document.getElementById('persp-row').style.display = show;
-  document.getElementById('clip-row').style.display  = show;
+  document.getElementById('persp-row').style.display        = show;
+  document.getElementById('clip-row').style.display         = show;
+  document.getElementById('scale-nodes-row').style.display  = show;
 }
 
 document.getElementById('btn-perspective').addEventListener('click', () => {
@@ -1039,6 +1066,12 @@ inputPersp.addEventListener('change',  () => {
 document.getElementById('btn-clip').addEventListener('click', () => {
   clipBehind = !clipBehind;
   document.getElementById('btn-clip').classList.toggle('active', clipBehind);
+  draw();
+});
+
+document.getElementById('btn-scale-nodes').addEventListener('click', () => {
+  perspScaleNodes = !perspScaleNodes;
+  document.getElementById('btn-scale-nodes').classList.toggle('active', perspScaleNodes);
   draw();
 });
 
