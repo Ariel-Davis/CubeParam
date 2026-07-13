@@ -162,6 +162,7 @@ button.active-loop {
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 #vertex-list {
@@ -205,6 +206,24 @@ button.active-loop {
   padding: 2px 6px;
   font-size: 11px;
   min-width: 0;
+}
+
+.vertex-editing {
+  background: rgba(60, 130, 255, 0.06);
+  border-radius: 5px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.v-edit-color {
+  width: 24px;
+  height: 24px;
+  padding: 1px;
+  background: #f0f0f0;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 #segment-list {

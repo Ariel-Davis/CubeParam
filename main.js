@@ -134,6 +134,10 @@ let segments         = [];
 let nextSegmentId    = 0;
 let selectedVertexIds = new Set();
 let segmentMode      = 'off';     // 'off' | 'on' | 'on++'
+let editingVertexId        = null;  // id of vertex currently in edit mode, or null
+let editingOriginal        = null;  // captureState() snapshot taken on vertex edit entry
+let editingSegmentId       = null;  // id of segment currently in edit mode, or null
+let editingSegmentOriginal = null;  // captureState() snapshot taken on segment edit entry
 
 // ─── Undo / redo ──────────────────────────────────────────────────────────────
 //
@@ -184,8 +188,11 @@ function redo() {
 }
 
 function updateUndoButtons() {
-  document.getElementById('btn-undo').disabled = undoStack.length === 0;
-  document.getElementById('btn-redo').disabled = redoStack.length === 0;
+  const inEdit = editingVertexId !== null || editingSegmentId !== null;
+  document.getElementById('btn-undo').disabled       = inEdit || undoStack.length === 0;
+  document.getElementById('btn-redo').disabled       = inEdit || redoStack.length === 0;
+  document.getElementById('btn-add-vertex').disabled = inEdit;
+  document.getElementById('btn-segment').disabled    = inEdit;
 }
 
 // ─── Object math ──────────────────────────────────────────────────────────────
@@ -241,9 +248,10 @@ function drawDiskBoundary(scale) {
   ctx.restore();
 }
 
-const AXIS_COLORS  = ['#cc3333', '#228822', '#2255cc'];  // x, y, z
-const AXIS_LABELS  = ['x', 'y', 'z'];
-const ARROW_HEAD   = 12;  // arrowhead length in pixels
+const AXIS_COLORS   = ['#cc3333', '#228822', '#2255cc'];  // x, y, z
+const AXIS_LABELS   = ['x', 'y', 'z'];
+const ARROW_HEAD    = 12;   // arrowhead length in pixels
+const DEFAULT_COLOR = '#4d4d4d';  // 30% grey, used for new vertices and segments
 
 function drawAxes(vecs, scale) {
   const ox = cx(), oy = cy();
@@ -464,8 +472,7 @@ function handleCanvasClick(px, py, pointerType) {
 function checkSelectionComplete() {
   if (selectedVertexIds.size < 2) return;
   const [id1, id2] = [...selectedVertexIds];
-  const v1    = vertices.find(v => v.id === id1);
-  const color = v1 ? v1.color : 'rgba(200,200,200,0.85)';
+  const color = DEFAULT_COLOR;
   snapshot();
   segments.push({ id: nextSegmentId++, vertexIds: [id1, id2], color, visible: true });
   selectedVertexIds.clear();
@@ -534,65 +541,165 @@ document.getElementById('btn-axes').addEventListener('click', () => {
   draw();
 });
 
+// ─── Vertex edit mode ─────────────────────────────────────────────────────────
+
+function enterEditMode(id) {
+  editingVertexId = id;
+  editingOriginal = captureState();
+  updateUndoButtons();
+  renderVertexList();
+}
+
+function commitEdit() {
+  undoStack.push(editingOriginal);
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack       = [];
+  editingVertexId = null;
+  editingOriginal = null;
+  updateUndoButtons();
+  renderVertexList();
+  draw();
+}
+
+function cancelEdit() {
+  if (editingOriginal) {
+    const orig = editingOriginal.vertices.find(u => u.id === editingVertexId);
+    const v    = vertices.find(u => u.id === editingVertexId);
+    if (orig && v) {
+      v.name      = orig.name;
+      v.coords    = [...orig.coords];
+      v.color     = orig.color;
+      v.visible   = orig.visible;
+      v.showLabel = orig.showLabel;
+    }
+  }
+  editingVertexId = null;
+  editingOriginal = null;
+  updateUndoButtons();
+  renderVertexList();
+  draw();
+}
+
 // ─── Vertex controls ──────────────────────────────────────────────────────────
 
 function renderVertexList() {
-  const list = document.getElementById('vertex-list');
+  const list   = document.getElementById('vertex-list');
   list.innerHTML = '';
+  const inEdit = editingVertexId !== null || editingSegmentId !== null;
+
   for (const v of vertices) {
     const entry = document.createElement('div');
     entry.className = 'vertex-entry';
 
-    const swatch = document.createElement('span');
-    swatch.className = 'v-swatch';
-    swatch.style.background = v.color;
+    if (v.id === editingVertexId) {
+      // ── Edit row ──────────────────────────────────────────────────────────
+      entry.className = 'vertex-entry vertex-editing';
 
-    const name = document.createElement('span');
-    name.className = 'v-name';
-    name.textContent = v.name;
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = v.color;
+      colorInput.className = 'v-edit-color';
+      colorInput.addEventListener('input', () => { v.color = colorInput.value; draw(); });
 
-    const coords = document.createElement('span');
-    coords.className = 'v-coords';
-    coords.textContent = v.coords.map(x => +x.toFixed(2)).join(', ');
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = v.name;
+      nameInput.className = 'v-name-input';
+      nameInput.addEventListener('blur', () => { const n = nameInput.value.trim(); if (n) v.name = n; });
+      nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
 
-    const labelToggle = document.createElement('button');
-    labelToggle.className = 'v-toggle';
-    labelToggle.textContent = 'A';
-    labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
-    labelToggle.style.opacity = v.showLabel ? '1' : '0.3';
-    labelToggle.addEventListener('click', () => {
-      snapshot();
-      v.showLabel = !v.showLabel;
-      renderVertexList();
-      draw();
-    });
+      const coordInputs = v.coords.map((val, i) => {
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.value = val;
+        inp.className = 'v-coord';
+        inp.step = 'any';
+        inp.addEventListener('blur', () => {
+          const n = parseFloat(inp.value);
+          if (!isNaN(n)) { v.coords[i] = n; draw(); }
+        });
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
+        return inp;
+      });
 
-    const toggle = document.createElement('button');
-    toggle.className = 'v-toggle';
-    toggle.textContent = v.visible ? '●' : '○';
-    toggle.title = v.visible ? 'Hide' : 'Show';
-    toggle.addEventListener('click', () => {
-      snapshot();
-      v.visible = !v.visible;
-      renderVertexList();
-      draw();
-    });
+      const commitBtn = document.createElement('button');
+      commitBtn.textContent = '✓';
+      commitBtn.className = 'v-toggle';
+      commitBtn.title = 'Commit changes';
+      commitBtn.addEventListener('click', commitEdit);
 
-    const del = document.createElement('button');
-    del.className = 'v-delete';
-    del.textContent = '×';
-    del.title = 'Delete';
-    del.addEventListener('click', () => {
-      snapshot();
-      segments = segments.filter(s => !s.vertexIds.includes(v.id));
-      vertices = vertices.filter(u => u.id !== v.id);
-      selectedVertexIds.delete(v.id);
-      renderVertexList();
-      renderSegmentList();
-      draw();
-    });
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = '✗';
+      cancelBtn.className = 'v-delete';
+      cancelBtn.title = 'Cancel edit';
+      cancelBtn.addEventListener('click', cancelEdit);
 
-    entry.append(swatch, name, coords, labelToggle, toggle, del);
+      entry.append(colorInput, nameInput, ...coordInputs, commitBtn, cancelBtn);
+
+    } else {
+      // ── Display row ───────────────────────────────────────────────────────
+      const swatch = document.createElement('span');
+      swatch.className = 'v-swatch';
+      swatch.style.background = v.color;
+
+      const name = document.createElement('span');
+      name.className = 'v-name';
+      name.textContent = v.name;
+
+      const coords = document.createElement('span');
+      coords.className = 'v-coords';
+      coords.textContent = v.coords.map(x => +x.toFixed(2)).join(', ');
+
+      const labelToggle = document.createElement('button');
+      labelToggle.className = 'v-toggle';
+      labelToggle.textContent = 'A';
+      labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
+      labelToggle.style.opacity = v.showLabel ? '1' : '0.3';
+      labelToggle.disabled = inEdit;
+      labelToggle.addEventListener('click', () => {
+        snapshot();
+        v.showLabel = !v.showLabel;
+        renderVertexList();
+        draw();
+      });
+
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '✎';
+      editBtn.className = 'v-toggle';
+      editBtn.title = 'Edit';
+      editBtn.disabled = inEdit;
+      editBtn.addEventListener('click', () => enterEditMode(v.id));
+
+      const toggle = document.createElement('button');
+      toggle.className = 'v-toggle';
+      toggle.textContent = v.visible ? '●' : '○';
+      toggle.title = v.visible ? 'Hide' : 'Show';
+      toggle.disabled = inEdit;
+      toggle.addEventListener('click', () => {
+        snapshot();
+        v.visible = !v.visible;
+        renderVertexList();
+        draw();
+      });
+
+      const del = document.createElement('button');
+      del.className = 'v-delete';
+      del.textContent = '×';
+      del.title = 'Delete';
+      del.disabled = inEdit;
+      del.addEventListener('click', () => {
+        snapshot();
+        segments = segments.filter(s => !s.vertexIds.includes(v.id));
+        vertices = vertices.filter(u => u.id !== v.id);
+        selectedVertexIds.delete(v.id);
+        renderVertexList();
+        renderSegmentList();
+        draw();
+      });
+
+      entry.append(swatch, name, coords, labelToggle, editBtn, toggle, del);
+    }
+
     list.appendChild(entry);
   }
 }
@@ -619,6 +726,39 @@ document.getElementById('btn-add-vertex').addEventListener('click', addVertexFro
   });
 });
 
+// ─── Segment edit mode ────────────────────────────────────────────────────────
+
+function enterSegmentEditMode(id) {
+  editingSegmentId       = id;
+  editingSegmentOriginal = captureState();
+  updateUndoButtons();
+  renderSegmentList();
+}
+
+function commitSegmentEdit() {
+  undoStack.push(editingSegmentOriginal);
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack              = [];
+  editingSegmentId       = null;
+  editingSegmentOriginal = null;
+  updateUndoButtons();
+  renderSegmentList();
+  draw();
+}
+
+function cancelSegmentEdit() {
+  if (editingSegmentOriginal) {
+    const orig = editingSegmentOriginal.segments.find(s => s.id === editingSegmentId);
+    const seg  = segments.find(s => s.id === editingSegmentId);
+    if (orig && seg) seg.color = orig.color;
+  }
+  editingSegmentId       = null;
+  editingSegmentOriginal = null;
+  updateUndoButtons();
+  renderSegmentList();
+  draw();
+}
+
 // ─── Segment controls ─────────────────────────────────────────────────────────
 
 function updateSegmentButton() {
@@ -629,8 +769,10 @@ function updateSegmentButton() {
 }
 
 function renderSegmentList() {
-  const list = document.getElementById('segment-list');
+  const list   = document.getElementById('segment-list');
   list.innerHTML = '';
+  const inEdit = editingVertexId !== null || editingSegmentId !== null;
+
   for (const seg of segments) {
     const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
     const v2 = vertices.find(v => v.id === seg.vertexIds[1]);
@@ -638,37 +780,78 @@ function renderSegmentList() {
     const entry = document.createElement('div');
     entry.className = 'segment-entry';
 
-    const swatch = document.createElement('span');
-    swatch.className = 's-swatch';
-    swatch.style.background = seg.color;
+    if (seg.id === editingSegmentId) {
+      // ── Edit row ──────────────────────────────────────────────────────────
+      entry.className = 'segment-entry vertex-editing';
 
-    const label = document.createElement('span');
-    label.className = 's-name';
-    label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = seg.color;
+      colorInput.className = 'v-edit-color';
+      colorInput.addEventListener('input', () => { seg.color = colorInput.value; draw(); });
 
-    const toggle = document.createElement('button');
-    toggle.className = 'v-toggle';
-    toggle.textContent = seg.visible ? '●' : '○';
-    toggle.title = seg.visible ? 'Hide' : 'Show';
-    toggle.addEventListener('click', () => {
-      snapshot();
-      seg.visible = !seg.visible;
-      renderSegmentList();
-      draw();
-    });
+      const label = document.createElement('span');
+      label.className = 's-name';
+      label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
 
-    const del = document.createElement('button');
-    del.className = 'v-delete';
-    del.textContent = '×';
-    del.title = 'Delete';
-    del.addEventListener('click', () => {
-      snapshot();
-      segments = segments.filter(s => s.id !== seg.id);
-      renderSegmentList();
-      draw();
-    });
+      const commitBtn = document.createElement('button');
+      commitBtn.textContent = '✓';
+      commitBtn.className = 'v-toggle';
+      commitBtn.title = 'Commit changes';
+      commitBtn.addEventListener('click', commitSegmentEdit);
 
-    entry.append(swatch, label, toggle, del);
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = '✗';
+      cancelBtn.className = 'v-delete';
+      cancelBtn.title = 'Cancel edit';
+      cancelBtn.addEventListener('click', cancelSegmentEdit);
+
+      entry.append(colorInput, label, commitBtn, cancelBtn);
+
+    } else {
+      // ── Display row ───────────────────────────────────────────────────────
+      const swatch = document.createElement('span');
+      swatch.className = 's-swatch';
+      swatch.style.background = seg.color;
+
+      const label = document.createElement('span');
+      label.className = 's-name';
+      label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
+
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '✎';
+      editBtn.className = 'v-toggle';
+      editBtn.title = 'Edit';
+      editBtn.disabled = inEdit;
+      editBtn.addEventListener('click', () => enterSegmentEditMode(seg.id));
+
+      const toggle = document.createElement('button');
+      toggle.className = 'v-toggle';
+      toggle.textContent = seg.visible ? '●' : '○';
+      toggle.title = seg.visible ? 'Hide' : 'Show';
+      toggle.disabled = inEdit;
+      toggle.addEventListener('click', () => {
+        snapshot();
+        seg.visible = !seg.visible;
+        renderSegmentList();
+        draw();
+      });
+
+      const del = document.createElement('button');
+      del.className = 'v-delete';
+      del.textContent = '×';
+      del.title = 'Delete';
+      del.disabled = inEdit;
+      del.addEventListener('click', () => {
+        snapshot();
+        segments = segments.filter(s => s.id !== seg.id);
+        renderSegmentList();
+        draw();
+      });
+
+      entry.append(swatch, label, editBtn, toggle, del);
+    }
+
     list.appendChild(entry);
   }
 }
