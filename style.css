@@ -333,9 +333,16 @@ button.active-loop {
 }
 
 .expr-input.expr-invalid,
-.v-coord.expr-invalid {
+.v-coord.expr-invalid,
+.v-name-input.expr-invalid,
+.const-name-input.expr-invalid {
   border-color: rgba(200, 50, 50, 0.60);
   background: rgba(255, 220, 220, 0.50);
+}
+
+.v-name.expr-invalid {
+  color: rgba(190, 30, 30, 0.90);
+  font-weight: bold;
 }
 
 #const-list {
