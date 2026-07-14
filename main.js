@@ -128,6 +128,7 @@ let perspectiveP   = 0;      // p = 1/F ∈ [0, 1]; 0 = orthographic, 1 = F at d
 let clipBehind     = true;   // skip vertices/segments beyond the focal plane
 let perspScaleNodes = false; // scale vertex radius by perspective depth factor
 let perspScaleSegs  = false; // taper segment width by perspective depth factor
+let darkMode        = false;
 
 // ─── Object system state ──────────────────────────────────────────────────────
 
@@ -248,11 +249,28 @@ function fromScreen(px, py, scale) {
   return new C((px - cx()) / scale, -(py - cy()) / scale);
 }
 
+// ─── Theme helpers ────────────────────────────────────────────────────────────
+
+function themeColor(hex) {
+  if (!darkMode) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const M = Math.max(r, g, b), m = Math.min(r, g, b);
+  const c = M + m - 255;
+  const cl = x => Math.max(0, Math.min(255, x));
+  return '#' + [cl(r - c), cl(g - c), cl(b - c)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+function darkInk(alpha) {
+  return darkMode ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+}
+
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 
 function drawDiskBoundary(scale) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.strokeStyle = darkInk(0.18);
   ctx.setLineDash([4, 6]);
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -273,7 +291,7 @@ function drawAxes(vecs, scale) {
   ctx.save();
   ctx.beginPath();
   ctx.arc(ox, oy, 3, 0, 2 * Math.PI);
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillStyle = darkInk(0.35);
   ctx.fill();
   ctx.restore();
 
@@ -282,7 +300,7 @@ function drawAxes(vecs, scale) {
     const dx    = tip.x - ox;
     const dy    = tip.y - oy;
     const len   = Math.hypot(dx, dy);
-    const color = AXIS_COLORS[k];
+    const color = themeColor(AXIS_COLORS[k]);
     if (len < 1) continue;
 
     const ux = dx / len, uy = dy / len;   // unit vector toward tip
@@ -380,7 +398,7 @@ function drawSegments(vecs, heights, scale, normS) {
       ctx.lineTo(p2.x - px*hw2, p2.y - py*hw2);
       ctx.lineTo(p1.x - px*hw1, p1.y - py*hw1);
       ctx.closePath();
-      ctx.fillStyle = seg.color;
+      ctx.fillStyle = themeColor(seg.color);
       ctx.fill();
     } else {
       ctx.beginPath();
@@ -394,7 +412,7 @@ function drawSegments(vecs, heights, scale, normS) {
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
       }
-      ctx.strokeStyle = seg.color;
+      ctx.strokeStyle = themeColor(seg.color);
       ctx.lineWidth = seg.id === selectedSegmentId ? w + 1 : w;
       ctx.stroke();
     }
@@ -442,9 +460,9 @@ function drawVertices(vecs, heights, scale, normS) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(scr.x, scr.y, r, 0, 2 * Math.PI);
-    ctx.fillStyle = v.color;
+    ctx.fillStyle = themeColor(v.color);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.strokeStyle = darkInk(0.25);
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
@@ -452,7 +470,7 @@ function drawVertices(vecs, heights, scale, normS) {
     if (v.showLabel) {
       ctx.save();
       ctx.font = '11px sans-serif';
-      ctx.fillStyle = v.color;
+      ctx.fillStyle = themeColor(v.color);
       ctx.fillText(v.name, scr.x + r + 4, scr.y - 7);
       ctx.restore();
     }
@@ -464,9 +482,9 @@ function drawControlPoint(scale) {
   ctx.save();
   ctx.beginPath();
   ctx.arc(pt.x, pt.y, 8, 0, 2 * Math.PI);
-  ctx.fillStyle = 'rgba(255, 200, 60, 0.95)';
+  ctx.fillStyle = darkMode ? 'rgba(195,140,0,0.95)' : 'rgba(255,200,60,0.95)';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.50)';
+  ctx.strokeStyle = darkInk(0.50);
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
@@ -598,6 +616,7 @@ function handleCanvasClick(px, py, pointerType) {
       if (segmentMode !== 'off') return;  // give user another shot at a vertex
       selectedSegmentId = seg.id === selectedSegmentId ? null : seg.id;
       focusedVertexId   = null;
+      selectedVertexIds.clear();
       renderVertexList();
       renderSegmentList();
       draw();
@@ -1128,6 +1147,15 @@ document.getElementById('btn-scale-segs').addEventListener('click', () => {
   draw();
 });
 
+
+// ─── Dark mode ────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-dark').addEventListener('click', () => {
+  darkMode = !darkMode;
+  document.body.classList.toggle('dark-mode', darkMode);
+  document.getElementById('btn-dark').classList.toggle('active', darkMode);
+  draw();
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 

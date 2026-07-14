@@ -9,6 +9,11 @@ body {
   overflow: hidden;
 }
 
+body.dark-mode,
+body.dark-mode canvas {
+  background: #000000;
+}
+
 canvas {
   display: block;
   touch-action: none; /* prevent browser scroll/zoom interfering with pointer events */
@@ -27,10 +32,27 @@ canvas {
   user-select: none;
 }
 
-#btn-toggle-controls {
+#controls-header {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+#btn-toggle-controls,
+#btn-dark {
   padding: 5px 10px;
   font-size: 15px;
   line-height: 1;
+}
+
+body.dark-mode .label {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+body.dark-mode .v-name,
+body.dark-mode .v-coords,
+body.dark-mode .s-name {
+  color: rgba(255, 255, 255, 0.80);
 }
 
 #controls-body {
