@@ -883,6 +883,7 @@ function enterEditMode(id) {
   updateUndoButtons();
   updateSciKeyboard();
   renderVertexList();
+  renderConstList();
 }
 
 function commitEdit() {
@@ -896,6 +897,7 @@ function commitEdit() {
   updateUndoButtons();
   updateSciKeyboard();
   renderVertexList();
+  renderConstList();
   draw();
 }
 
@@ -920,34 +922,40 @@ function cancelEdit() {
   updateUndoButtons();
   updateSciKeyboard();
   renderVertexList();
+  renderConstList();
   draw();
 }
 
 // ─── Science keyboard ─────────────────────────────────────────────────────────
 
 function positionSciKeyboard() {
-  const kbd      = document.getElementById('sci-keyboard');
-  if (kbd.style.display === 'none') return;
-  const omegaBtn = document.getElementById('btn-omega');
-  const wrapper  = document.getElementById('controls-wrapper');
-  if (!omegaBtn || !wrapper) return;
+  const kbd = document.getElementById('sci-keyboard');
+  if (kbd.style.display === 'none' || !activeExprInput) return;
+  const wrapper = document.getElementById('controls-wrapper');
+  if (!wrapper) return;
   const wRect = wrapper.getBoundingClientRect();
-  const oRect = omegaBtn.getBoundingClientRect();
-  const omegaMid = oRect.top - wRect.top + oRect.height / 2;
-  kbd.style.marginTop = (omegaMid - kbd.offsetHeight / 2) + 'px';
+  const iRect = activeExprInput.getBoundingClientRect();
+  const inputMid = iRect.top - wRect.top + iRect.height / 2;
+  kbd.style.marginTop = (inputMid - kbd.offsetHeight / 2) + 'px';
 }
 
 
 function updateSciKeyboard() {
-  const kbd      = document.getElementById('sci-keyboard');
-  const inEdit   = editingVertexId !== null;
-  kbd.style.display = (inEdit && omegaMode !== 'off') ? '' : 'none';
-  const omegaBtn = document.getElementById('btn-omega');
-  if (omegaBtn) {
-    omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
-    omegaBtn.className = 'v-toggle' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
+  const kbd  = document.getElementById('sci-keyboard');
+  const show = omegaMode !== 'off' && activeExprInput !== null;
+  kbd.style.display = show ? '' : 'none';
+  const omegaText  = omegaMode === 'on++' ? 'Ω+' : 'Ω';
+  const omegaSuffix = omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '';
+  const vertexOmega = document.getElementById('btn-omega');
+  if (vertexOmega) {
+    vertexOmega.textContent = omegaText;
+    vertexOmega.className   = 'v-toggle' + omegaSuffix;
   }
-  if (inEdit && omegaMode !== 'off') requestAnimationFrame(positionSciKeyboard);
+  document.querySelectorAll('.const-omega-btn').forEach(btn => {
+    btn.textContent = omegaText;
+    btn.className   = 'v-toggle const-omega-btn' + omegaSuffix;
+  });
+  if (show) requestAnimationFrame(positionSciKeyboard);
 }
 
 document.getElementById('vertex-list').addEventListener('scroll', positionSciKeyboard);
@@ -974,6 +982,22 @@ function renderConstList() {
     const entry = document.createElement('div');
     entry.className = 'const-entry';
 
+    // Ω button slot — visible only while this entry's expr input is focused
+    const btnSlot = document.createElement('div');
+    btnSlot.className = 'const-btn-slot';
+    const omegaBtn = document.createElement('button');
+    omegaBtn.className = 'v-toggle const-omega-btn' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
+    omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
+    omegaBtn.style.visibility = 'hidden';
+    omegaBtn.addEventListener('mousedown', e => e.preventDefault());
+    omegaBtn.addEventListener('click', () => {
+      if      (omegaMode === 'off')  omegaMode = 'on';
+      else if (omegaMode === 'on')   omegaMode = 'on++';
+      else                           omegaMode = 'off';
+      updateSciKeyboard();
+    });
+    btnSlot.appendChild(omegaBtn);
+
     const nameInp = document.createElement('input');
     nameInp.type = 'text';
     nameInp.className = 'const-name-input';
@@ -993,9 +1017,23 @@ function renderConstList() {
     exprInp.type = 'text';
     exprInp.className = 'expr-input';
     exprInp.value = c.expr;
+    exprInp.disabled = editingVertexId !== null;
+
+    exprInp.addEventListener('focus', () => {
+      activeExprInput = exprInp;
+      omegaBtn.style.visibility = '';
+      updateSciKeyboard();
+      requestAnimationFrame(positionSciKeyboard);
+    });
+    exprInp.addEventListener('blur', () => {
+      setTimeout(() => {
+        omegaBtn.style.visibility = 'hidden';
+        if (activeExprInput === exprInp) { activeExprInput = null; updateSciKeyboard(); }
+      }, 0);
+    });
     exprInp.addEventListener('change', () => {
       c.expr = exprInp.value;
-      buildConstantEnv();  // updates c.value as a side effect
+      buildConstantEnv();
       valSpan.textContent = isNaN(c.value) ? '?' : +c.value.toFixed(4);
       exprInp.classList.toggle('expr-invalid', isNaN(c.value) && c.expr.trim() !== '');
       reEvalVertices();
@@ -1017,7 +1055,7 @@ function renderConstList() {
       reEvalVertices(); renderConstList(); draw();
     });
 
-    entry.append(nameInp, eq, exprInp, valSpan, del);
+    entry.append(btnSlot, nameInp, eq, exprInp, valSpan, del);
     list.appendChild(entry);
   }
 }
@@ -1124,6 +1162,7 @@ function renderVertexList() {
           omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
           omegaBtn.className = 'v-toggle' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
           omegaBtn.title = 'Science keyboard';
+          omegaBtn.addEventListener('mousedown', e => e.preventDefault());
           omegaBtn.addEventListener('click', () => {
             if      (omegaMode === 'off')  omegaMode = 'on';
             else if (omegaMode === 'on')   omegaMode = 'on++';
@@ -1144,7 +1183,10 @@ function renderVertexList() {
         exprInp.type = 'text';
         exprInp.className = 'expr-input';
         exprInp.value = exprVal;
-        exprInp.addEventListener('focus', () => { activeExprInput = exprInp; });
+        exprInp.addEventListener('focus', () => {
+          activeExprInput = exprInp;
+          if (omegaMode !== 'off') { updateSciKeyboard(); requestAnimationFrame(positionSciKeyboard); }
+        });
         exprInp.addEventListener('input', () => {
           v.exprs[i] = exprInp.value;
           const val  = evalExpr(exprInp.value, buildConstantEnv());

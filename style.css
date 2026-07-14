@@ -344,7 +344,14 @@ button.active-loop {
   gap: 3px;
   max-height: 120px;
   overflow-y: auto;
-  padding-left: 49px;
+}
+
+.const-btn-slot {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .const-entry {
