@@ -20,16 +20,51 @@ canvas {
   background: #ffffff;
 }
 
-#controls {
+#controls-wrapper {
   position: fixed;
   top: 16px;
   right: 16px;
   z-index: 100;
   display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  user-select: none;
+}
+
+#sci-keyboard {
+  background: rgba(248, 248, 248, 0.97);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 42px;
+}
+
+body.dark-mode #sci-keyboard {
+  background: rgba(25, 25, 25, 0.97);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.sk-row {
+  display: flex;
+  gap: 4px;
+}
+
+.sk-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-width: 36px;
+  text-align: center;
+}
+
+#controls {
+  display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  user-select: none;
 }
 
 #controls-header {
@@ -51,8 +86,12 @@ body.dark-mode .label {
 
 body.dark-mode .v-name,
 body.dark-mode .v-coords,
-body.dark-mode .s-name {
-  color: rgba(255, 255, 255, 0.80);
+body.dark-mode .s-name,
+body.dark-mode .const-eq,
+body.dark-mode .const-value,
+body.dark-mode .coord-label,
+body.dark-mode .coord-value {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 #controls-body {
@@ -245,6 +284,97 @@ button.active-loop {
   border-radius: 5px;
   padding: 2px 4px;
   margin: -2px -4px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  position: relative;
+}
+
+.vertex-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coord-btn-slot {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.coord-label {
+  font-family: monospace;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.coord-value {
+  font-family: monospace;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.40);
+  min-width: 40px;
+}
+
+
+.expr-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 4px;
+  background: #f0f0f0;
+  color: rgba(0, 0, 0, 0.90);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.expr-input.expr-invalid,
+.v-coord.expr-invalid {
+  border-color: rgba(200, 50, 50, 0.60);
+  background: rgba(255, 220, 220, 0.50);
+}
+
+#const-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding-left: 49px;
+}
+
+.const-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.const-name-input {
+  width: 44px;
+  padding: 4px;
+  background: #f0f0f0;
+  color: rgba(0, 0, 0, 0.90);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.const-eq {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.const-value {
+  font-family: monospace;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.45);
+  min-width: 44px;
 }
 
 .list-selected {

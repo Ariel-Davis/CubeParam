@@ -130,6 +130,14 @@ let perspScaleNodes = false; // scale vertex radius by perspective depth factor
 let perspScaleSegs  = false; // taper segment width by perspective depth factor
 let darkMode        = false;
 
+// ─── Constants and expression state ───────────────────────────────────────────
+
+let constants      = [];   // [{ id, name, expr, value }]
+let nextConstantId = 0;
+let omegaMode      = 'off';  // 'off' | 'on' | 'on++'
+let activeExprInput    = null;   // the coord input currently focused in edit mode
+let _pendingScrollToEdit = false; // trigger scroll-to-edit-entry on next renderVertexList
+
 // ─── Object system state ──────────────────────────────────────────────────────
 
 let vertices         = [];
@@ -157,9 +165,10 @@ let redoStack = [];
 
 function captureState() {
   return {
-    vertices:         vertices.map(v => ({ ...v, coords: [...v.coords] })),
-    segments:         segments.map(s => ({ ...s, vertexIds: [...s.vertexIds] })),
+    vertices:          vertices.map(v => ({ ...v, coords: [...v.coords], exprs: [...(v.exprs ?? ['','',''])] })),
+    segments:          segments.map(s => ({ ...s, vertexIds: [...s.vertexIds] })),
     selectedVertexIds: new Set(selectedVertexIds),
+    constants:         constants.map(c => ({ ...c })),
   };
 }
 
@@ -174,12 +183,16 @@ function restoreState(state) {
   vertices               = state.vertices;
   segments               = state.segments;
   selectedVertexIds      = state.selectedVertexIds;
+  constants              = state.constants ?? [];
   editingVertexId        = null;
   editingOriginal        = null;
   editingSegmentId       = null;
   editingSegmentOriginal = null;
   focusedVertexId        = null;
   selectedSegmentId      = null;
+  activeExprInput        = null;
+  reEvalVertices();
+  renderConstList();
   renderVertexList();
   renderSegmentList();
   draw();
@@ -247,6 +260,155 @@ function toScreen(c, scale) {
 
 function fromScreen(px, py, scale) {
   return new C((px - cx()) / scale, -(py - cy()) / scale);
+}
+
+// ─── Expression parser ────────────────────────────────────────────────────────
+//
+// Evaluates a math expression string in an environment of named constants.
+// Supports: numbers, +  -  *  /  ^, unary minus, parentheses,
+//           \pi  \e  \sin(x)  \cos(x)  \tan(x)  \sqrt(x)  \abs(x),
+//           and any user-defined constant name (identifier).
+// Returns NaN on parse error or domain error (div-by-zero, sqrt of negative).
+
+function evalExpr(src, env) {
+  let pos = 0;
+  const s = (src ?? '').trim();
+
+  function skipWS() { while (pos < s.length && /\s/.test(s[pos])) pos++; }
+  function peek()   { return s[pos]; }
+
+  function parseExpr()    { return parseAddSub(); }
+
+  function parseAddSub() {
+    let v = parseMulDiv(); skipWS();
+    while (pos < s.length && (peek() === '+' || peek() === '-')) {
+      const op = s[pos++]; skipWS();
+      const r  = parseMulDiv();
+      v = op === '+' ? v + r : v - r;
+      skipWS();
+    }
+    return v;
+  }
+
+  function parseMulDiv() {
+    let v = parsePow(); skipWS();
+    while (pos < s.length && (peek() === '*' || peek() === '/')) {
+      const op = s[pos++]; skipWS();
+      const r  = parsePow();
+      v = op === '*' ? v * r : (r === 0 ? NaN : v / r);
+      skipWS();
+    }
+    return v;
+  }
+
+  function parsePow() {
+    const base = parseUnary(); skipWS();
+    if (pos < s.length && peek() === '^') {
+      pos++; skipWS();
+      return Math.pow(base, parseUnary());
+    }
+    return base;
+  }
+
+  function parseUnary() {
+    skipWS();
+    if (pos < s.length && peek() === '-') { pos++; skipWS(); return -parseAtom(); }
+    if (pos < s.length && peek() === '+') { pos++; skipWS(); return  parseAtom(); }
+    return parseAtom();
+  }
+
+  function applyFunc(fn) {
+    skipWS();
+    if (peek() !== '(') return NaN;
+    pos++;
+    const arg = parseExpr();
+    skipWS();
+    if (pos < s.length && peek() === ')') pos++;
+    return fn(arg);
+  }
+
+  function parseAtom() {
+    skipWS();
+    if (pos >= s.length) return NaN;
+
+    // Parenthesised sub-expression
+    if (peek() === '(') {
+      pos++;
+      const v = parseExpr();
+      skipWS();
+      if (pos < s.length && peek() === ')') pos++;
+      return v;
+    }
+
+    // Number literal (with optional scientific notation)
+    if (/[\d.]/.test(peek())) {
+      const m = /^\d*\.?\d+([eE][+\-]?\d+)?/.exec(s.slice(pos));
+      if (m) { pos += m[0].length; return parseFloat(m[0]); }
+      return NaN;
+    }
+
+    // Backslash token: \pi, \e, \sin, \cos, \tan, \sqrt, \abs
+    if (peek() === '\\') {
+      pos++;
+      let name = '';
+      while (pos < s.length && /[a-zA-Z]/.test(s[pos])) name += s[pos++];
+      switch (name) {
+        case 'pi':   return Math.PI;
+        case 'e':    return Math.E;
+        case 'sin':  return applyFunc(Math.sin);
+        case 'cos':  return applyFunc(Math.cos);
+        case 'tan':  return applyFunc(Math.tan);
+        case 'sqrt': return applyFunc(x => x < 0 ? NaN : Math.sqrt(x));
+        case 'abs':  return applyFunc(Math.abs);
+        default:     return NaN;
+      }
+    }
+
+    // Identifier: user constant name
+    if (/[a-zA-Z_]/.test(peek())) {
+      let name = '';
+      while (pos < s.length && /[a-zA-Z0-9_]/.test(s[pos])) name += s[pos++];
+      return (name in env) ? env[name] : NaN;
+    }
+
+    return NaN;
+  }
+
+  try {
+    const result = parseExpr();
+    skipWS();
+    return pos < s.length ? NaN : result;  // leftover chars = parse error
+  } catch (_) {
+    return NaN;
+  }
+}
+
+function buildConstantEnv() {
+  const env = {};
+  for (const c of constants) {
+    c.value = evalExpr(c.expr, env);
+    if (!isNaN(c.value)) env[c.name] = c.value;
+  }
+  return env;
+}
+
+function reEvalVertices() {
+  const env = buildConstantEnv();
+  for (const v of vertices) {
+    for (let i = 0; i < 3; i++) {
+      const expr = v.exprs?.[i];
+      if (expr) v.coords[i] = evalExpr(expr, env);
+    }
+  }
+}
+
+function insertAtCursor(input, text, offset) {
+  const start  = input.selectionStart;
+  const end    = input.selectionEnd;
+  input.value  = input.value.slice(0, start) + text + input.value.slice(end);
+  const newPos = start + text.length - offset;
+  input.setSelectionRange(newPos, newPos);
+  input.dispatchEvent(new Event('input'));
 }
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
@@ -367,6 +529,7 @@ function drawSegments(vecs, heights, scale, normS) {
     if (!v1 || !v2) continue;
     const r1 = projectPoint(v1.coords, vecs, heights);
     const r2 = projectPoint(v2.coords, vecs, heights);
+    if (isNaN(r1.depth) || isNaN(r1.pt.re) || isNaN(r2.depth) || isNaN(r2.pt.re)) continue;
     const a1 = applyPerspective(r1.pt, r1.depth, normS);
     const a2 = applyPerspective(r2.pt, r2.depth, normS);
     if (!a1.ok || !a2.ok) continue;
@@ -424,6 +587,7 @@ function drawVertices(vecs, heights, scale, normS) {
   for (const v of vertices) {
     if (!v.visible) continue;
     const { pt, depth } = projectPoint(v.coords, vecs, heights);
+    if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) continue;
     const { pt: ppt, ok, factor } = applyPerspective(pt, depth, normS);
     if (!ok) continue;
     const scr = toScreen(ppt, scale);
@@ -577,6 +741,7 @@ function handleCanvasClick(px, py, pointerType) {
   for (const v of vertices) {
     if (!v.visible) continue;
     const { pt, depth } = projectPoint(v.coords, vecs, heights);
+    if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) continue;
     const { pt: ppt, ok } = applyPerspective(pt, depth, s);
     if (!ok) continue;
     const scr = toScreen(ppt, display);
@@ -607,6 +772,7 @@ function handleCanvasClick(px, py, pointerType) {
     if (!v1 || !v2) continue;
     const r1 = projectPoint(v1.coords, vecs, heights);
     const r2 = projectPoint(v2.coords, vecs, heights);
+    if (isNaN(r1.depth) || isNaN(r1.pt.re) || isNaN(r2.depth) || isNaN(r2.pt.re)) continue;
     const a1 = applyPerspective(r1.pt, r1.depth, s);
     const a2 = applyPerspective(r2.pt, r2.depth, s);
     if (!a1.ok || !a2.ok) continue;
@@ -709,9 +875,13 @@ document.getElementById('btn-axes').addEventListener('click', () => {
 // ─── Vertex edit mode ─────────────────────────────────────────────────────────
 
 function enterEditMode(id) {
+  _pendingScrollToEdit = true;
+  const v = vertices.find(u => u.id === id);
+  if (v && !v.exprs) v.exprs = ['', '', ''];
   editingVertexId = id;
   editingOriginal = captureState();
   updateUndoButtons();
+  updateSciKeyboard();
   renderVertexList();
 }
 
@@ -721,7 +891,10 @@ function commitEdit() {
   redoStack       = [];
   editingVertexId = null;
   editingOriginal = null;
+  if (omegaMode === 'on') omegaMode = 'off';
+  activeExprInput = null;
   updateUndoButtons();
+  updateSciKeyboard();
   renderVertexList();
   draw();
 }
@@ -733,6 +906,7 @@ function cancelEdit() {
     if (orig && v) {
       v.name      = orig.name;
       v.coords    = [...orig.coords];
+      v.exprs     = [...(orig.exprs ?? ['', '', ''])];
       v.color     = orig.color;
       v.radius    = orig.radius ?? 5;
       v.visible   = orig.visible;
@@ -741,25 +915,158 @@ function cancelEdit() {
   }
   editingVertexId = null;
   editingOriginal = null;
+  if (omegaMode === 'on') omegaMode = 'off';
+  activeExprInput = null;
   updateUndoButtons();
+  updateSciKeyboard();
   renderVertexList();
   draw();
 }
 
+// ─── Science keyboard ─────────────────────────────────────────────────────────
+
+function positionSciKeyboard() {
+  const kbd      = document.getElementById('sci-keyboard');
+  if (kbd.style.display === 'none') return;
+  const omegaBtn = document.getElementById('btn-omega');
+  const wrapper  = document.getElementById('controls-wrapper');
+  if (!omegaBtn || !wrapper) return;
+  const wRect = wrapper.getBoundingClientRect();
+  const oRect = omegaBtn.getBoundingClientRect();
+  const omegaMid = oRect.top - wRect.top + oRect.height / 2;
+  kbd.style.marginTop = (omegaMid - kbd.offsetHeight / 2) + 'px';
+}
+
+
+function updateSciKeyboard() {
+  const kbd      = document.getElementById('sci-keyboard');
+  const inEdit   = editingVertexId !== null;
+  kbd.style.display = (inEdit && omegaMode !== 'off') ? '' : 'none';
+  const omegaBtn = document.getElementById('btn-omega');
+  if (omegaBtn) {
+    omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
+    omegaBtn.className = 'v-toggle' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
+  }
+  if (inEdit && omegaMode !== 'off') requestAnimationFrame(positionSciKeyboard);
+}
+
+document.getElementById('vertex-list').addEventListener('scroll', positionSciKeyboard);
+
+document.getElementById('sci-keyboard').querySelectorAll('.sk-btn').forEach(btn => {
+  btn.addEventListener('mousedown', e => {
+    e.preventDefault();  // keep focus on expr input
+    if (!activeExprInput) return;
+    insertAtCursor(activeExprInput, btn.dataset.insert, parseInt(btn.dataset.offset ?? '0'));
+  });
+});
+
+// ─── Constants controls ───────────────────────────────────────────────────────
+
+function renderConstList() {
+  const list = document.getElementById('const-list');
+  list.innerHTML = '';
+  const env = {};
+
+  for (const c of constants) {
+    c.value = evalExpr(c.expr, env);
+    if (!isNaN(c.value)) env[c.name] = c.value;
+
+    const entry = document.createElement('div');
+    entry.className = 'const-entry';
+
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text';
+    nameInp.className = 'const-name-input';
+    nameInp.value = c.name;
+    nameInp.addEventListener('change', () => {
+      const n = nameInp.value.trim();
+      if (n && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n)) {
+        snapshot(); c.name = n; reEvalVertices(); renderConstList(); draw();
+      } else { nameInp.value = c.name; }
+    });
+
+    const eq = document.createElement('span');
+    eq.className = 'const-eq';
+    eq.textContent = '=';
+
+    const exprInp = document.createElement('input');
+    exprInp.type = 'text';
+    exprInp.className = 'expr-input';
+    exprInp.value = c.expr;
+    exprInp.addEventListener('change', () => {
+      c.expr = exprInp.value;
+      buildConstantEnv();  // updates c.value as a side effect
+      valSpan.textContent = isNaN(c.value) ? '?' : +c.value.toFixed(4);
+      exprInp.classList.toggle('expr-invalid', isNaN(c.value) && c.expr.trim() !== '');
+      reEvalVertices();
+      draw();
+    });
+
+    const valSpan = document.createElement('span');
+    valSpan.className = 'const-value';
+    valSpan.dataset.constVal = c.id;
+    valSpan.textContent = isNaN(c.value) ? '?' : +c.value.toFixed(4);
+
+    const del = document.createElement('button');
+    del.className = 'v-delete';
+    del.textContent = '×';
+    del.title = 'Delete constant';
+    del.addEventListener('click', () => {
+      snapshot();
+      constants = constants.filter(x => x.id !== c.id);
+      reEvalVertices(); renderConstList(); draw();
+    });
+
+    entry.append(nameInp, eq, exprInp, valSpan, del);
+    list.appendChild(entry);
+  }
+}
+
+document.getElementById('btn-add-const').addEventListener('click', () => {
+  const nameInp = document.getElementById('c-name');
+  const exprInp = document.getElementById('c-expr');
+  const name = nameInp.value.trim();
+  const expr = exprInp.value.trim();
+  if (!name || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return;
+  snapshot();
+  constants.push({ id: nextConstantId++, name, expr, value: NaN });
+  nameInp.value = '';
+  exprInp.value = '';
+  reEvalVertices();
+  renderConstList();
+  draw();
+});
+
+document.getElementById('c-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-add-const').click();
+});
+document.getElementById('c-expr').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-add-const').click();
+});
+
 // ─── Vertex controls ──────────────────────────────────────────────────────────
 
 function renderVertexList() {
-  const list   = document.getElementById('vertex-list');
-  list.innerHTML = '';
-  const inEdit = editingVertexId !== null || editingSegmentId !== null;
+  const list       = document.getElementById('vertex-list');
+  const savedScroll = list.scrollTop;
+  list.innerHTML   = '';
+  const inEdit     = editingVertexId !== null || editingSegmentId !== null;
+  let   editEntry    = null;
+  let   focusedEntry = null;
 
   for (const v of vertices) {
     const entry = document.createElement('div');
     entry.className = 'vertex-entry';
 
     if (v.id === editingVertexId) {
-      // ── Edit row ──────────────────────────────────────────────────────────
+      // ── Edit block (column layout) ─────────────────────────────────────────
       entry.className = 'vertex-entry vertex-editing';
+      editEntry = entry;
+      if (!v.exprs) v.exprs = ['', '', ''];
+
+      // Row 1: color / name / radius / ✓ ✗
+      const mainRow = document.createElement('div');
+      mainRow.className = 'vertex-edit-row';
 
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
@@ -773,20 +1080,6 @@ function renderVertexList() {
       nameInput.className = 'v-name-input';
       nameInput.addEventListener('blur', () => { const n = nameInput.value.trim(); if (n) v.name = n; });
       nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
-
-      const coordInputs = v.coords.map((val, i) => {
-        const inp = document.createElement('input');
-        inp.type = 'number';
-        inp.value = val;
-        inp.className = 'v-coord';
-        inp.step = 'any';
-        inp.addEventListener('blur', () => {
-          const n = parseFloat(inp.value);
-          if (!isNaN(n)) { v.coords[i] = n; draw(); }
-        });
-        inp.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
-        return inp;
-      });
 
       const radiusInp = document.createElement('input');
       radiusInp.type = 'number';
@@ -814,13 +1107,72 @@ function renderVertexList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelEdit);
 
-      entry.append(colorInput, nameInput, ...coordInputs, radiusInp, commitBtn, cancelBtn);
+      mainRow.append(colorInput, nameInput, radiusInp, commitBtn, cancelBtn);
+      entry.appendChild(mainRow);
+
+      // Rows 2–4: coordinate expression inputs
+      const env = buildConstantEnv();
+      ['a₁', 'a₂', 'a₃'].forEach((lbl, i) => {
+        const row = document.createElement('div');
+        row.className = 'vertex-edit-row';
+
+        const btnSlot = document.createElement('div');
+        btnSlot.className = 'coord-btn-slot';
+        if (i === 1) {
+          const omegaBtn = document.createElement('button');
+          omegaBtn.id = 'btn-omega';
+          omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
+          omegaBtn.className = 'v-toggle' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
+          omegaBtn.title = 'Science keyboard';
+          omegaBtn.addEventListener('click', () => {
+            if      (omegaMode === 'off')  omegaMode = 'on';
+            else if (omegaMode === 'on')   omegaMode = 'on++';
+            else                           omegaMode = 'off';
+            updateSciKeyboard();
+          });
+          btnSlot.appendChild(omegaBtn);
+        }
+        row.appendChild(btnSlot);
+
+        const coordLabel = document.createElement('span');
+        coordLabel.className = 'coord-label';
+        coordLabel.textContent = lbl + ' =';
+        row.appendChild(coordLabel);
+
+        const exprVal = v.exprs[i] || String(+v.coords[i].toFixed(6));
+        const exprInp = document.createElement('input');
+        exprInp.type = 'text';
+        exprInp.className = 'expr-input';
+        exprInp.value = exprVal;
+        exprInp.addEventListener('focus', () => { activeExprInput = exprInp; });
+        exprInp.addEventListener('input', () => {
+          v.exprs[i] = exprInp.value;
+          const val  = evalExpr(exprInp.value, buildConstantEnv());
+          const bad  = isNaN(val) && exprInp.value.trim() !== '';
+          exprInp.classList.toggle('expr-invalid', bad);
+          if (!isNaN(val)) { v.coords[i] = val; valSpan.textContent = +val.toFixed(4); }
+          else              { valSpan.textContent = '?'; }
+          draw();
+        });
+        exprInp.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
+        row.appendChild(exprInp);
+
+        const valSpan = document.createElement('span');
+        valSpan.className = 'coord-value';
+        const curVal = evalExpr(exprVal, env);
+        valSpan.textContent = isNaN(curVal) ? '?' : +curVal.toFixed(4);
+        row.appendChild(valSpan);
+
+        entry.appendChild(row);
+      });
+
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
       if (selectedVertexIds.has(v.id) || v.id === focusedVertexId) {
         entry.classList.add('list-selected');
       }
+      if (v.id === focusedVertexId) focusedEntry = entry;
 
       const swatch = document.createElement('span');
       swatch.className = 'v-swatch';
@@ -887,21 +1239,33 @@ function renderVertexList() {
     }
 
     list.appendChild(entry);
-    if (v.id === focusedVertexId) entry.scrollIntoView({ block: 'nearest' });
+  }
+
+  if (_pendingScrollToEdit && editEntry) {
+    _pendingScrollToEdit = false;
+    editEntry.scrollIntoView({ block: 'nearest' });
+  } else if (focusedEntry) {
+    focusedEntry.scrollIntoView({ block: 'nearest' });
+  } else {
+    list.scrollTop = savedScroll;
   }
 }
 
 function addVertexFromInputs() {
   const nameInput = document.getElementById('v-name');
-  const name  = nameInput.value.trim() || `P${nextVertexId}`;
-  const a1     = parseFloat(document.getElementById('v-a1').value) || 0;
-  const a2     = parseFloat(document.getElementById('v-a2').value) || 0;
-  const a3     = parseFloat(document.getElementById('v-a3').value) || 0;
+  const coordIds  = ['v-a1', 'v-a2', 'v-a3'];
+  const coordInps = coordIds.map(id => document.getElementById(id));
+  const env       = buildConstantEnv();
+  const vals      = coordInps.map(inp => evalExpr(inp.value.trim() || '0', env));
+  coordInps.forEach((inp, k) => inp.classList.toggle('expr-invalid', isNaN(vals[k])));
+  if (vals.some(isNaN)) return;
+  const name   = nameInput.value.trim() || `P${nextVertexId}`;
   const color  = document.getElementById('v-color').value;
   const radius = Math.max(1, parseFloat(document.getElementById('v-radius').value) || 5);
   snapshot();
-  vertices.push({ id: nextVertexId++, name, coords: [a1, a2, a3], color, radius, visible: true, showLabel: true });
+  vertices.push({ id: nextVertexId++, name, coords: vals, exprs: ['', '', ''], color, radius, visible: true, showLabel: true });
   nameInput.value = '';
+  coordInps.forEach(inp => { inp.value = '0'; inp.classList.remove('expr-invalid'); });
   renderVertexList();
   draw();
 }
@@ -1160,4 +1524,5 @@ document.getElementById('btn-dark').addEventListener('click', () => {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 updateUndoButtons();
+renderConstList();
 resize();
