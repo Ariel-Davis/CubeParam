@@ -161,6 +161,15 @@ let codeOpen         = false;  // true while the Code submenu is open
 let codeLineRecords  = [];     // last parseCodeText() result, one entry per textarea line
 let previewOverride  = null;   // { vertices, segments } staged preview while editing, or null
 
+// The "set" cluster shown at the top of VERTICES/SEGMENTS on a fresh Load —
+// updated on every Save so the last-saved governing values are what greets
+// you next time you open the code file, rather than resetting to the
+// built-in defaults. Deliberately outside the undo/redo system (like
+// darkMode/userScale) — it's a UI convenience for what new code should
+// default to, not part of the object model itself.
+let lastSetVertex  = { color: undefined, r: undefined, visible: undefined, label: undefined };
+let lastSetSegment = { color: undefined, width: undefined, visible: undefined };
+
 // Reparsing/validation is gated on "leaving a line after changing it" (not on
 // every keystroke) — these track the line the caret was in and its text as of
 // entering it, so a move to a different line can tell whether anything changed.
@@ -1001,16 +1010,17 @@ function serializeState(vertsArr, constsArr, segsArr) {
   emitSection(out, 'eq',   'CONSTANTS', constsArr.map(formatConstLine));
   emitSection(out, 'eq',   'FUNCTIONS', []);
   // Committed vertex/segment objects carry no memory of any `set` line that
-  // once governed them (that's an editing-session-scoped, code-file-only
-  // concept) — a fresh Load always starts from the built-in defaults, shown
-  // explicitly here for the same "always visible" consistency Sort keeps.
-  emitSection(out, 'dash', 'VERTICES',  buildSetBlock('vertex', {}), vertsArr.map(formatVertexLine));
+  // once governed them individually (each one's own resolved value/expr is
+  // what persists, via its own color=/r=/etc.) — but the *cluster itself*
+  // remembers the last-saved governing values (lastSetVertex/lastSetSegment)
+  // so a fresh Load shows what you left off with, not the built-in defaults.
+  emitSection(out, 'dash', 'VERTICES',  buildSetBlock('vertex', lastSetVertex), vertsArr.map(formatVertexLine));
   const segLines = segsArr.map(seg => {
     const v1 = vertsArr.find(v => v.id === seg.vertexIds[0]);
     const v2 = vertsArr.find(v => v.id === seg.vertexIds[1]);
     return (v1 && v2) ? formatSegmentLine(v1, v2, seg) : null;
   }).filter(Boolean);
-  emitSection(out, 'dash', 'SEGMENTS', buildSetBlock('segment', {}), segLines);
+  emitSection(out, 'dash', 'SEGMENTS', buildSetBlock('segment', lastSetSegment), segLines);
   emitSection(out, 'dash', 'CURVES', []);
   out.push(makeDividerLine());
   out.push('');
@@ -2392,6 +2402,11 @@ function codeSave() {
   const textarea = document.getElementById('code-textarea');
   const staged = parseCodeText(textarea.value);
   const { newVertices, newConstants, newSegments } = buildCommittedArraysFromStaged(staged);
+
+  // Remember this save's governing `set` values so the next Load starts
+  // from here instead of resetting to the built-in defaults.
+  lastSetVertex  = { ...staged.finalSet.vertex };
+  lastSetSegment = { ...staged.finalSet.segment };
 
   snapshot();
   vertices          = newVertices;
