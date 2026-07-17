@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -32,84 +32,128 @@
         <button id="btn-toggle-controls" class="active">☰</button>
       </div>
       <div id="controls-body">
-        <div class="toggle-group">
-          <span class="label">Anchor</span>
-          <button id="btn-u3"  class="active">z Axis</button>
-          <button id="btn-diag">Diagonal</button>
+
+        <!-- Submenu navigation -->
+        <div id="submenu-nav">
+          <button id="btn-sub-view" class="submenu-btn active" title="View">⚙</button>
+          <button id="btn-sub-aux"  class="submenu-btn"        title="Auxiliary objects">α</button>
+          <button id="btn-sub-disp" class="submenu-btn active" title="Display objects">△</button>
         </div>
-        <div class="toggle-group">
-          <span class="label">Mode</span>
-          <button id="btn-modeB" class="active">Compact</button>
-          <button id="btn-modeA">Poly</button>
-        </div>
-        <div class="toggle-group" id="scale-row">
-          <input type="range"  id="slider-scale" min="0.25" max="4" step="0.01" value="1">
-          <span class="label" id="scale-label">scale =</span>
-          <input type="number" id="input-scale"  value="1" step="0.01">
-        </div>
-        <div class="toggle-group">
-          <span class="label">axes</span>
-          <button id="btn-axes">show</button>
-        </div>
-        <div class="toggle-group">
-          <span class="label">persp</span>
-          <button id="btn-perspective">on</button>
-        </div>
-        <div class="toggle-group" id="persp-row" style="display:none">
-          <input type="range"  id="slider-persp" min="0" max="1" step="0.001" value="0">
-          <span class="label" id="persp-label">1/F =</span>
-          <input type="number" id="input-persp"  value="0" step="0.001" min="0" max="1">
-        </div>
-        <div class="toggle-group" id="clip-row" style="display:none">
-          <span class="label">clip</span>
-          <button id="btn-clip" class="active">behind</button>
-        </div>
-        <div class="toggle-group" id="scale-nodes-row" style="display:none">
-          <span class="label">nodes</span>
-          <button id="btn-scale-nodes">scale</button>
-        </div>
-        <div class="toggle-group" id="scale-segs-row" style="display:none">
-          <span class="label">segs</span>
-          <button id="btn-scale-segs">scale</button>
-        </div>
-        <div class="section-divider"></div>
+
+        <!-- Undo / redo: always visible -->
         <div class="toggle-group">
           <span class="label"></span>
           <button id="btn-undo" disabled>undo</button>
           <button id="btn-redo" disabled>redo</button>
         </div>
-        <div class="section-divider"></div>
-        <div class="toggle-group">
-          <span class="label">const</span>
-          <input type="text" id="c-name" class="v-name-input" placeholder="name" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <input type="text" id="c-expr" class="expr-input"   placeholder="= expr" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <button id="btn-add-const">+</button>
+
+        <!-- View submenu -->
+        <div id="sub-view" class="submenu">
+          <div class="submenu-header">View</div>
+          <div class="toggle-group">
+            <span class="label">Anchor</span>
+            <button id="btn-u3"  class="active">z Axis</button>
+            <button id="btn-diag">Diagonal</button>
+          </div>
+          <div class="toggle-group">
+            <span class="label">Mode</span>
+            <button id="btn-modeB" class="active">Compact</button>
+            <button id="btn-modeA">Poly</button>
+          </div>
+          <div class="toggle-group" id="scale-row">
+            <input type="range"  id="slider-scale" min="0.25" max="4" step="0.01" value="1">
+            <span class="label" id="scale-label">scale =</span>
+            <input type="number" id="input-scale"  value="1" step="0.01">
+          </div>
+          <div class="toggle-group">
+            <span class="label">axes</span>
+            <button id="btn-axes">show</button>
+          </div>
+          <div class="toggle-group">
+            <span class="label">persp</span>
+            <button id="btn-perspective">on</button>
+          </div>
+          <div class="toggle-group" id="persp-row" style="display:none">
+            <input type="range"  id="slider-persp" min="0" max="1" step="0.001" value="0">
+            <span class="label" id="persp-label">1/F =</span>
+            <input type="number" id="input-persp"  value="0" step="0.001" min="0" max="1">
+          </div>
+          <div class="toggle-group" id="clip-row" style="display:none">
+            <span class="label">clip</span>
+            <button id="btn-clip" class="active">behind</button>
+          </div>
+          <div class="toggle-group" id="scale-nodes-row" style="display:none">
+            <span class="label">nodes</span>
+            <button id="btn-scale-nodes">scale</button>
+          </div>
+          <div class="toggle-group" id="scale-segs-row" style="display:none">
+            <span class="label">segs</span>
+            <button id="btn-scale-segs">scale</button>
+          </div>
         </div>
-        <div id="const-list"></div>
-        <div class="section-divider"></div>
-        <div class="toggle-group">
-          <span class="label">vertex</span>
-          <input type="text" id="v-name" class="v-name-input" placeholder="name" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <input type="text" id="v-a1" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <input type="text" id="v-a2" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <input type="text" id="v-a3" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <input type="color"  id="v-color" value="#4d4d4d">
-          <input type="number" id="v-radius" class="v-coord" value="5" step="0.5" min="1" title="Node radius">
-          <button id="btn-add-vertex">+</button>
+
+        <!-- Auxiliary objects submenu -->
+        <div id="sub-aux" class="submenu" style="display:none">
+          <div class="submenu-header">Auxiliary</div>
+          <div class="toggle-group">
+            <span class="label">const</span>
+            <input type="text" id="c-name" class="v-name-input" placeholder="name" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <input type="text" id="c-expr" class="expr-input"   placeholder="= expr" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <button id="btn-add-const">+</button>
+          </div>
+          <div id="const-list"></div>
         </div>
-        <div id="vertex-list"></div>
-        <div class="section-divider"></div>
-        <div class="toggle-group">
-          <span class="label">create</span>
-          <input type="color"  id="seg-color" value="#4d4d4d">
-          <input type="number" id="seg-width" value="1.5" step="0.5" min="0.5" title="Line width">
-          <button id="btn-segment">segment</button>
+
+        <!-- Display objects submenu -->
+        <div id="sub-disp" class="submenu">
+          <div class="submenu-header">Display</div>
+          <div class="toggle-group">
+            <span class="label">vertex</span>
+            <input type="text" id="v-name" class="v-name-input" placeholder="name" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <input type="text" id="v-a1" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <input type="text" id="v-a2" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <input type="text" id="v-a3" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <input type="color"  id="v-color" value="#4d4d4d">
+            <input type="number" id="v-radius" class="v-coord" value="5" step="0.5" min="1" title="Node radius">
+            <button id="btn-add-vertex">+</button>
+          </div>
+          <div id="vertex-list"></div>
+          <div class="section-divider"></div>
+          <div class="toggle-group">
+            <span class="label">create</span>
+            <input type="color"  id="seg-color" value="#4d4d4d">
+            <input type="number" id="seg-width" value="1.5" step="0.5" min="0.5" title="Line width">
+            <button id="btn-segment">segment</button>
+          </div>
+          <div id="segment-list"></div>
         </div>
-        <div id="segment-list"></div>
+
+        <!-- Code submenu -->
+        <div id="sub-code" class="submenu" style="display:none">
+          <div class="submenu-header">Code</div>
+          <div class="code-toolbar">
+            <button id="btn-code-sort">Sort</button>
+            <button id="btn-code-save">Save</button>
+            <button id="btn-code-exit">Exit</button>
+            <button id="btn-code-save-exit">Save+Exit</button>
+          </div>
+          <div class="code-editor-wrap">
+            <div id="code-gutter"></div>
+            <textarea id="code-textarea" spellcheck="false" autocapitalize="none" autocorrect="off" wrap="off"></textarea>
+          </div>
+          <div id="code-error-list"></div>
+        </div>
+
+        <!-- Interpreter row (placeholder — wired up with Code submenu later) -->
+        <div id="interpreter-row">
+          <input type="text" id="interpreter-input" class="expr-input" placeholder="define object…" autocapitalize="none" autocorrect="off" spellcheck="false" disabled>
+          <button id="btn-sub-code" class="submenu-btn" title="Code">⌨</button>
+        </div>
+
       </div>
     </div>
   </div>
 
-  <script src="main.js?v=37"></script>
+  <script src="main.js?v=39"></script>
 </body>
 </html>

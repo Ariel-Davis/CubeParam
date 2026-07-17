@@ -155,6 +155,18 @@ let editingOriginal        = null;  // captureState() snapshot taken on vertex e
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
 let editingSegmentOriginal = null;  // captureState() snapshot taken on segment edit entry
 
+// ─── Code submenu state ────────────────────────────────────────────────────────
+
+let codeOpen         = false;  // true while the Code submenu is open
+let codeLineRecords  = [];     // last parseCodeText() result, one entry per textarea line
+let previewOverride  = null;   // { vertices, segments } staged preview while editing, or null
+
+// Reparsing/validation is gated on "leaving a line after changing it" (not on
+// every keystroke) — these track the line the caret was in and its text as of
+// entering it, so a move to a different line can tell whether anything changed.
+let codeCurrentLineIdx      = 0;
+let codeCurrentLineSnapshot = '';
+
 // ─── Undo / redo ──────────────────────────────────────────────────────────────
 //
 // Tracks mutations to the object system only (vertices, segments, selection).
@@ -200,8 +212,12 @@ function restoreState(state) {
   draw();
 }
 
+function isEditingBlocked() {
+  return editingVertexId !== null || editingSegmentId !== null || codeOpen;
+}
+
 function undo() {
-  if (editingVertexId !== null || editingSegmentId !== null) return;
+  if (isEditingBlocked()) return;
   if (undoStack.length === 0) return;
   redoStack.push(captureState());
   restoreState(undoStack.pop());
@@ -209,7 +225,7 @@ function undo() {
 }
 
 function redo() {
-  if (editingVertexId !== null || editingSegmentId !== null) return;
+  if (isEditingBlocked()) return;
   if (redoStack.length === 0) return;
   undoStack.push(captureState());
   restoreState(redoStack.pop());
@@ -217,7 +233,7 @@ function redo() {
 }
 
 function updateUndoButtons() {
-  const inEdit = editingVertexId !== null || editingSegmentId !== null;
+  const inEdit = isEditingBlocked();
   document.getElementById('btn-undo').disabled       = inEdit || undoStack.length === 0;
   document.getElementById('btn-redo').disabled       = inEdit || redoStack.length === 0;
   document.getElementById('btn-add-vertex').disabled = inEdit;
@@ -416,9 +432,13 @@ function renameConstantEverywhere(oldName, newName) {
     if (v.exprs) v.exprs = v.exprs.map(e => renameInExpr(e, oldName, newName));
 }
 
+function isNameTakenIn(name, vertexList, constList, excludeVertexId = null, excludeConstId = null) {
+  return vertexList.some(v => v.name === name && v.id !== excludeVertexId)
+      || constList.some(c => c.name === name && c.id !== excludeConstId);
+}
+
 function isNameTaken(name, excludeVertexId = null, excludeConstId = null) {
-  return vertices.some(v => v.name === name && v.id !== excludeVertexId)
-      || constants.some(c => c.name === name && c.id !== excludeConstId);
+  return isNameTakenIn(name, vertices, constants, excludeVertexId, excludeConstId);
 }
 
 function setNameError(el) {
@@ -445,6 +465,369 @@ function insertAtCursor(input, text, offset) {
   const newPos = start + text.length - offset;
   input.setSelectionRange(newPos, newPos);
   input.dispatchEvent(new Event('input'));
+}
+
+// ─── Code submenu: parser & serializer ─────────────────────────────────────────
+//
+// Canonical text format (see NOTES2.md for the full spec). Two literal
+// backslashes open a section header — '=' bars for the two auxiliary
+// (non-drawn) sections, '-' bars for the three display (drawn) sections:
+//   \\======== CONSTANTS ========
+//   \\======== FUNCTIONS ========
+//   \\-------- VERTICES --------
+//   \\-------- SEGMENTS --------
+//   \\-------- CURVES --------
+//   \\----------------------------------------     (divider — no name)
+// Below the divider is the scratch area: a place to type new objects of any
+// kind without caring which section they belong in. Sort always relocates
+// every *valid* recognized object out of the scratch area into its home
+// section, leaving only invalid/unrecognized text behind there.
+//
+// Object lines: "keyword name?: rest". const/vertex/segment are supported;
+// function/slider/curve are recognized but rejected (Phase 1 — no evaluator
+// support for them yet, but their sections still exist so the file format
+// doesn't need to change again once they are). Everything else is
+// 'unrecognized'.
+//
+// parseCodeText() is a pure function: it only reads its `text` argument and
+// calls evalExpr()/isNameTakenIn(), so it can build a fully independent staged
+// object set without touching the live vertices/constants/segments arrays.
+
+const SECTION_DEFS = [
+  { key: 'constants', title: 'CONSTANTS', style: 'eq',   match: /CONSTANT/i },
+  { key: 'functions', title: 'FUNCTIONS', style: 'eq',   match: /FUNCTION/i },
+  { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i },
+  { key: 'segments',  title: 'SEGMENTS',  style: 'dash', match: /SEGMENT/i },
+  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i },
+];
+const SECTION_ORDER = SECTION_DEFS.map(d => d.key);
+
+const CODE_HEADER_EQ_RE   = /^\\\\=+\s*(.*?)\s*=+$/;
+const CODE_HEADER_DASH_RE = /^\\\\-+\s*(.*?)\s*-+$/;
+const CODE_OBJECT_RE = /^(const|vertex|segment|function|slider|curve)\b\s*([^:]*):(.*)$/;
+const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
+
+function classifyHeaderSection(headerText) {
+  const def = SECTION_DEFS.find(d => d.match.test(headerText));
+  return def ? def.key : null;
+}
+
+function makeHeaderLine(style, title) {
+  const bar = style === 'eq' ? '========' : '--------';
+  return `\\\\${bar} ${title} ${bar}`;
+}
+
+function makeDividerLine() {
+  return '\\\\----------------------------------------';
+}
+
+// Pushes one canonical section: header, exactly one blank line, its content
+// lines (if any), then one trailing blank line only if it had content — an
+// empty section is just its header followed by a single blank line.
+function emitSection(outLines, style, title, contentLines) {
+  outLines.push(makeHeaderLine(style, title));
+  outLines.push('');
+  for (const l of contentLines) outLines.push(l);
+  if (contentLines.length > 0) outLines.push('');
+}
+
+// Splits the text after a colon into positional tokens and recognized
+// attribute tokens (classified by shape, not position). `allowedAttrs` is
+// the subset of {color, r, width, visible, label} legal for this line kind.
+function tokenizeAttrs(rest, allowedAttrs) {
+  const tokens = rest.split(/\s+/).filter(t => t.length > 0);
+  const positional = [];
+  const attrs = {};
+  for (const tok of tokens) {
+    if (CODE_COLOR_RE.test(tok)) {
+      if (!allowedAttrs.includes('color')) return { error: `'${tok}' not valid here` };
+      attrs.color = tok;
+    } else if (/^r=/.test(tok)) {
+      if (!allowedAttrs.includes('r')) return { error: `'r=' not valid here` };
+      const n = parseFloat(tok.slice(2));
+      if (isNaN(n)) return { error: `invalid radius '${tok}'` };
+      attrs.r = n;
+    } else if (/^w=/.test(tok)) {
+      if (!allowedAttrs.includes('width')) return { error: `'w=' not valid here` };
+      const n = parseFloat(tok.slice(2));
+      if (isNaN(n)) return { error: `invalid width '${tok}'` };
+      attrs.width = n;
+    } else if (/^visible=/.test(tok)) {
+      if (!allowedAttrs.includes('visible')) return { error: `'visible=' not valid here` };
+      const v = tok.slice(8);
+      if (v !== 'true' && v !== 'false') return { error: `invalid visible value '${tok}'` };
+      attrs.visible = v === 'true';
+    } else if (/^label=/.test(tok)) {
+      if (!allowedAttrs.includes('label')) return { error: `'label=' not valid here` };
+      const v = tok.slice(6);
+      if (v !== 'true' && v !== 'false') return { error: `invalid label value '${tok}'` };
+      attrs.label = v === 'true';
+    } else {
+      positional.push(tok);
+    }
+  }
+  return { positional, attrs };
+}
+
+function parseCodeText(text) {
+  const lines           = [];
+  const stagedConstants = [];
+  const stagedVertices  = [];
+  const stagedSegments  = [];
+  const env             = {};        // const name -> value, built incrementally
+  const vertexByName    = new Map(); // name -> staged vertex, built incrementally
+  let autoVertexN = 0;
+  let autoConstN  = 0;
+
+  for (const raw of text.split('\n')) {
+    const trimmed = raw.trim();
+    const rec = { raw, kind: 'blank', targetSection: null, headerSection: null, valid: true, errorMsg: null, parsed: null };
+
+    if (trimmed === '') { lines.push(rec); continue; }
+
+    const eqMatch   = trimmed.match(CODE_HEADER_EQ_RE);
+    const dashMatch = !eqMatch ? trimmed.match(CODE_HEADER_DASH_RE) : null;
+    if (eqMatch || dashMatch) {
+      const captured = (eqMatch ? eqMatch[1] : dashMatch[1]).trim();
+      if (captured === '') {
+        rec.kind = 'divider';
+      } else {
+        rec.kind = 'header';
+        rec.headerSection = classifyHeaderSection(captured);
+      }
+      lines.push(rec);
+      continue;
+    }
+
+    const objMatch = trimmed.match(CODE_OBJECT_RE);
+    if (!objMatch) {
+      rec.kind = 'unrecognized';
+      rec.valid = false;
+      rec.errorMsg = trimmed.includes(':')
+        ? 'unknown object type (expected const/vertex/segment)'
+        : "missing ':' — expected 'keyword: ...'";
+      lines.push(rec);
+      continue;
+    }
+
+    const [, keyword, nameRaw, restRaw] = objMatch;
+    const name = nameRaw.trim();
+    const rest = restRaw.trim();
+
+    if (keyword === 'function' || keyword === 'slider' || keyword === 'curve') {
+      rec.kind = 'unsupported';
+      rec.valid = false;
+      rec.errorMsg = `${keyword} objects are not yet supported`;
+      rec.targetSection = keyword === 'function' ? 'functions' : keyword === 'curve' ? 'curves' : null;
+      lines.push(rec);
+      continue;
+    }
+
+    if (keyword === 'const') {
+      rec.kind = 'const';
+      rec.targetSection = 'constants';
+      let finalName = name;
+      if (finalName === '') {
+        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants));
+      } else if (!CODE_IDENT_RE.test(finalName)) {
+        rec.valid = false; rec.errorMsg = `invalid constant name '${finalName}'`; lines.push(rec); continue;
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants)) {
+        rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
+      }
+      const value = evalExpr(rest, env);
+      if (isNaN(value)) {
+        rec.valid = false; rec.errorMsg = 'invalid expression'; lines.push(rec); continue;
+      }
+      const obj = { name: finalName, expr: rest, value };
+      env[finalName] = value;
+      stagedConstants.push(obj);
+      rec.parsed = obj;
+      lines.push(rec);
+      continue;
+    }
+
+    if (keyword === 'vertex') {
+      rec.kind = 'vertex';
+      rec.targetSection = 'vertices';
+      const tok = tokenizeAttrs(rest, ['color', 'r', 'visible', 'label']);
+      if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
+      if (tok.positional.length !== 3) {
+        rec.valid = false; rec.errorMsg = `expected 3 coordinates, found ${tok.positional.length}`; lines.push(rec); continue;
+      }
+      let finalName = name;
+      if (finalName === '') {
+        do { finalName = `P${autoVertexN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants));
+      } else if (!CODE_IDENT_RE.test(finalName)) {
+        rec.valid = false; rec.errorMsg = `invalid vertex name '${finalName}'`; lines.push(rec); continue;
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants)) {
+        rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
+      }
+      const coords = tok.positional.map(t => evalExpr(t, env));
+      if (coords.some(isNaN)) {
+        rec.valid = false; rec.errorMsg = 'invalid coordinate expression'; lines.push(rec); continue;
+      }
+      const obj = {
+        name: finalName,
+        coords,
+        exprs: tok.positional.slice(),
+        color: tok.attrs.color ?? DEFAULT_COLOR,
+        radius: tok.attrs.r ?? 5,
+        visible: tok.attrs.visible ?? true,
+        showLabel: tok.attrs.label ?? true,
+      };
+      stagedVertices.push(obj);
+      vertexByName.set(finalName, obj);
+      rec.parsed = obj;
+      lines.push(rec);
+      continue;
+    }
+
+    // segment — per settled decision, syntax is always "segment: v1 v2" (no
+    // name field on segments); a hand-typed name token is tolerated but discarded.
+    rec.kind = 'segment';
+    rec.targetSection = 'segments';
+    const tok = tokenizeAttrs(rest, ['color', 'width', 'visible']);
+    if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
+    if (tok.positional.length !== 2) {
+      rec.valid = false; rec.errorMsg = `expected 2 vertex names, found ${tok.positional.length}`; lines.push(rec); continue;
+    }
+    const v1 = vertexByName.get(tok.positional[0]);
+    const v2 = vertexByName.get(tok.positional[1]);
+    if (!v1 || !v2) {
+      rec.valid = false; rec.errorMsg = `unknown vertex '${!v1 ? tok.positional[0] : tok.positional[1]}'`; lines.push(rec); continue;
+    }
+    const obj = {
+      v1Name: v1.name,
+      v2Name: v2.name,
+      color: tok.attrs.color ?? DEFAULT_COLOR,
+      lineWidth: tok.attrs.width ?? 1.5,
+      visible: tok.attrs.visible ?? true,
+    };
+    stagedSegments.push(obj);
+    rec.parsed = obj;
+    lines.push(rec);
+  }
+
+  return { lines, stagedConstants, stagedVertices, stagedSegments };
+}
+
+function formatCoordExpr(v, i) {
+  const expr = v.exprs?.[i];
+  if (expr) return expr.replace(/\s+/g, '');
+  return String(+v.coords[i].toFixed(6));
+}
+
+function formatConstLine(c) {
+  return `const ${c.name}: ${c.expr}`;
+}
+
+function formatVertexLine(v) {
+  const coords = [0, 1, 2].map(i => formatCoordExpr(v, i)).join('  ');
+  let line = `vertex ${v.name}: ${coords}`;
+  if ((v.color ?? DEFAULT_COLOR).toLowerCase() !== DEFAULT_COLOR) line += `  ${v.color}`;
+  if ((v.radius ?? 5) !== 5) line += `  r=${v.radius}`;
+  if (v.visible === false) line += `  visible=false`;
+  if (v.showLabel === false) line += `  label=false`;
+  return line;
+}
+
+// v1/v2 need only a `.name` — callers may pass either full vertex objects
+// (serializeState) or a staged segment's {v1Name, v2Name} wrapped as {name}.
+function formatSegmentLine(v1, v2, seg) {
+  let line = `segment:  ${v1.name}  ${v2.name}`;
+  if ((seg.color ?? DEFAULT_COLOR).toLowerCase() !== DEFAULT_COLOR) line += `  ${seg.color}`;
+  if ((seg.lineWidth ?? 1.5) !== 1.5) line += `  w=${seg.lineWidth}`;
+  if (seg.visible === false) line += `  visible=false`;
+  return line;
+}
+
+function serializeState(vertsArr, constsArr, segsArr) {
+  const out = [];
+  emitSection(out, 'eq',   'CONSTANTS', constsArr.map(formatConstLine));
+  emitSection(out, 'eq',   'FUNCTIONS', []);
+  emitSection(out, 'dash', 'VERTICES',  vertsArr.map(formatVertexLine));
+  const segLines = segsArr.map(seg => {
+    const v1 = vertsArr.find(v => v.id === seg.vertexIds[0]);
+    const v2 = vertsArr.find(v => v.id === seg.vertexIds[1]);
+    return (v1 && v2) ? formatSegmentLine(v1, v2, seg) : null;
+  }).filter(Boolean);
+  emitSection(out, 'dash', 'SEGMENTS', segLines);
+  emitSection(out, 'dash', 'CURVES', []);
+  out.push(makeDividerLine());
+  out.push('');
+  return out.join('\n');
+}
+
+// Rebuilds the file from scratch: five canonical sections (each followed by
+// exactly one blank line when it has content, none of the growing-gap effect
+// a naive splice-in-place produces), a divider, then the scratch area. Every
+// *valid* recognized object always lands in its home section regardless of
+// where it started (which is what empties the scratch area of anything
+// usable). Invalid/unrecognized lines never move — they stay within whichever
+// section (or the scratch area) they were structurally sitting in.
+function sortCodeText(text) {
+  const { lines } = parseCodeText(text);
+
+  const headerIdx = {};
+  let dividerIdx = -1;
+  lines.forEach((rec, i) => {
+    if (rec.kind === 'header' && rec.headerSection && !(rec.headerSection in headerIdx)) {
+      headerIdx[rec.headerSection] = i;
+    }
+    if (rec.kind === 'divider' && dividerIdx === -1) dividerIdx = i;
+  });
+
+  const markers = SECTION_ORDER
+    .map(key => ({ key, idx: headerIdx[key] ?? -1 }))
+    .concat([{ key: '__divider__', idx: dividerIdx }])
+    .filter(m => m.idx !== -1)
+    .sort((a, b) => a.idx - b.idx);
+
+  const ranges = {};
+  markers.forEach((m, i) => {
+    if (m.key === '__divider__') return;
+    const start = m.idx + 1;
+    const end   = i + 1 < markers.length ? markers[i + 1].idx : lines.length;
+    ranges[m.key] = [start, end];
+  });
+  for (const key of SECTION_ORDER) if (!(key in ranges)) ranges[key] = [0, 0];
+  const scratchStart = dividerIdx === -1 ? lines.length : dividerIdx + 1;
+  const scratchRange = [scratchStart, lines.length];
+
+  function homeOf(idx) {
+    for (const key of SECTION_ORDER) {
+      const [s, e] = ranges[key];
+      if (idx >= s && idx < e) return key;
+    }
+    if (idx >= scratchRange[0] && idx < scratchRange[1]) return 'scratch';
+    return null;
+  }
+
+  const perSection = Object.fromEntries(SECTION_ORDER.map(k => [k, []]));
+  const scratchKept = [];
+
+  lines.forEach((rec, i) => {
+    if (rec.kind === 'header' || rec.kind === 'divider' || rec.kind === 'blank') return;
+    if (rec.valid && SECTION_ORDER.includes(rec.targetSection)) {
+      perSection[rec.targetSection].push(rec);
+      return;
+    }
+    const loc = homeOf(i);
+    if (loc && loc !== 'scratch') perSection[loc].push(rec);
+    else scratchKept.push(rec);
+  });
+
+  const out = [];
+  for (const key of SECTION_ORDER) {
+    const def = SECTION_DEFS.find(d => d.key === key);
+    emitSection(out, def.style, def.title, perSection[key].map(r => r.raw));
+  }
+  out.push(makeDividerLine());
+  out.push('');
+  for (const rec of scratchKept) out.push(rec.raw);
+
+  return out.join('\n');
 }
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
@@ -557,11 +940,11 @@ function applyPerspective(pt, depth, normS) {
   return { pt: pt.scale(1 / d), ok: true, factor: 1 / d };
 }
 
-function drawSegments(vecs, heights, scale, normS) {
-  for (const seg of segments) {
+function drawSegments(segs, verts, vecs, heights, scale, normS) {
+  for (const seg of segs) {
     if (!seg.visible) continue;
-    const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
-    const v2 = vertices.find(v => v.id === seg.vertexIds[1]);
+    const v1 = verts.find(v => v.id === seg.vertexIds[0]);
+    const v2 = verts.find(v => v.id === seg.vertexIds[1]);
     if (!v1 || !v2) continue;
     const r1 = projectPoint(v1.coords, vecs, heights);
     const r2 = projectPoint(v2.coords, vecs, heights);
@@ -619,8 +1002,8 @@ function drawSegments(vecs, heights, scale, normS) {
   }
 }
 
-function drawVertices(vecs, heights, scale, normS) {
-  for (const v of vertices) {
+function drawVertices(verts, vecs, heights, scale, normS) {
+  for (const v of verts) {
     if (!v.visible) continue;
     const { pt, depth } = projectPoint(v.coords, vecs, heights);
     if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) continue;
@@ -695,10 +1078,12 @@ function draw() {
   const base                 = getBaseScale();
   const display              = getDisplayScale();
   const { vecs, heights, s } = getProjectionState();
+  const activeVerts = codeOpen && previewOverride ? previewOverride.vertices : vertices;
+  const activeSegs  = codeOpen && previewOverride ? previewOverride.segments : segments;
   if (displayMode === 'B') drawDiskBoundary(base);
   if (showAxes) drawAxes(vecs, display);
-  drawSegments(vecs, heights, display, s);
-  drawVertices(vecs, heights, display, s);
+  drawSegments(activeSegs, activeVerts, vecs, heights, display, s);
+  drawVertices(activeVerts, vecs, heights, display, s);
   drawControlPoint(base);
 }
 
@@ -769,7 +1154,7 @@ function distToSegmentPx(px, py, ax, ay, bx, by) {
 }
 
 function handleCanvasClick(px, py, pointerType) {
-  if (editingVertexId !== null || editingSegmentId !== null) return;
+  if (isEditingBlocked()) return;
   const display              = getDisplayScale();
   const { vecs, heights, s } = getProjectionState();
   const hitR = pointerType === 'touch' ? 28 : 14;
@@ -1402,6 +1787,13 @@ document.getElementById('btn-add-vertex').addEventListener('click', addVertexFro
   });
 });
 
+['v-a1', 'v-a2', 'v-a3', 'v-radius'].forEach(id => {
+  document.getElementById(id).addEventListener('focus', function() {
+    const el = this;
+    setTimeout(() => el.select(), 0);
+  });
+});
+
 // ─── Segment edit mode ────────────────────────────────────────────────────────
 
 function enterSegmentEditMode(id) {
@@ -1570,6 +1962,285 @@ document.getElementById('btn-toggle-controls').addEventListener('click', () => {
   body.classList.toggle('collapsed');
   btn.classList.toggle('active', !body.classList.contains('collapsed'));
 });
+
+['view', 'aux', 'disp'].forEach(key => {
+  document.getElementById(`btn-sub-${key}`).addEventListener('click', () => {
+    const sub  = document.getElementById(`sub-${key}`);
+    const btn  = document.getElementById(`btn-sub-${key}`);
+    const open = sub.style.display === 'none';
+    sub.style.display = open ? '' : 'none';
+    btn.classList.toggle('active', open);
+  });
+});
+
+// ─── Code submenu ───────────────────────────────────────────────────────────
+//
+// The textarea is a UI-only buffer. Typing never touches the real vertices/
+// constants/segments arrays — it only rebuilds `previewOverride` (consumed by
+// draw()) so editing gives live canvas feedback without disturbing the undo
+// stack. Only Save/Save+Exit actually commit, via the same snapshot()-then-
+// mutate pattern every other action in this file already uses.
+
+// Assigns fresh sequential ids to a staged parse result, mirroring
+// restoreState()'s full-replace convention — segments reference the
+// freshly-assigned vertex ids from this same build.
+function buildCommittedArraysFromStaged(staged) {
+  const newVertices = staged.stagedVertices.map((v, i) => ({
+    id: i,
+    name: v.name,
+    coords: [...v.coords],
+    exprs: [...v.exprs],
+    color: v.color,
+    radius: v.radius,
+    visible: v.visible,
+    showLabel: v.showLabel,
+  }));
+  const nameToId = new Map(newVertices.map(v => [v.name, v.id]));
+  const newConstants = staged.stagedConstants.map((c, i) => ({
+    id: i,
+    name: c.name,
+    expr: c.expr,
+    value: c.value,
+  }));
+  const newSegments = staged.stagedSegments.map((s, i) => ({
+    id: i,
+    vertexIds: [nameToId.get(s.v1Name), nameToId.get(s.v2Name)],
+    color: s.color,
+    lineWidth: s.lineWidth,
+    visible: s.visible,
+  }));
+  return { newVertices, newConstants, newSegments };
+}
+
+function refreshCodeGutterAndErrors() {
+  const gutter    = document.getElementById('code-gutter');
+  const errorList = document.getElementById('code-error-list');
+  gutter.innerHTML    = '';
+  errorList.innerHTML = '';
+
+  codeLineRecords.forEach((rec, i) => {
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'code-gutter-line' + (!rec.valid ? ' code-line-error' : '');
+    lineDiv.textContent = String(i + 1);
+    gutter.appendChild(lineDiv);
+
+    if (!rec.valid) {
+      const errRow = document.createElement('div');
+      errRow.className = 'code-error-row';
+      errRow.textContent = `Line ${i + 1}: ${rec.errorMsg}`;
+      errRow.addEventListener('click', () => {
+        const textarea = document.getElementById('code-textarea');
+        const lines = textarea.value.split('\n');
+        let pos = 0;
+        for (let j = 0; j < i; j++) pos += lines[j].length + 1;
+        textarea.focus();
+        textarea.setSelectionRange(pos, pos + lines[i].length);
+      });
+      errorList.appendChild(errRow);
+    }
+  });
+}
+
+// Synchronous reparse + staged preview refresh. Called whenever the caret
+// leaves a line that actually changed (see the line-tracking listeners near
+// the bottom of this section) and directly by Sort/Save/Exit, which always
+// need up-to-date results regardless of caret position.
+function reparseAndPreview() {
+  const textarea = document.getElementById('code-textarea');
+  const staged = parseCodeText(textarea.value);
+  codeLineRecords = staged.lines;
+  const { newVertices, newSegments } = buildCommittedArraysFromStaged(staged);
+  previewOverride = { vertices: newVertices, segments: newSegments };
+  refreshCodeGutterAndErrors();
+  draw();
+}
+
+// Resyncs the line-change-tracking state to wherever the caret currently is —
+// needed after any programmatic rewrite of textarea.value (Sort/Save/Load),
+// since those don't go through the caret-driven listeners themselves.
+function resetCodeLineTracking() {
+  const textarea = document.getElementById('code-textarea');
+  const lines = textarea.value.split('\n');
+  codeCurrentLineIdx      = textarea.value.slice(0, textarea.selectionStart).split('\n').length - 1;
+  codeCurrentLineSnapshot = lines[codeCurrentLineIdx] ?? '';
+}
+
+function codeSort() {
+  const textarea = document.getElementById('code-textarea');
+  textarea.value = sortCodeText(textarea.value);
+  reparseAndPreview();
+  resetCodeLineTracking();
+}
+
+// Rewrites only the successfully-parsed const/vertex/segment lines to their
+// canonical form (resolved auto-names, normalized spacing, defaults dropped);
+// every other line (blank, header, invalid, unsupported, unrecognized) keeps
+// its raw text untouched — this is what keeps an unfixed error line visible
+// after Save instead of disappearing (no cascade-delete).
+function reserializeValidLines() {
+  const textarea = document.getElementById('code-textarea');
+  const lines = codeLineRecords.map(rec => {
+    if (!rec.valid || !rec.parsed) return rec.raw;
+    if (rec.kind === 'const')   return formatConstLine(rec.parsed);
+    if (rec.kind === 'vertex')  return formatVertexLine(rec.parsed);
+    if (rec.kind === 'segment') return formatSegmentLine({ name: rec.parsed.v1Name }, { name: rec.parsed.v2Name }, rec.parsed);
+    return rec.raw;
+  });
+  textarea.value = lines.join('\n');
+}
+
+function codeSave() {
+  codeSort();
+  const textarea = document.getElementById('code-textarea');
+  const staged = parseCodeText(textarea.value);
+  const { newVertices, newConstants, newSegments } = buildCommittedArraysFromStaged(staged);
+
+  snapshot();
+  vertices          = newVertices;
+  nextVertexId      = newVertices.length;
+  constants         = newConstants;
+  nextConstantId    = newConstants.length;
+  segments          = newSegments;
+  nextSegmentId     = newSegments.length;
+  selectedVertexIds = new Set();
+  focusedVertexId   = null;
+  selectedSegmentId = null;
+
+  reEvalVertices();
+  renderConstList();
+  renderVertexList();
+  renderSegmentList();
+  previewOverride = null;
+  draw();
+
+  // Re-canonicalize just the valid lines in place; invalid lines are left
+  // exactly as typed so the user can still see and fix them.
+  codeLineRecords = staged.lines;
+  reserializeValidLines();
+  const reparsed = parseCodeText(textarea.value);
+  codeLineRecords = reparsed.lines;
+  refreshCodeGutterAndErrors();
+  resetCodeLineTracking();
+}
+
+function openCodeSubmenu() {
+  if (editingVertexId !== null)  cancelEdit();
+  if (editingSegmentId !== null) cancelSegmentEdit();
+
+  document.getElementById('sub-aux').style.display = 'none';
+  document.getElementById('btn-sub-aux').classList.remove('active');
+  document.getElementById('btn-sub-aux').disabled = true;
+  document.getElementById('sub-disp').style.display = 'none';
+  document.getElementById('btn-sub-disp').classList.remove('active');
+  document.getElementById('btn-sub-disp').disabled = true;
+
+  codeOpen = true;
+  document.getElementById('sub-code').style.display = '';
+  document.getElementById('btn-sub-code').classList.add('active');
+
+  const textarea = document.getElementById('code-textarea');
+  textarea.value = serializeState(vertices, constants, segments);
+  reparseAndPreview();
+  resetCodeLineTracking();
+  updateUndoButtons();
+
+  // Sync the gutter's height now rather than waiting on the ResizeObserver —
+  // while '#sub-code' was display:none the textarea measured 0-height, so a
+  // stale 0px may still be sitting on the gutter from that; correct it the
+  // instant the panel actually becomes visible and has a real layout.
+  document.getElementById('code-gutter').style.height = textarea.offsetHeight + 'px';
+}
+
+function closeCodeSubmenu() {
+  codeOpen        = false;
+  previewOverride = null;
+  codeLineRecords = [];
+  document.getElementById('code-gutter').innerHTML    = '';
+  document.getElementById('code-error-list').innerHTML = '';
+
+  document.getElementById('sub-code').style.display = 'none';
+  document.getElementById('btn-sub-code').classList.remove('active');
+
+  document.getElementById('btn-sub-aux').disabled  = false;
+  document.getElementById('btn-sub-disp').disabled = false;
+
+  updateUndoButtons();
+  draw();
+}
+
+function codeExit() {
+  codeSort();
+  closeCodeSubmenu();
+}
+
+function codeSaveExit() {
+  codeSave();
+  closeCodeSubmenu();
+}
+
+document.getElementById('btn-sub-code').addEventListener('click', () => {
+  if (!codeOpen) openCodeSubmenu();
+  else           codeExit();
+});
+
+document.getElementById('btn-code-sort').addEventListener('click', codeSort);
+document.getElementById('btn-code-save').addEventListener('click', codeSave);
+document.getElementById('btn-code-exit').addEventListener('click', codeExit);
+document.getElementById('btn-code-save-exit').addEventListener('click', codeSaveExit);
+
+// Validation/live-preview is gated on "leaving a line after changing it" —
+// not on every keystroke — so errors don't flash up mid-edit. Arrow keys,
+// clicks, and Enter all move the caret (and 'keyup' fires after the browser
+// has already applied the move), so checking on keyup/click/blur is enough;
+// plain typing within a line never trips it since the caret's line index
+// doesn't change.
+{
+  const codeTextareaEl = document.getElementById('code-textarea');
+
+  function codeCheckLineLeave(forceCheck) {
+    const idxNow = codeTextareaEl.value.slice(0, codeTextareaEl.selectionStart).split('\n').length - 1;
+    const movedLine = idxNow !== codeCurrentLineIdx;
+    if (movedLine || forceCheck) {
+      const leftLineNow = codeTextareaEl.value.split('\n')[codeCurrentLineIdx] ?? '';
+      if (leftLineNow !== codeCurrentLineSnapshot) reparseAndPreview();
+    }
+    if (movedLine) {
+      codeCurrentLineIdx      = idxNow;
+      codeCurrentLineSnapshot = codeTextareaEl.value.split('\n')[idxNow] ?? '';
+    }
+  }
+
+  codeTextareaEl.addEventListener('keyup', () => codeCheckLineLeave(false));
+  codeTextareaEl.addEventListener('click', () => codeCheckLineLeave(false));
+  codeTextareaEl.addEventListener('blur',  () => codeCheckLineLeave(true));
+
+  // Plain textareas treat Tab as "move focus to the next element" — insert a
+  // literal tab character instead (the syntax spec already treats tabs as
+  // valid column separators).
+  codeTextareaEl.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const start = codeTextareaEl.selectionStart;
+    const end   = codeTextareaEl.selectionEnd;
+    codeTextareaEl.setRangeText('\t', start, end, 'end');
+  });
+}
+
+document.getElementById('code-textarea').addEventListener('scroll', () => {
+  document.getElementById('code-gutter').scrollTop = document.getElementById('code-textarea').scrollTop;
+});
+
+// The gutter's CSS height matches the textarea's default 260px so it clips
+// (and can therefore scroll) rather than just growing to fit every line —
+// but the textarea is user-resizable (resize:vertical), so keep the gutter's
+// height in sync with whatever height the textarea actually ends up at.
+// offsetHeight (border-box, like the CSS `height` we're setting) is used
+// rather than the ResizeObserver entry's contentRect, which excludes padding
+// and would otherwise leave the two consistently 12px out of sync.
+new ResizeObserver(() => {
+  const textarea = document.getElementById('code-textarea');
+  document.getElementById('code-gutter').style.height = textarea.offsetHeight + 'px';
+}).observe(document.getElementById('code-textarea'));
 
 // ─── Undo / redo controls ─────────────────────────────────────────────────────
 
