@@ -113,17 +113,48 @@
             <input type="text" id="v-a1" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
             <input type="text" id="v-a2" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
             <input type="text" id="v-a3" class="v-coord" value="0" autocapitalize="none" autocorrect="off" spellcheck="false">
-            <input type="color"  id="v-color" value="#4d4d4d">
+            <button id="v-color-btn" class="color-picker-btn" title="Color" style="background:#4d4d4d"></button>
+            <div id="v-color-popover" class="color-popover" style="display:none">
+              <div class="color-section-label">Presets</div>
+              <div id="v-color-presets" class="color-preset-list"></div>
+              <div class="color-section-label">Constants</div>
+              <div id="v-color-grid" class="color-const-list"></div>
+              <div class="color-custom-wrap">
+                <div class="color-custom-btn">Custom…</div>
+                <input type="color" id="v-color" class="color-native-overlay" value="#4d4d4d">
+              </div>
+            </div>
             <input type="number" id="v-radius" class="v-coord" value="5" step="0.5" min="1" title="Node radius">
+            <button id="v-add-more" class="v-toggle" title="More options">⋯</button>
             <button id="btn-add-vertex">+</button>
+          </div>
+          <div class="toggle-group" id="v-add-extra" style="display:none">
+            <span class="label"></span>
+            <button id="v-add-label"   class="v-toggle" title="New vertices show label">A</button>
+            <button id="v-add-visible" class="v-toggle" title="New vertices visible">●</button>
           </div>
           <div id="vertex-list"></div>
           <div class="section-divider"></div>
           <div class="toggle-group">
             <span class="label">create</span>
-            <input type="color"  id="seg-color" value="#4d4d4d">
+            <button id="seg-color-btn" class="color-picker-btn" title="Color" style="background:#4d4d4d"></button>
+            <div id="seg-color-popover" class="color-popover" style="display:none">
+              <div class="color-section-label">Presets</div>
+              <div id="seg-color-presets" class="color-preset-list"></div>
+              <div class="color-section-label">Constants</div>
+              <div id="seg-color-grid" class="color-const-list"></div>
+              <div class="color-custom-wrap">
+                <div class="color-custom-btn">Custom…</div>
+                <input type="color" id="seg-color" class="color-native-overlay" value="#4d4d4d">
+              </div>
+            </div>
             <input type="number" id="seg-width" value="1.5" step="0.5" min="0.5" title="Line width">
+            <button id="seg-add-more" class="v-toggle" title="More options">⋯</button>
             <button id="btn-segment">segment</button>
+          </div>
+          <div class="toggle-group" id="seg-add-extra" style="display:none">
+            <span class="label"></span>
+            <button id="seg-add-visible" class="v-toggle" title="New segments visible">●</button>
           </div>
           <div id="segment-list"></div>
         </div>

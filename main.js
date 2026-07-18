@@ -499,6 +499,16 @@ function renameConstantEverywhere(oldName, newName) {
     for (const f of ['colorExpr', 'widthExpr', 'visibleExpr'])
       if (s[f]) s[f] = renameInExpr(s[f], oldName, newName);
   }
+  // lastSetVertex/lastSetSegment (what a fresh code-file Load shows) and
+  // pendingVertexDefaults/pendingSegmentDefaults (what the GUI add-rows
+  // currently link to) can also hold a bare constant-name reference in
+  // `color` — always a single identifier, never a compound expression, so a
+  // plain equality check is correct (renameInExpr's word-boundary regex is
+  // overkill here).
+  if (lastSetVertex.color === oldName)         lastSetVertex.color = newName;
+  if (lastSetSegment.color === oldName)        lastSetSegment.color = newName;
+  if (pendingVertexDefaults.color === oldName)  pendingVertexDefaults.color = newName;
+  if (pendingSegmentDefaults.color === oldName) pendingSegmentDefaults.color = newName;
 }
 
 function isNameTakenIn(name, vertexList, constList, excludeVertexId = null, excludeConstId = null) {
@@ -537,6 +547,44 @@ function insertAtCursor(input, text, offset) {
 }
 
 const DEFAULT_COLOR = '#4d4d4d';  // 30% grey, used for new vertices and segments
+
+// Curated quick-pick list for the color picker popover's "Presets" section —
+// 4 neutrals (including DEFAULT_COLOR, for a fast "back to default") plus 12
+// hues spaced ~30° apart for strong visual separation between many objects.
+const PRESET_COLORS = [
+  { name: 'Black',       hex: '#000000' },
+  { name: 'White',       hex: '#ffffff' },
+  { name: 'Default gray', hex: DEFAULT_COLOR },
+  { name: 'Light gray',  hex: '#b3b3b3' },
+  { name: 'Red',         hex: '#e53935' },
+  { name: 'Orange',      hex: '#fb8c00' },
+  { name: 'Yellow',      hex: '#fdd835' },
+  { name: 'Lime',        hex: '#7cb342' },
+  { name: 'Green',       hex: '#43a047' },
+  { name: 'Teal',        hex: '#00897b' },
+  { name: 'Cyan',        hex: '#00acc1' },
+  { name: 'Blue',        hex: '#1e88e5' },
+  { name: 'Indigo',      hex: '#3949ab' },
+  { name: 'Purple',      hex: '#8e24aa' },
+  { name: 'Magenta',     hex: '#d81b60' },
+  { name: 'Brown',       hex: '#6d4c41' },
+];
+
+// What the GUI "add vertex"/"create segment" rows currently default to —
+// raw expr text per field (a literal, or a constant reference for color),
+// mirroring lastSetVertex/lastSetSegment's shape. Synced from lastSet* on
+// every code-file exit (syncAddRowDefaultsFromLastSet), and mutated directly
+// by touching the add-row's own controls (native color input flattens,
+// color-constant grid links, visible/label expander toggles). This is what
+// addVertexFromInputs()/checkSelectionComplete() actually read when creating
+// a new object, so a GUI-created vertex/segment can inherit a live constant
+// link exactly like one typed in the code file with `set ... color=c` can.
+let pendingVertexDefaults  = { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true' };
+let pendingSegmentDefaults = { color: DEFAULT_COLOR, width: '1.5', visible: 'true' };
+
+// The two add-row color pickers (see setupColorPicker) — static DOM, wired
+// once at init, refreshed on demand from renderAddRowDefaults().
+let vColorPicker, segColorPicker;
 
 // ─── Code submenu: parser & serializer ─────────────────────────────────────────
 //
@@ -1508,12 +1556,15 @@ function handleCanvasClick(px, py, pointerType) {
 function checkSelectionComplete() {
   if (selectedVertexIds.size < 2) return;
   const [id1, id2] = [...selectedVertexIds];
-  const color     = document.getElementById('seg-color').value;
+  const colorExpr = pendingSegmentDefaults.color;
+  const colorRes   = resolveColorAttr(colorExpr, buildEnvs().colorEnv);
+  const color      = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
   const lineWidth = Math.max(0.5, parseFloat(document.getElementById('seg-width').value) || 1.5);
+  const visible   = pendingSegmentDefaults.visible === 'true';
   snapshot();
   segments.push({
-    id: nextSegmentId++, vertexIds: [id1, id2], color, lineWidth, visible: true,
-    colorExpr: color, widthExpr: String(lineWidth), visibleExpr: 'true',
+    id: nextSegmentId++, vertexIds: [id1, id2], color, lineWidth, visible,
+    colorExpr, widthExpr: String(lineWidth), visibleExpr: String(visible),
   });
   selectedVertexIds.clear();
   if (segmentMode === 'on') segmentMode = 'off';
@@ -1816,6 +1867,10 @@ function renderConstList() {
     entry.append(btnSlot, nameInp, eq, exprInp, valSpan, del);
     list.appendChild(entry);
   }
+
+  // Constants changing (add/edit/rename/delete) is exactly when a color
+  // linked in an add-row needs its live preview/grid refreshed too.
+  renderAddRowDefaults();
 }
 
 document.getElementById('btn-add-const').addEventListener('click', () => {
@@ -1842,6 +1897,157 @@ document.getElementById('c-expr').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-add-const').click();
 });
 
+// ─── Add-row defaults (mirrors code-file `set` values) ─────────────────────────
+//
+// pendingVertexDefaults/pendingSegmentDefaults are what addVertexFromInputs()/
+// checkSelectionComplete() actually use when creating a new object — a two-
+// step refresh mirroring the buildEnvs()/reEvalObjects() split: sync (rare —
+// only when the underlying last-saved values change, i.e. on code-file exit)
+// vs. render (frequent — called via the renderConstList() hook below so a
+// color linked to a constant stays live as that constant is edited).
+
+// Copies lastSetVertex/lastSetSegment (raw expr text, possibly undefined per
+// field) into the pending-defaults state, falling back to BUILTIN_SET_DEFAULTS
+// exactly like buildSetBlock() does for the code file's own display.
+function syncAddRowDefaultsFromLastSet() {
+  for (const field of SET_FIELD_ORDER.vertex)
+    pendingVertexDefaults[field] = lastSetVertex[field] ?? BUILTIN_SET_DEFAULTS.vertex[field];
+  for (const field of SET_FIELD_ORDER.segment)
+    pendingSegmentDefaults[field] = lastSetSegment[field] ?? BUILTIN_SET_DEFAULTS.segment[field];
+}
+
+// Shared by all 4 "color picker" locations (vertex/segment x add-row/edit-
+// mode): one row button (rowBtn) opens a small popover showing, all at once
+// (no mode-switching): a scrollable list of preset colors, a scrollable list
+// of color constants (own field, independent scroll from presets so a long
+// preset list never buries the constants), and a "Custom…" control for
+// reaching an arbitrary color. That control is a real native
+// <input type="color"> overlaid (invisible) directly on top of a decorative
+// "Custom…" label — not a button forwarding a synthetic .click() into a
+// hidden input. Safari doesn't reliably honor a forwarded click as user-
+// initiated for this input type, so the click that opens the OS picker has
+// to be genuinely real; this function never touches that input's click
+// behavior at all, only its input/change events.
+//
+// getExpr()/setExpr(value) read/write whatever the caller's linkable field is
+// (pendingVertexDefaults.color, or a live vertex/segment's colorExpr) — this
+// function only knows about the DOM. onLiteralChange(hex) fires on every
+// native-input tick (cheap: model + rowBtn preview + draw() only, no DOM
+// rebuild, since a rebuild mid-drag could close the OS color picker).
+// onPicked() fires once, after a preset/constant is clicked (or a custom
+// pick finishes) and the popover has already closed, so it's safe for it to
+// do a full re-render.
+//
+// Popover position is computed from rowBtn's bounding rect (position:fixed)
+// rather than a CSS-relative ancestor, so it isn't clipped by the vertex/
+// segment list's own overflow:auto scrolling.
+function setupColorPicker(rowBtn, popoverEl, presetListEl, constListEl, nativeInput, getExpr, setExpr, onLiteralChange, onPicked) {
+  function onOutsideClick(e) {
+    if (e.target !== rowBtn && !popoverEl.contains(e.target)) close();
+  }
+
+  function open() {
+    const r = rowBtn.getBoundingClientRect();
+    popoverEl.style.top     = (r.bottom + 4) + 'px';
+    popoverEl.style.left    = r.left + 'px';
+    popoverEl.style.display = 'flex';
+    document.addEventListener('pointerdown', onOutsideClick, true);
+  }
+  function close() {
+    popoverEl.style.display = 'none';
+    document.removeEventListener('pointerdown', onOutsideClick, true);
+  }
+
+  rowBtn.addEventListener('click', () => {
+    if (popoverEl.style.display === 'none') open(); else close();
+  });
+  nativeInput.addEventListener('input', () => onLiteralChange(nativeInput.value));
+  nativeInput.addEventListener('change', () => { onLiteralChange(nativeInput.value); close(); });
+
+  function makeRow(name, hex, linked, onClick) {
+    const row = document.createElement('div');
+    row.className = 'color-preset-row' + (linked ? ' linked' : '');
+    const swatch = document.createElement('span');
+    swatch.className = 'v-swatch';
+    swatch.style.background = hex;
+    row.append(swatch, document.createTextNode(name));
+    row.addEventListener('click', onClick);
+    return row;
+  }
+
+  // Rebuilds both lists — called whenever `constants` changes (via
+  // renderAddRowDefaults/renderConstList for add-rows) or, for edit-mode,
+  // simply because the whole row is rebuilt fresh on every relevant render.
+  function refresh() {
+    presetListEl.innerHTML = '';
+    for (const p of PRESET_COLORS) {
+      presetListEl.appendChild(makeRow(p.name, p.hex, getExpr() === p.hex, () => {
+        setExpr(p.hex);
+        close();
+        onPicked();
+      }));
+    }
+
+    constListEl.innerHTML = '';
+    const colorConsts = constants.filter(c => c.kind === 'color');
+    if (colorConsts.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'color-const-row empty';
+      empty.textContent = 'No color constants yet';
+      constListEl.appendChild(empty);
+    } else {
+      for (const c of colorConsts) {
+        const row = makeRow(c.name, c.value, getExpr() === c.name, () => {
+          setExpr(c.name);
+          close();
+          onPicked();
+        });
+        row.classList.replace('color-preset-row', 'color-const-row');
+        constListEl.appendChild(row);
+      }
+    }
+  }
+
+  return { refresh, close };
+}
+
+function renderAddRowDefaults() {
+  const { numericEnv, colorEnv, boolEnv } = buildEnvs();
+
+  const vColorRes = resolveColorAttr(pendingVertexDefaults.color, colorEnv);
+  const vColorResolved = vColorRes.ok ? vColorRes.value : DEFAULT_COLOR;
+  document.getElementById('v-color').value = vColorResolved;
+  document.getElementById('v-color-btn').style.background = vColorResolved;
+  const vRadiusRes = resolveNumAttr(pendingVertexDefaults.r, numericEnv);
+  document.getElementById('v-radius').value = vRadiusRes.ok ? vRadiusRes.value : 5;
+  // visible/label have no constant-linking UI (snapshot-only) — collapse
+  // straight to a resolved literal 'true'/'false', there's no raw reference
+  // worth preserving once resolved.
+  const vVisibleRes = resolveBoolAttr(pendingVertexDefaults.visible, boolEnv);
+  const vLabelRes   = resolveBoolAttr(pendingVertexDefaults.label, boolEnv);
+  pendingVertexDefaults.visible = String(vVisibleRes.ok ? vVisibleRes.value : true);
+  pendingVertexDefaults.label   = String(vLabelRes.ok   ? vLabelRes.value   : true);
+  const vVisibleBtn = document.getElementById('v-add-visible');
+  const vLabelBtn   = document.getElementById('v-add-label');
+  vVisibleBtn.textContent   = pendingVertexDefaults.visible === 'true' ? '●' : '○';
+  vVisibleBtn.style.opacity = pendingVertexDefaults.visible === 'true' ? '1' : '0.3';
+  vLabelBtn.style.opacity   = pendingVertexDefaults.label   === 'true' ? '1' : '0.3';
+  vColorPicker.refresh();
+
+  const sColorRes = resolveColorAttr(pendingSegmentDefaults.color, colorEnv);
+  const sColorResolved = sColorRes.ok ? sColorRes.value : DEFAULT_COLOR;
+  document.getElementById('seg-color').value = sColorResolved;
+  document.getElementById('seg-color-btn').style.background = sColorResolved;
+  const sWidthRes = resolveNumAttr(pendingSegmentDefaults.width, numericEnv);
+  document.getElementById('seg-width').value = sWidthRes.ok ? sWidthRes.value : 1.5;
+  const sVisibleRes = resolveBoolAttr(pendingSegmentDefaults.visible, boolEnv);
+  pendingSegmentDefaults.visible = String(sVisibleRes.ok ? sVisibleRes.value : true);
+  const sVisibleBtn = document.getElementById('seg-add-visible');
+  sVisibleBtn.textContent   = pendingSegmentDefaults.visible === 'true' ? '●' : '○';
+  sVisibleBtn.style.opacity = pendingSegmentDefaults.visible === 'true' ? '1' : '0.3';
+  segColorPicker.refresh();
+}
+
 // ─── Vertex controls ──────────────────────────────────────────────────────────
 
 function renderVertexList() {
@@ -1866,11 +2072,52 @@ function renderVertexList() {
       const mainRow = document.createElement('div');
       mainRow.className = 'vertex-edit-row';
 
+      const colorBtn = document.createElement('button');
+      colorBtn.className = 'color-picker-btn';
+      colorBtn.title = 'Color';
+      colorBtn.style.background = v.color;
+
+      const colorPopover = document.createElement('div');
+      colorPopover.className = 'color-popover';
+      colorPopover.style.display = 'none';
+
+      const presetLabel = document.createElement('div');
+      presetLabel.className = 'color-section-label';
+      presetLabel.textContent = 'Presets';
+      const presetList = document.createElement('div');
+      presetList.className = 'color-preset-list';
+
+      const constLabel = document.createElement('div');
+      constLabel.className = 'color-section-label';
+      constLabel.textContent = 'Constants';
+      const colorGrid = document.createElement('div');
+      colorGrid.className = 'color-const-list';
+
+      const customWrap = document.createElement('div');
+      customWrap.className = 'color-custom-wrap';
+      const customBtn = document.createElement('div');
+      customBtn.className = 'color-custom-btn';
+      customBtn.textContent = 'Custom…';
+
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
       colorInput.value = v.color;
-      colorInput.className = 'v-edit-color';
-      colorInput.addEventListener('input', () => { v.color = colorInput.value; v.colorExpr = colorInput.value; draw(); });
+      colorInput.className = 'color-native-overlay';
+
+      customWrap.append(customBtn, colorInput);
+      colorPopover.append(presetLabel, presetList, constLabel, colorGrid, customWrap);
+
+      setupColorPicker(colorBtn, colorPopover, presetList, colorGrid, colorInput,
+        () => v.colorExpr,
+        name => { v.colorExpr = name; },
+        hex => { v.color = hex; v.colorExpr = hex; colorBtn.style.background = hex; draw(); },
+        () => {
+          const c = constants.find(cc => cc.name === v.colorExpr);
+          if (c) v.color = c.value;
+          draw();
+          renderVertexList();
+        }
+      ).refresh();
 
       const nameInput = document.createElement('input');
       nameInput.type = 'text';
@@ -1915,7 +2162,7 @@ function renderVertexList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelEdit);
 
-      mainRow.append(colorInput, nameInput, radiusInp, commitBtn, cancelBtn);
+      mainRow.append(colorBtn, colorPopover, nameInput, radiusInp, commitBtn, cancelBtn);
       entry.appendChild(mainRow);
 
       // Rows 2–4: coordinate expression inputs
@@ -2081,12 +2328,20 @@ function addVertexFromInputs() {
   if (vals.some(isNaN)) return;
   const name   = nameInput.value.trim() || `P${nextVertexId}`;
   if (isNameTaken(name)) { setNameError(nameInput); return; }
-  const color  = document.getElementById('v-color').value;
-  const radius = Math.max(1, parseFloat(document.getElementById('v-radius').value) || 5);
+  // Color comes from pendingVertexDefaults (not the native input directly) so
+  // a constant link survives into the new vertex's colorExpr — the native
+  // input can only ever show the resolved literal preview. Radius has no
+  // linking UI, so it's read straight off its own live input as always.
+  const colorExpr = pendingVertexDefaults.color;
+  const colorRes   = resolveColorAttr(colorExpr, buildEnvs().colorEnv);
+  const color      = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
+  const radius     = Math.max(1, parseFloat(document.getElementById('v-radius').value) || 5);
+  const visible    = pendingVertexDefaults.visible === 'true';
+  const showLabel  = pendingVertexDefaults.label   === 'true';
   snapshot();
   vertices.push({
-    id: nextVertexId++, name, coords: vals, exprs, color, radius, visible: true, showLabel: true,
-    colorExpr: color, radiusExpr: String(radius), visibleExpr: 'true', labelExpr: 'true',
+    id: nextVertexId++, name, coords: vals, exprs, color, radius, visible, showLabel,
+    colorExpr, radiusExpr: String(radius), visibleExpr: String(visible), labelExpr: String(showLabel),
   });
   nameInput.value = '';
   coordInps.forEach(inp => { inp.value = '0'; inp.classList.remove('expr-invalid'); });
@@ -2107,6 +2362,36 @@ document.getElementById('btn-add-vertex').addEventListener('click', addVertexFro
     const el = this;
     setTimeout(() => el.select(), 0);
   });
+});
+
+// Touching the native swatch directly always flattens to a literal, exactly
+// like every other "materialize on touch" GUI control in this codebase.
+vColorPicker = setupColorPicker(
+  document.getElementById('v-color-btn'),
+  document.getElementById('v-color-popover'),
+  document.getElementById('v-color-presets'),
+  document.getElementById('v-color-grid'),
+  document.getElementById('v-color'),
+  () => pendingVertexDefaults.color,
+  name => { pendingVertexDefaults.color = name; },
+  hex => { pendingVertexDefaults.color = hex; document.getElementById('v-color-btn').style.background = hex; },
+  renderAddRowDefaults
+);
+
+document.getElementById('v-add-more').addEventListener('click', () => {
+  const row  = document.getElementById('v-add-extra');
+  const btn  = document.getElementById('v-add-more');
+  const open = row.style.display === 'none';
+  row.style.display = open ? '' : 'none';
+  btn.classList.toggle('active', open);
+});
+document.getElementById('v-add-label').addEventListener('click', () => {
+  pendingVertexDefaults.label = pendingVertexDefaults.label === 'true' ? 'false' : 'true';
+  renderAddRowDefaults();
+});
+document.getElementById('v-add-visible').addEventListener('click', () => {
+  pendingVertexDefaults.visible = pendingVertexDefaults.visible === 'true' ? 'false' : 'true';
+  renderAddRowDefaults();
 });
 
 // ─── Segment edit mode ────────────────────────────────────────────────────────
@@ -2170,11 +2455,52 @@ function renderSegmentList() {
       // ── Edit row ──────────────────────────────────────────────────────────
       entry.className = 'segment-entry vertex-editing';
 
+      const colorBtn = document.createElement('button');
+      colorBtn.className = 'color-picker-btn';
+      colorBtn.title = 'Color';
+      colorBtn.style.background = seg.color;
+
+      const colorPopover = document.createElement('div');
+      colorPopover.className = 'color-popover';
+      colorPopover.style.display = 'none';
+
+      const presetLabel = document.createElement('div');
+      presetLabel.className = 'color-section-label';
+      presetLabel.textContent = 'Presets';
+      const presetList = document.createElement('div');
+      presetList.className = 'color-preset-list';
+
+      const constLabel = document.createElement('div');
+      constLabel.className = 'color-section-label';
+      constLabel.textContent = 'Constants';
+      const colorGrid = document.createElement('div');
+      colorGrid.className = 'color-const-list';
+
+      const customWrap = document.createElement('div');
+      customWrap.className = 'color-custom-wrap';
+      const customBtn = document.createElement('div');
+      customBtn.className = 'color-custom-btn';
+      customBtn.textContent = 'Custom…';
+
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
       colorInput.value = seg.color;
-      colorInput.className = 'v-edit-color';
-      colorInput.addEventListener('input', () => { seg.color = colorInput.value; seg.colorExpr = colorInput.value; draw(); });
+      colorInput.className = 'color-native-overlay';
+
+      customWrap.append(customBtn, colorInput);
+      colorPopover.append(presetLabel, presetList, constLabel, colorGrid, customWrap);
+
+      setupColorPicker(colorBtn, colorPopover, presetList, colorGrid, colorInput,
+        () => seg.colorExpr,
+        name => { seg.colorExpr = name; },
+        hex => { seg.color = hex; seg.colorExpr = hex; colorBtn.style.background = hex; draw(); },
+        () => {
+          const c = constants.find(cc => cc.name === seg.colorExpr);
+          if (c) seg.color = c.value;
+          draw();
+          renderSegmentList();
+        }
+      ).refresh();
 
       const label = document.createElement('span');
       label.className = 's-name';
@@ -2206,7 +2532,7 @@ function renderSegmentList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelSegmentEdit);
 
-      entry.append(colorInput, label, widthInp, commitBtn, cancelBtn);
+      entry.append(colorBtn, colorPopover, label, widthInp, commitBtn, cancelBtn);
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
@@ -2271,6 +2597,30 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   renderVertexList();
   renderSegmentList();
   draw();
+});
+
+segColorPicker = setupColorPicker(
+  document.getElementById('seg-color-btn'),
+  document.getElementById('seg-color-popover'),
+  document.getElementById('seg-color-presets'),
+  document.getElementById('seg-color-grid'),
+  document.getElementById('seg-color'),
+  () => pendingSegmentDefaults.color,
+  name => { pendingSegmentDefaults.color = name; },
+  hex => { pendingSegmentDefaults.color = hex; document.getElementById('seg-color-btn').style.background = hex; },
+  renderAddRowDefaults
+);
+
+document.getElementById('seg-add-more').addEventListener('click', () => {
+  const row  = document.getElementById('seg-add-extra');
+  const btn  = document.getElementById('seg-add-more');
+  const open = row.style.display === 'none';
+  row.style.display = open ? '' : 'none';
+  btn.classList.toggle('active', open);
+});
+document.getElementById('seg-add-visible').addEventListener('click', () => {
+  pendingSegmentDefaults.visible = pendingSegmentDefaults.visible === 'true' ? 'false' : 'true';
+  renderAddRowDefaults();
 });
 
 // ─── Controls panel toggle ────────────────────────────────────────────────────
@@ -2472,6 +2822,12 @@ function closeCodeSubmenu() {
   document.getElementById('btn-sub-aux').disabled  = false;
   document.getElementById('btn-sub-disp').disabled = false;
 
+  // The add-rows should show whatever was last actually saved — whether this
+  // particular exit came via Save+Exit or a plain Exit that discarded
+  // unsaved edits, lastSetVertex/lastSetSegment already reflect that.
+  syncAddRowDefaultsFromLastSet();
+  renderAddRowDefaults();
+
   updateUndoButtons();
   draw();
 }
@@ -2630,5 +2986,6 @@ document.addEventListener('pointerdown', clearNameError, true);
 document.addEventListener('keydown',     clearNameError, true);
 
 updateUndoButtons();
+syncAddRowDefaultsFromLastSet();
 renderConstList();
 resize();

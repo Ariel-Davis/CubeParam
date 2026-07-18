@@ -376,16 +376,145 @@ button.active-loop {
   width: 38px;
 }
 
-#v-color,
-#seg-color {
+.color-picker-btn {
   width: 26px;
   height: 26px;
   padding: 1px;
-  background: #f0f0f0;
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+/* Popover shared by all 4 color-picker locations — a mini palette that opens
+   next to whichever .color-picker-btn triggered it. Positioned via JS
+   (position:fixed, coordinates from the trigger button's bounding rect)
+   rather than a CSS-relative ancestor, so it isn't clipped by the vertex/
+   segment list's own overflow:auto scrolling. Shows presets and constants
+   at once (each independently scrollable) plus a "Custom…" escape hatch —
+   no mode-switching, everything is reachable without an extra click. */
+.color-popover {
+  position: fixed;
+  z-index: 50;
+  width: 176px;
+  background: rgba(248, 248, 248, 0.97);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+body.dark-mode .color-popover {
+  background: rgba(25, 25, 25, 0.97);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.color-section-label {
+  font-family: sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: 2px;
+}
+
+body.dark-mode .color-section-label {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.color-preset-list,
+.color-const-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 110px;
+  overflow-y: auto;
+}
+
+.color-preset-row,
+.color-const-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.color-preset-row:hover,
+.color-const-row:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark-mode .color-preset-row:hover,
+body.dark-mode .color-const-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.color-preset-row .v-swatch,
+.color-const-row .v-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+.color-const-row.empty {
+  cursor: default;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+}
+
+body.dark-mode .color-const-row.empty {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.color-preset-row.linked,
+.color-const-row.linked {
+  outline: 2px solid rgba(60, 130, 255, 0.85);
+  outline-offset: -1px;
+}
+
+/* The "Custom…" control is a real native <input type="color"> overlaid
+   (invisible) directly on top of a purely-decorative label — not a button
+   that forwards a synthetic .click() to a hidden input. Safari doesn't
+   reliably honor a forwarded click as user-initiated for this input type,
+   so the click that opens the OS picker has to be genuinely real. */
+.color-custom-wrap {
+  position: relative;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.color-custom-btn {
+  width: 100%;
+  text-align: center;
+  padding: 5px 11px;
+  background: #e8e8e8;
+  color: rgba(0, 0, 0, 0.70);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  font-family: sans-serif;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.color-native-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
 }
 
 #vertex-list {
