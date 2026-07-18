@@ -137,6 +137,15 @@ body.dark-mode .coord-value {
   padding-top: 6px;
 }
 
+/* Unlike the other submenus (sized to their content, with #controls-body
+   scrolling if needed), Code should always claim whatever vertical space is
+   left over — regardless of which other submenus happen to be open — so the
+   editor itself grows/shrinks rather than leaving dead space below it. */
+#sub-code {
+  flex: 1;
+  min-height: 0;
+}
+
 body.dark-mode .submenu {
   border-top-color: rgba(255, 255, 255, 0.10);
 }
@@ -182,6 +191,8 @@ body.dark-mode #interpreter-row {
 
 .code-editor-wrap {
   display: flex;
+  flex: 1;
+  min-height: 0;
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
   overflow: hidden;
@@ -191,10 +202,17 @@ body.dark-mode .code-editor-wrap {
   border-color: rgba(255, 255, 255, 0.18);
 }
 
+/* The textarea owns the actual focus ring target, but the highlight itself
+   is drawn on the whole wrap (gutter + textarea) so the two read as one
+   cohesive unit rather than the outline appearing to cut between them. */
+.code-editor-wrap.focused {
+  border-color: rgba(60, 130, 255, 0.85);
+  box-shadow: 0 0 0 2px rgba(60, 130, 255, 0.35);
+}
+
 #code-gutter {
   flex-shrink: 0;
   width: 34px;
-  height: 260px;
   padding: 6px 4px;
   background: #ececec;
   color: rgba(0, 0, 0, 0.35);
@@ -202,8 +220,19 @@ body.dark-mode .code-editor-wrap {
   font-size: 11px;
   line-height: 16px;
   text-align: right;
-  overflow-y: hidden;
+  /* Genuinely scrollable (not hidden) so a scroll gesture can start from the
+     gutter itself, for cohesion with the textarea beside it — kept in sync
+     bidirectionally via JS. No bounce either way (see #code-textarea's
+     overscroll-behavior below), so there's nothing to desync mid-gesture,
+     and its own scrollbar is hidden since the textarea already shows one. */
+  overflow-y: auto;
+  overscroll-behavior: none;
+  scrollbar-width: none;
   user-select: none;
+}
+
+#code-gutter::-webkit-scrollbar {
+  display: none;
 }
 
 body.dark-mode #code-gutter {
@@ -219,17 +248,24 @@ body.dark-mode #code-gutter {
 #code-textarea {
   flex: 1;
   min-width: 0;
-  height: 260px;
   padding: 6px;
   background: #f0f0f0;
   color: rgba(0, 0, 0, 0.90);
   border: none;
+  outline: none;
   font-family: monospace;
   font-size: 11px;
   line-height: 16px;
   white-space: pre;
   overflow: auto;
   resize: vertical;
+  /* Elastic overscroll bounce only ever fires from a real touch-driven
+     scroll gesture, never from a programmatic scrollTop assignment — so the
+     gutter (whose scrollTop only ever follows this textarea's, via JS) can
+     never bounce in sync with it no matter what. Suppressing bounce on both
+     axes here is what actually keeps the two visually locked together,
+     rather than trying (and failing) to mirror an unmirrorable animation. */
+  overscroll-behavior: none;
 }
 
 body.dark-mode #code-textarea {

@@ -2708,6 +2708,7 @@ function buildCommittedArraysFromStaged(staged) {
 function refreshCodeGutterAndErrors() {
   const gutter    = document.getElementById('code-gutter');
   const errorList = document.getElementById('code-error-list');
+  const textarea  = document.getElementById('code-textarea');
   gutter.innerHTML    = '';
   errorList.innerHTML = '';
 
@@ -2722,7 +2723,6 @@ function refreshCodeGutterAndErrors() {
       errRow.className = 'code-error-row';
       errRow.textContent = `Line ${i + 1}: ${rec.errorMsg}`;
       errRow.addEventListener('click', () => {
-        const textarea = document.getElementById('code-textarea');
         const lines = textarea.value.split('\n');
         let pos = 0;
         for (let j = 0; j < i; j++) pos += lines[j].length + 1;
@@ -2732,6 +2732,12 @@ function refreshCodeGutterAndErrors() {
       errorList.appendChild(errRow);
     }
   });
+
+  // Rebuilding via innerHTML = '' resets the gutter's own scrollTop to 0 —
+  // restore it to match the textarea's current scroll position immediately,
+  // rather than leaving the two desynced until the next native scroll event
+  // on the textarea happens to fire and correct it.
+  gutter.scrollTop = textarea.scrollTop;
 }
 
 // Synchronous reparse + staged preview refresh. Called whenever the caret
@@ -2901,6 +2907,13 @@ document.getElementById('btn-code-save-exit').addEventListener('click', codeSave
   codeTextareaEl.addEventListener('click', () => codeCheckLineLeave(false));
   codeTextareaEl.addEventListener('blur',  () => codeCheckLineLeave(true));
 
+  // The focus ring lives on the whole gutter+textarea wrap, not just the
+  // textarea itself (see .code-editor-wrap.focused), so gutter and code
+  // read as one cohesive unit rather than the highlight cutting between them.
+  const codeEditorWrapEl = document.querySelector('.code-editor-wrap');
+  codeTextareaEl.addEventListener('focus', () => codeEditorWrapEl.classList.add('focused'));
+  codeTextareaEl.addEventListener('blur',  () => codeEditorWrapEl.classList.remove('focused'));
+
   // Plain textareas treat Tab as "move focus to the next element" — insert a
   // literal tab character instead (the syntax spec already treats tabs as
   // valid column separators).
@@ -2913,8 +2926,16 @@ document.getElementById('btn-code-save-exit').addEventListener('click', codeSave
   });
 }
 
+// Bidirectional so a scroll gesture can start from either side and the two
+// stay locked together — e.g. the user should be able to scroll by touching
+// the row-numbers column itself, not just the code. Safe from feedback loops:
+// assigning a scrollTop that's already at that value doesn't fire another
+// 'scroll' event, so each gesture settles after one mirrored update.
 document.getElementById('code-textarea').addEventListener('scroll', () => {
   document.getElementById('code-gutter').scrollTop = document.getElementById('code-textarea').scrollTop;
+});
+document.getElementById('code-gutter').addEventListener('scroll', () => {
+  document.getElementById('code-textarea').scrollTop = document.getElementById('code-gutter').scrollTop;
 });
 
 // The gutter's CSS height matches the textarea's default 260px so it clips
