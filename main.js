@@ -1946,11 +1946,31 @@ function setupColorPicker(rowBtn, popoverEl, presetListEl, constListEl, nativeIn
     if (e.target !== rowBtn && !popoverEl.contains(e.target)) close();
   }
 
+  // Anchored below-and-right of rowBtn by default, but clamped to the
+  // viewport: if there isn't room below, the popover shifts up so its own
+  // bottom edge lands at the viewport's bottom edge (not the button's); same
+  // idea horizontally. Measuring real offsetWidth/Height requires the
+  // popover to already be laid out (display:flex), so it's briefly measured
+  // invisibly before being revealed at its final position to avoid a
+  // visible jump.
   function open() {
-    const r = rowBtn.getBoundingClientRect();
-    popoverEl.style.top     = (r.bottom + 4) + 'px';
-    popoverEl.style.left    = r.left + 'px';
+    refresh();
+    popoverEl.style.visibility = 'hidden';
+    popoverEl.style.top  = '0px';
+    popoverEl.style.left = '0px';
     popoverEl.style.display = 'flex';
+    const r       = rowBtn.getBoundingClientRect();
+    const popRect = popoverEl.getBoundingClientRect();
+    const margin  = 4;
+    let top  = r.bottom + margin;
+    let left = r.left;
+    top  = Math.min(top,  window.innerHeight - popRect.height - margin);
+    left = Math.min(left, window.innerWidth  - popRect.width  - margin);
+    top  = Math.max(top,  margin);
+    left = Math.max(left, margin);
+    popoverEl.style.top  = top  + 'px';
+    popoverEl.style.left = left + 'px';
+    popoverEl.style.visibility = '';
     document.addEventListener('pointerdown', onOutsideClick, true);
   }
   function close() {
@@ -1962,7 +1982,10 @@ function setupColorPicker(rowBtn, popoverEl, presetListEl, constListEl, nativeIn
     if (popoverEl.style.display === 'none') open(); else close();
   });
   nativeInput.addEventListener('input', () => onLiteralChange(nativeInput.value));
-  nativeInput.addEventListener('change', () => { onLiteralChange(nativeInput.value); close(); });
+  // A custom pick needs its own refresh() — unlike preset/constant clicks
+  // (whose row handlers already trigger one via onPicked), nothing else
+  // would clear a stale .linked highlight left over from before this pick.
+  nativeInput.addEventListener('change', () => { onLiteralChange(nativeInput.value); refresh(); close(); });
 
   function makeRow(name, hex, linked, onClick) {
     const row = document.createElement('div');
