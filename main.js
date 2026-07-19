@@ -1362,13 +1362,21 @@ function applyPerspective(pt, depth, normS) {
 // projected (x,y): depth(x,y) = A*x + B*y + C. Solved once per face per frame
 // from any 3 of its projected vertices (closed-form, no iteration) — this is
 // what lets two faces be compared correctly at the specific point where they
-// actually overlap in projection, rather than by a lossy single "average
-// depth" number, which can get the order backwards even for convex,
-// non-scissoring geometry (a large tilted face's average can be dragged far
-// from its own near-peak's true local depth — see the plan for the worked
-// counterexample). Deliberately done in the pre-perspective plane, where the
-// affine relationship is exact; perspective division is applied separately,
-// only for the final on-screen fill path, not for the ordering math itself.
+// actually overlap, rather than by a lossy single "average depth" number,
+// which can get the order backwards even for convex, non-scissoring geometry
+// (a large tilted face's average can be dragged far from its own near-peak's
+// true local depth — see the plan for the worked counterexample).
+//
+// That "point where they actually overlap" has to be measured in the same
+// space as what's actually painted — the POST-perspective screen point (see
+// applyPerspective), not the pre-perspective (x,y) the affine formula above
+// is stated in. Perspective divides each face by its own d(x,y) = 1-depth/F,
+// which is a different warp per face (their planes differ), so two faces can
+// overlap on screen with no overlap pre-perspective, or the reverse — using
+// pre-perspective (x,y) for overlap/comparison is simply asking about the
+// wrong picture once perspective is on. faceScreenDepthFn below inverts the
+// divide in closed form so the comparison can be done correctly, in the
+// space that's actually rendered.
 
 function det3(m) {
   return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
@@ -1376,9 +1384,9 @@ function det3(m) {
        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 }
 
-// pts: 3 points [x, y, depth]. Returns a function (x,y) => depth, or null if
-// the 3 points are (numerically) collinear in projection — caller should
-// retry with a different triple.
+// pts: 3 points [x, y, depth]. Returns { A, B, C } (depth = A*x + B*y + C),
+// or null if the 3 points are (numerically) collinear in projection — caller
+// should retry with a different triple.
 function solveAffineDepth(pts) {
   const M = pts.map(([x, y]) => [x, y, 1]);
   const detM = det3(M);
@@ -1388,7 +1396,7 @@ function solveAffineDepth(pts) {
   const A = det3(withCol(M, 0, col(2))) / detM;
   const B = det3(withCol(M, 1, col(2))) / detM;
   const C = det3(withCol(M, 2, col(2))) / detM;
-  return (x, y) => A * x + B * y + C;
+  return { A, B, C };
 }
 
 // Tries consecutive vertex triples until a non-degenerate (non-collinear) one
@@ -1396,10 +1404,32 @@ function solveAffineDepth(pts) {
 // coincidentally-collinear early triple in larger polygons.
 function faceAffineDepth(pts2D) {
   for (let k = 2; k < pts2D.length; k++) {
-    const fn = solveAffineDepth([pts2D[0], pts2D[1], pts2D[k]]);
-    if (fn) return fn;
+    const coeffs = solveAffineDepth([pts2D[0], pts2D[1], pts2D[k]]);
+    if (coeffs) return coeffs;
   }
   return null;
+}
+
+// Given a face's pre-perspective affine depth coefficients and the focal
+// distance F currently in effect (Infinity when perspective is off), returns
+// a function mapping a POST-perspective screen point — after
+// applyPerspective's 1/d divide, before toScreen's pixel remapping — back to
+// the true depth the face has there.
+//
+// Derivation: screen (xs,ys) = (x,y)/d with d = 1 - depth(x,y)/F and
+// depth(x,y) = A*x+B*y+C, so x = xs*d, y = ys*d. Substituting:
+//   depth = A*xs*d + B*ys*d + C = d*(A*xs+B*ys) + C
+//   d     = 1 - depth/F
+// Solving the pair for depth directly (no iteration):
+//   depth(xs,ys) = (A*xs+B*ys+C) / (1 + (A*xs+B*ys)/F)
+// When F=Infinity this reduces exactly to the plain affine formula, since
+// screen coordinates equal pre-perspective coordinates when there's no
+// perspective divide to invert.
+function faceScreenDepthFn(A, B, C, F) {
+  return (xs, ys) => {
+    const linear = A * xs + B * ys;
+    return (linear + C) / (1 + linear / F);
+  };
 }
 
 function pointInPolygon(x, y, poly) {
@@ -1518,7 +1548,7 @@ function computeFaceDrawOrder(items) {
   const edges = [];
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
-      const delta = compareFaceDepths(items[i].poly2D, items[i].depthFn, items[j].poly2D, items[j].depthFn);
+      const delta = compareFaceDepths(items[i].screenPoly, items[i].screenDepthFn, items[j].screenPoly, items[j].screenDepthFn);
       if (delta === null) continue; // no pixel where their order is decided
       // depth = a1*h1 + a2*h2 + a3*h3 is LARGER when a point is nearer the
       // observer. Farther (smaller depth) must draw first (painter's algorithm).
@@ -1529,18 +1559,20 @@ function computeFaceDrawOrder(items) {
 }
 
 // Projects every visible face's vertices, derives each one's affine depth
-// formula, computes a back-to-front draw order via computeFaceDrawOrder, and
-// fills each face in that order. Drawn before drawSegments/drawVertices in
-// draw() — faces are a simple base layer for Phase 1, not yet interleaved in
-// depth with the wireframe (see plan).
+// formula and its screen-space equivalent, computes a back-to-front draw
+// order via computeFaceDrawOrder, and fills each face in that order. Drawn
+// before drawSegments/drawVertices in draw() — faces are a simple base layer
+// for Phase 1, not yet interleaved in depth with the wireframe (see plan).
 function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
+  const F = perspectiveOn ? perspPtoF(perspectiveP) : Infinity;
   const items = [];
   for (const f of facesArr) {
     if (!f.visible) continue;
     const vs = f.vertexIds.map(id => vertsArr.find(v => v.id === id));
     if (vs.some(v => !v)) continue;
-    const pts2D = [];      // [x, y, depth] pre-perspective, for ordering
-    const screenPts = [];  // {x,y} post-perspective, for the actual fill path
+    const pts2D = [];      // [x, y, depth] pre-perspective, for avgDepth
+    const screenPoly = []; // [x, y] post-perspective, pre-toScreen, for ordering
+    const screenPts = [];  // {x,y} post-perspective pixel coords, for the fill path
     let bad = false;
     for (const v of vs) {
       const { pt, depth } = projectPoint(v.coords, vecs, heights);
@@ -1548,16 +1580,17 @@ function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
       pts2D.push([pt.re, pt.im, depth]);
       const a = applyPerspective(pt, depth, normS);
       if (!a.ok) { bad = true; break; }
+      screenPoly.push([a.pt.re, a.pt.im]);
       screenPts.push(toScreen(a.pt, scale));
     }
     if (bad) continue;
-    const depthFn = faceAffineDepth(pts2D);
-    if (!depthFn) continue; // degenerate (all vertices collinear in projection)
+    const coeffs = faceAffineDepth(pts2D);
+    if (!coeffs) continue; // degenerate (all vertices collinear in projection)
     items.push({
       face: f,
-      poly2D: pts2D.map(([x, y]) => [x, y]),
+      screenPoly,
       screenPts,
-      depthFn,
+      screenDepthFn: faceScreenDepthFn(coeffs.A, coeffs.B, coeffs.C, F),
       avgDepth: pts2D.reduce((s, p) => s + p[2], 0) / pts2D.length,
     });
   }
