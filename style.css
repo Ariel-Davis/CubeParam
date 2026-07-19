@@ -117,10 +117,20 @@ body.dark-mode .coord-value {
   display: none;
 }
 
+#top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 #submenu-nav {
   display: flex;
   gap: 4px;
   justify-content: flex-end;
+}
+
+.push-right {
+  margin-left: auto;
 }
 
 .submenu-btn {

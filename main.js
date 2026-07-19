@@ -121,6 +121,7 @@ let paramMode   = 'u3';
 let displayMode = 'B';
 let controlPt   = new C(0.5, 0.3);
 let dragging    = false;
+let showPointer    = true;   // controls the draggable control-point marker
 let userScale      = 1.0;
 let showAxes       = false;
 let perspectiveOn  = false;
@@ -1755,7 +1756,7 @@ function draw() {
   drawFaces(activeFaces, activeVerts, vecs, heights, display, s);
   drawSegments(activeSegs, activeVerts, vecs, heights, display, s);
   drawVertices(activeVerts, vecs, heights, display, s);
-  drawControlPoint(base);
+  if (showPointer) drawControlPoint(base);
 }
 
 // ─── Pointer interaction ──────────────────────────────────────────────────────
@@ -1785,7 +1786,7 @@ canvas.addEventListener('pointerdown', e => {
   const ctrlPt    = toScreen(controlPt, getBaseScale());
   const hitRadius = e.pointerType === 'touch' ? 40 : 20;
 
-  if (Math.hypot(px - ctrlPt.x, py - ctrlPt.y) <= hitRadius) {
+  if (showPointer && Math.hypot(px - ctrlPt.x, py - ctrlPt.y) <= hitRadius) {
     dragging = true;
   } else {
     pointerDownData = { px, py, pointerType: e.pointerType };
@@ -1968,6 +1969,12 @@ inputScale.addEventListener('change', () => {
 document.getElementById('btn-axes').addEventListener('click', () => {
   showAxes = !showAxes;
   document.getElementById('btn-axes').classList.toggle('active', showAxes);
+  draw();
+});
+
+document.getElementById('btn-show-pointer').addEventListener('click', () => {
+  showPointer = !showPointer;
+  document.getElementById('btn-show-pointer').classList.toggle('active', showPointer);
   draw();
 });
 
@@ -3372,10 +3379,8 @@ window.addEventListener('keydown', e => {
 function updatePerspectiveUI() {
   document.getElementById('btn-perspective').classList.toggle('active', perspectiveOn);
   const show = perspectiveOn ? '' : 'none';
-  document.getElementById('persp-row').style.display        = show;
-  document.getElementById('clip-row').style.display         = show;
-  document.getElementById('scale-nodes-row').style.display  = show;
-  document.getElementById('scale-segs-row').style.display   = show;
+  document.getElementById('persp-row').style.display       = show;
+  document.getElementById('scale-persp-row').style.display = show;
 }
 
 document.getElementById('btn-perspective').addEventListener('click', () => {

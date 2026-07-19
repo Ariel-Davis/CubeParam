@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=28">
+  <link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -33,62 +33,55 @@
       </div>
       <div id="controls-body">
 
-        <!-- Submenu navigation -->
-        <div id="submenu-nav">
-          <button id="btn-sub-view" class="submenu-btn active" title="View">⚙</button>
-          <button id="btn-sub-aux"  class="submenu-btn"        title="Auxiliary objects">α</button>
-          <button id="btn-sub-disp" class="submenu-btn active" title="Display objects">△</button>
-        </div>
-
-        <!-- Undo / redo: always visible -->
-        <div class="toggle-group">
-          <span class="label"></span>
-          <button id="btn-undo" disabled>undo</button>
-          <button id="btn-redo" disabled>redo</button>
+        <!-- Top row: undo/redo (left) + submenu navigation (right) -->
+        <div id="top-row">
+          <div class="toggle-group">
+            <button id="btn-undo" disabled>undo</button>
+            <button id="btn-redo" disabled>redo</button>
+          </div>
+          <div id="submenu-nav">
+            <button id="btn-sub-view" class="submenu-btn active" title="View">⚙</button>
+            <button id="btn-sub-aux"  class="submenu-btn"        title="Auxiliary objects">α</button>
+            <button id="btn-sub-disp" class="submenu-btn active" title="Display objects">△</button>
+          </div>
         </div>
 
         <!-- View submenu -->
         <div id="sub-view" class="submenu">
           <div class="submenu-header">View</div>
           <div class="toggle-group">
-            <span class="label">Anchor</span>
-            <button id="btn-u3"  class="active">z Axis</button>
-            <button id="btn-diag">Diagonal</button>
-          </div>
-          <div class="toggle-group">
             <span class="label">Mode</span>
             <button id="btn-modeB" class="active">Compact</button>
             <button id="btn-modeA">Poly</button>
+            <button id="btn-show-pointer" class="active push-right">Show Pointer</button>
+          </div>
+          <div class="toggle-group">
+            <span class="label">Anchor</span>
+            <button id="btn-u3"  class="active">z Axis</button>
+            <button id="btn-diag">Diagonal</button>
+            <button id="btn-axes" class="push-right">Show Axes</button>
           </div>
           <div class="toggle-group" id="scale-row">
+            <span class="label"></span>
             <input type="range"  id="slider-scale" min="0.25" max="4" step="0.01" value="1">
             <span class="label" id="scale-label">scale =</span>
             <input type="number" id="input-scale"  value="1" step="0.01">
           </div>
           <div class="toggle-group">
-            <span class="label">axes</span>
-            <button id="btn-axes">show</button>
-          </div>
-          <div class="toggle-group">
-            <span class="label">persp</span>
-            <button id="btn-perspective">on</button>
+            <span class="label"></span>
+            <button id="btn-perspective">Perspective</button>
           </div>
           <div class="toggle-group" id="persp-row" style="display:none">
+            <span class="label"></span>
             <input type="range"  id="slider-persp" min="0" max="1" step="0.001" value="0">
             <span class="label" id="persp-label">1/F =</span>
             <input type="number" id="input-persp"  value="0" step="0.001" min="0" max="1">
+            <button id="btn-clip" class="active push-right" title="Clip behind camera">📷</button>
           </div>
-          <div class="toggle-group" id="clip-row" style="display:none">
-            <span class="label">clip</span>
-            <button id="btn-clip" class="active">behind</button>
-          </div>
-          <div class="toggle-group" id="scale-nodes-row" style="display:none">
-            <span class="label">nodes</span>
-            <button id="btn-scale-nodes">scale</button>
-          </div>
-          <div class="toggle-group" id="scale-segs-row" style="display:none">
-            <span class="label">segs</span>
-            <button id="btn-scale-segs">scale</button>
+          <div class="toggle-group" id="scale-persp-row" style="display:none">
+            <span class="label">Scale</span>
+            <button id="btn-scale-nodes">Nodes</button>
+            <button id="btn-scale-segs">Segments</button>
           </div>
         </div>
 
@@ -187,6 +180,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=47"></script>
+  <script src="main.js?v=48"></script>
 </body>
 </html>
