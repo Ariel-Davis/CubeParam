@@ -146,6 +146,8 @@ let vertices         = [];
 let nextVertexId     = 0;
 let segments         = [];
 let nextSegmentId    = 0;
+let faces            = [];
+let nextFaceId       = 0;
 let selectedVertexIds = new Set();
 let segmentMode       = 'off';     // 'off' | 'on' | 'on++'
 let focusedVertexId   = null;      // vertex id highlighted in the list (canvas click)
@@ -169,6 +171,7 @@ let previewOverride  = null;   // { vertices, segments } staged preview while ed
 // default to, not part of the object model itself.
 let lastSetVertex  = { color: undefined, r: undefined, visible: undefined, label: undefined };
 let lastSetSegment = { color: undefined, width: undefined, visible: undefined };
+let lastSetFace    = { color: undefined, visible: undefined };
 
 // Reparsing/validation is gated on "leaving a line after changing it" (not on
 // every keystroke) — these track the line the caret was in and its text as of
@@ -190,6 +193,7 @@ function captureState() {
   return {
     vertices:          vertices.map(v => ({ ...v, coords: [...v.coords], exprs: [...(v.exprs ?? ['','',''])] })),
     segments:          segments.map(s => ({ ...s, vertexIds: [...s.vertexIds] })),
+    faces:             faces.map(f => ({ ...f, vertexIds: [...f.vertexIds] })),
     selectedVertexIds: new Set(selectedVertexIds),
     constants:         constants.map(c => ({ ...c })),
   };
@@ -205,6 +209,7 @@ function snapshot() {
 function restoreState(state) {
   vertices               = state.vertices;
   segments               = state.segments;
+  faces                  = state.faces ?? [];
   selectedVertexIds      = state.selectedVertexIds;
   constants              = state.constants ?? [];
   editingVertexId        = null;
@@ -218,6 +223,7 @@ function restoreState(state) {
   renderConstList();
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   draw();
 }
 
@@ -480,6 +486,10 @@ function reEvalObjects() {
     if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv);  if (r.ok) s.lineWidth = r.value; }
     if (s.visibleExpr) { const r = resolveBoolAttr(s.visibleExpr, boolEnv);  if (r.ok) s.visible   = r.value; }
   }
+  for (const fc of faces) {
+    if (fc.colorExpr)   { const r = resolveColorAttr(fc.colorExpr, colorEnv); if (r.ok) fc.color   = r.value; }
+    if (fc.visibleExpr) { const r = resolveBoolAttr(fc.visibleExpr, boolEnv); if (r.ok) fc.visible  = r.value; }
+  }
 }
 
 function renameInExpr(expr, oldName, newName) {
@@ -499,6 +509,10 @@ function renameConstantEverywhere(oldName, newName) {
     for (const f of ['colorExpr', 'widthExpr', 'visibleExpr'])
       if (s[f]) s[f] = renameInExpr(s[f], oldName, newName);
   }
+  for (const fc of faces) {
+    for (const f of ['colorExpr', 'visibleExpr'])
+      if (fc[f]) fc[f] = renameInExpr(fc[f], oldName, newName);
+  }
   // lastSetVertex/lastSetSegment (what a fresh code-file Load shows) and
   // pendingVertexDefaults/pendingSegmentDefaults (what the GUI add-rows
   // currently link to) can also hold a bare constant-name reference in
@@ -507,17 +521,19 @@ function renameConstantEverywhere(oldName, newName) {
   // overkill here).
   if (lastSetVertex.color === oldName)         lastSetVertex.color = newName;
   if (lastSetSegment.color === oldName)        lastSetSegment.color = newName;
+  if (lastSetFace.color === oldName)           lastSetFace.color = newName;
   if (pendingVertexDefaults.color === oldName)  pendingVertexDefaults.color = newName;
   if (pendingSegmentDefaults.color === oldName) pendingSegmentDefaults.color = newName;
 }
 
-function isNameTakenIn(name, vertexList, constList, excludeVertexId = null, excludeConstId = null) {
+function isNameTakenIn(name, vertexList, constList, faceList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null) {
   return vertexList.some(v => v.name === name && v.id !== excludeVertexId)
-      || constList.some(c => c.name === name && c.id !== excludeConstId);
+      || constList.some(c => c.name === name && c.id !== excludeConstId)
+      || faceList.some(f => f.name === name && f.id !== excludeFaceId);
 }
 
-function isNameTaken(name, excludeVertexId = null, excludeConstId = null) {
-  return isNameTakenIn(name, vertices, constants, excludeVertexId, excludeConstId);
+function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null) {
+  return isNameTakenIn(name, vertices, constants, faces, excludeVertexId, excludeConstId, excludeFaceId);
 }
 
 function setNameError(el) {
@@ -617,14 +633,15 @@ const SECTION_DEFS = [
   { key: 'functions', title: 'FUNCTIONS', style: 'eq',   match: /FUNCTION/i },
   { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i },
   { key: 'segments',  title: 'SEGMENTS',  style: 'dash', match: /SEGMENT/i },
+  { key: 'faces',     title: 'FACES',     style: 'dash', match: /FACE/i },
   { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i },
 ];
 const SECTION_ORDER = SECTION_DEFS.map(d => d.key);
 
 const CODE_HEADER_EQ_RE   = /^\\\\=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^\\\\-+\s*(.*?)\s*-+$/;
-const CODE_OBJECT_RE = /^(const|vertex|segment|function|slider|curve)\b\s*([^:]*):(.*)$/;
-const CODE_SET_RE    = /^set\s+(vertex|segment)\s+(.+)$/;
+const CODE_OBJECT_RE = /^(const|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
+const CODE_SET_RE    = /^set\s+(vertex|segment|face)\s+(.+)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
 
@@ -670,12 +687,14 @@ function emitSection(outLines, style, title, ...blocks) {
 const SET_FIELD_ORDER = {
   vertex:  ['color', 'r', 'visible', 'label'],
   segment: ['color', 'width', 'visible'],
+  face:    ['color', 'visible'],
 };
 // Text-typed (not number/boolean) for consistency — every field is raw expr
 // text everywhere else now, so these fall-back defaults are too.
 const BUILTIN_SET_DEFAULTS = {
   vertex:  { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true' },
   segment: { color: DEFAULT_COLOR, width: '1.5', visible: 'true' },
+  face:    { color: DEFAULT_COLOR, visible: 'true' },
 };
 
 // Builds the consolidated "set" cluster for one type from the *final* state
@@ -745,6 +764,7 @@ function parseCodeText(text) {
   const stagedConstants = [];
   const stagedVertices  = [];
   const stagedSegments  = [];
+  const stagedFaces     = [];
   // Three environments, built incrementally in the same left-to-right walk
   // as everything else — a const can only reference an earlier const of the
   // same kind, exactly like the pre-existing numeric-only rule.
@@ -754,6 +774,7 @@ function parseCodeText(text) {
   const vertexByName    = new Map(); // name -> staged vertex, built incrementally
   let autoVertexN = 0;
   let autoConstN  = 0;
+  let autoFaceN   = 0;
 
   // Order-dependent "current set" state, like a paintbrush: a `set vertex
   // color=...` line updates this and every later vertex line that omits
@@ -764,6 +785,7 @@ function parseCodeText(text) {
   const currentSet = {
     vertex:  { color: undefined, r: undefined, visible: undefined, label: undefined },
     segment: { color: undefined, width: undefined, visible: undefined },
+    face:    { color: undefined, visible: undefined },
   };
 
   for (const raw of text.split('\n')) {
@@ -794,7 +816,7 @@ function parseCodeText(text) {
       // entirely positional (which object lines follow it), unlike const/
       // vertex/segment lines whose meaning doesn't depend on where within
       // their section they sit — so Sort must never relocate it.
-      const allowed = setType === 'vertex' ? ['color', 'r', 'visible', 'label'] : ['color', 'width', 'visible'];
+      const allowed = SET_FIELD_ORDER[setType];
       const tok = tokenizeAttrs(fieldTok.trim(), allowed);
       const attrKeys = tok.error ? [] : Object.keys(tok.attrs);
       if (tok.error || tok.positional.length > 0 || attrKeys.length !== 1) {
@@ -855,12 +877,12 @@ function parseCodeText(text) {
       rec.targetSection = 'constants';
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants));
+        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid constant name '${finalName}'`; lines.push(rec); continue;
       } else if (finalName === 'true' || finalName === 'false') {
         rec.valid = false; rec.errorMsg = `'${finalName}' is reserved and cannot be used as a constant name`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
@@ -916,10 +938,10 @@ function parseCodeText(text) {
 
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `P${autoVertexN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants));
+        do { finalName = `P${autoVertexN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid vertex name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
       const coords = coordExprs.map(t => evalExpr(t, numericEnv));
@@ -952,6 +974,49 @@ function parseCodeText(text) {
       };
       stagedVertices.push(obj);
       vertexByName.set(finalName, obj);
+      rec.parsed = obj;
+      lines.push(rec);
+      continue;
+    }
+
+    if (keyword === 'face') {
+      rec.kind = 'face';
+      rec.targetSection = 'faces';
+      const tok = tokenizeAttrs(rest, ['color', 'visible']);
+      if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
+      if (tok.positional.length < 3) {
+        rec.valid = false; rec.errorMsg = `expected at least 3 vertex names, found ${tok.positional.length}`; lines.push(rec); continue;
+      }
+      const faceVerts = tok.positional.map(n => vertexByName.get(n));
+      const missingIdx = faceVerts.findIndex(v => !v);
+      if (missingIdx !== -1) {
+        rec.valid = false; rec.errorMsg = `unknown vertex '${tok.positional[missingIdx]}'`; lines.push(rec); continue;
+      }
+
+      let finalName = name;
+      if (finalName === '') {
+        do { finalName = `F${autoFaceN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces));
+      } else if (!CODE_IDENT_RE.test(finalName)) {
+        rec.valid = false; rec.errorMsg = `invalid face name '${finalName}'`; lines.push(rec); continue;
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces)) {
+        rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
+      }
+
+      const faceColorExprText   = tok.attrs.color   ?? currentSet.face.color   ?? DEFAULT_COLOR;
+      const faceVisibleExprText = tok.attrs.visible ?? currentSet.face.visible ?? 'true';
+
+      const faceColorRes = resolveColorAttr(faceColorExprText, colorEnv);
+      if (!faceColorRes.ok) { rec.valid = false; rec.errorMsg = `unknown color '${faceColorExprText}'`; lines.push(rec); continue; }
+      const faceVisibleRes = resolveBoolAttr(faceVisibleExprText, boolEnv);
+      if (!faceVisibleRes.ok) { rec.valid = false; rec.errorMsg = `invalid visible value '${faceVisibleExprText}'`; lines.push(rec); continue; }
+
+      const obj = {
+        name: finalName,
+        vertexNames: faceVerts.map(v => v.name),
+        color: faceColorRes.value,     colorExpr: faceColorExprText,
+        visible: faceVisibleRes.value, visibleExpr: faceVisibleExprText,
+      };
+      stagedFaces.push(obj);
       rec.parsed = obj;
       lines.push(rec);
       continue;
@@ -994,7 +1059,7 @@ function parseCodeText(text) {
     lines.push(rec);
   }
 
-  return { lines, stagedConstants, stagedVertices, stagedSegments, finalSet: currentSet };
+  return { lines, stagedConstants, stagedVertices, stagedSegments, stagedFaces, finalSet: currentSet };
 }
 
 function formatCoordExpr(v, i) {
@@ -1035,6 +1100,16 @@ function formatSegmentLine(v1, v2, seg) {
   return `segment:  ${v1.name}  ${v2.name}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('width', widthExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
 }
 
+// vertsForFace need only a `.name` each — callers may pass either full vertex
+// objects (serializeState) or a staged face's resolved-name list, same
+// convention as formatSegmentLine.
+function formatFaceLine(vertsForFace, f) {
+  const colorExpr   = f.colorExpr   ?? f.color ?? DEFAULT_COLOR;
+  const visibleExpr = f.visibleExpr ?? String(f.visible !== false);
+  const names = vertsForFace.map(v => v.name).join('  ');
+  return `face ${f.name}: ${names}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
+}
+
 function formatSetLine(parsed) {
   return `set ${parsed.setType} ${formatFieldToken(parsed.field, parsed.value)}`;
 }
@@ -1049,19 +1124,21 @@ function formatLineForOutput(rec) {
   if (rec.kind === 'const')   return formatConstLine(rec.parsed);
   if (rec.kind === 'vertex')  return formatVertexLine(rec.parsed);
   if (rec.kind === 'segment') return formatSegmentLine({ name: rec.parsed.v1Name }, { name: rec.parsed.v2Name }, rec.parsed);
+  if (rec.kind === 'face')    return formatFaceLine(rec.parsed.vertexNames.map(n => ({ name: n })), rec.parsed);
   if (rec.kind === 'set')     return formatSetLine(rec.parsed);
   return rec.raw;
 }
 
-function serializeState(vertsArr, constsArr, segsArr) {
+function serializeState(vertsArr, constsArr, segsArr, facesArr) {
   const out = [];
   emitSection(out, 'eq',   'CONSTANTS', constsArr.map(formatConstLine));
   emitSection(out, 'eq',   'FUNCTIONS', []);
-  // Committed vertex/segment objects carry no memory of any `set` line that
-  // once governed them individually (each one's own resolved value/expr is
-  // what persists, via its own color=/r=/etc.) — but the *cluster itself*
-  // remembers the last-saved governing values (lastSetVertex/lastSetSegment)
-  // so a fresh Load shows what you left off with, not the built-in defaults.
+  // Committed vertex/segment/face objects carry no memory of any `set` line
+  // that once governed them individually (each one's own resolved value/expr
+  // is what persists, via its own color=/r=/etc.) — but the *cluster itself*
+  // remembers the last-saved governing values (lastSetVertex/lastSetSegment/
+  // lastSetFace) so a fresh Load shows what you left off with, not the
+  // built-in defaults.
   emitSection(out, 'dash', 'VERTICES',  buildSetBlock('vertex', lastSetVertex), vertsArr.map(formatVertexLine));
   const segLines = segsArr.map(seg => {
     const v1 = vertsArr.find(v => v.id === seg.vertexIds[0]);
@@ -1069,6 +1146,11 @@ function serializeState(vertsArr, constsArr, segsArr) {
     return (v1 && v2) ? formatSegmentLine(v1, v2, seg) : null;
   }).filter(Boolean);
   emitSection(out, 'dash', 'SEGMENTS', buildSetBlock('segment', lastSetSegment), segLines);
+  const faceLines = (facesArr ?? []).map(f => {
+    const verts = f.vertexIds.map(id => vertsArr.find(v => v.id === id));
+    return verts.every(Boolean) ? formatFaceLine(verts, f) : null;
+  }).filter(Boolean);
+  emitSection(out, 'dash', 'FACES', buildSetBlock('face', lastSetFace), faceLines);
   emitSection(out, 'dash', 'CURVES', []);
   out.push(makeDividerLine());
   out.push('');
@@ -1152,6 +1234,8 @@ function sortCodeText(text) {
       emitSection(out, def.style, def.title, buildSetBlock('vertex', finalSet.vertex), objectLines);
     } else if (key === 'segments') {
       emitSection(out, def.style, def.title, buildSetBlock('segment', finalSet.segment), objectLines);
+    } else if (key === 'faces') {
+      emitSection(out, def.style, def.title, buildSetBlock('face', finalSet.face), objectLines);
     } else {
       emitSection(out, def.style, def.title, objectLines);
     }
@@ -1270,6 +1354,226 @@ function applyPerspective(pt, depth, normS) {
   const d = 1 - h / F;   // = 1 - p·h when F=1/p; Infinity case: h/∞=0 → d=1
   if (clipBehind && d <= 0) return { pt: null, ok: false, factor: 1 };
   return { pt: pt.scale(1 / d), ok: true, factor: 1 / d };
+}
+
+// ─── Face depth-ordering ──────────────────────────────────────────────────────
+//
+// Faces are planar, so depth is an *affine* function of pre-perspective
+// projected (x,y): depth(x,y) = A*x + B*y + C. Solved once per face per frame
+// from any 3 of its projected vertices (closed-form, no iteration) — this is
+// what lets two faces be compared correctly at the specific point where they
+// actually overlap in projection, rather than by a lossy single "average
+// depth" number, which can get the order backwards even for convex,
+// non-scissoring geometry (a large tilted face's average can be dragged far
+// from its own near-peak's true local depth — see the plan for the worked
+// counterexample). Deliberately done in the pre-perspective plane, where the
+// affine relationship is exact; perspective division is applied separately,
+// only for the final on-screen fill path, not for the ordering math itself.
+
+function det3(m) {
+  return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+       - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+       + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+}
+
+// pts: 3 points [x, y, depth]. Returns a function (x,y) => depth, or null if
+// the 3 points are (numerically) collinear in projection — caller should
+// retry with a different triple.
+function solveAffineDepth(pts) {
+  const M = pts.map(([x, y]) => [x, y, 1]);
+  const detM = det3(M);
+  if (Math.abs(detM) < 1e-9) return null;
+  const col = i => pts.map(p => p[i]);
+  const withCol = (base, i, replacement) => base.map((row, r) => row.map((v, c) => c === i ? replacement[r] : v));
+  const A = det3(withCol(M, 0, col(2))) / detM;
+  const B = det3(withCol(M, 1, col(2))) / detM;
+  const C = det3(withCol(M, 2, col(2))) / detM;
+  return (x, y) => A * x + B * y + C;
+}
+
+// Tries consecutive vertex triples until a non-degenerate (non-collinear) one
+// is found — handles the common n=3 case trivially and copes with a
+// coincidentally-collinear early triple in larger polygons.
+function faceAffineDepth(pts2D) {
+  for (let k = 2; k < pts2D.length; k++) {
+    const fn = solveAffineDepth([pts2D[0], pts2D[1], pts2D[k]]);
+    if (fn) return fn;
+  }
+  return null;
+}
+
+function pointInPolygon(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonCentroid(poly) {
+  let sx = 0, sy = 0;
+  for (const [x, y] of poly) { sx += x; sy += y; }
+  return [sx / poly.length, sy / poly.length];
+}
+
+function segIntersect(p1, p2, p3, p4) {
+  const [x1, y1] = p1, [x2, y2] = p2, [x3, y3] = p3, [x4, y4] = p4;
+  const d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(d) < 1e-9) return null;
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d;
+  const u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / d;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
+}
+
+// Finds every candidate point worth testing in the intersection of two
+// projected polygons — centroids and their midpoint first (cheap, common
+// case), then vertex-in-polygon, then edge-intersection points. Returns them
+// ALL, in preference order, rather than just the first hit: for two faces
+// that share a 3D edge, the shared vertices sit exactly on both polygons'
+// boundary, so pointInPolygon's ray-cast test can go either way on floating-
+// point noise there — a single-answer version of this function can easily
+// hand back a point exactly on the shared edge, which is meaningless for
+// depth comparison (see compareFaceDepths). Returning every candidate lets
+// the caller skip degenerate ones and keep looking for a real one.
+function findOverlapCandidates(polyA, polyB) {
+  const out = [];
+  const cA = polygonCentroid(polyA), cB = polygonCentroid(polyB);
+  if (pointInPolygon(cA[0], cA[1], polyB)) out.push(cA);
+  if (pointInPolygon(cB[0], cB[1], polyA)) out.push(cB);
+  const mid = [(cA[0] + cB[0]) / 2, (cA[1] + cB[1]) / 2];
+  if (pointInPolygon(mid[0], mid[1], polyA) && pointInPolygon(mid[0], mid[1], polyB)) out.push(mid);
+  for (const v of polyA) if (pointInPolygon(v[0], v[1], polyB)) out.push(v);
+  for (const v of polyB) if (pointInPolygon(v[0], v[1], polyA)) out.push(v);
+  for (let i = 0; i < polyA.length; i++) {
+    const a1 = polyA[i], a2 = polyA[(i + 1) % polyA.length];
+    for (let j = 0; j < polyB.length; j++) {
+      const b1 = polyB[j], b2 = polyB[(j + 1) % polyB.length];
+      const pt = segIntersect(a1, a2, b1, b2);
+      if (pt) out.push(pt);
+    }
+  }
+  return out;
+}
+
+// Threshold well above float noise on a tied (shared-edge) comparison
+// (observed ~1e-16) and well below any genuine depth difference observed on
+// this app's scenes (observed >= ~1e-2 whenever two faces truly overlap in
+// projection) — separates a real signal from a degenerate tie.
+const FACE_DEPTH_TIE_EPS = 1e-6;
+
+// Compares two faces' true depth at a point where they actually overlap in
+// projection. Walks findOverlapCandidates' list and returns the delta
+// (depthA - depthB) at the first candidate that isn't a near-zero tie —
+// positive means A has the larger depth value (A is nearer the observer,
+// draws last), negative means B is nearer.
+// Returns null if every candidate is a tie (including "no overlap at all",
+// which is the common case for two faces that only touch along a shared
+// edge): since each face's depth is an affine function of (x,y), the two
+// faces' depth difference is also affine, so it is either exactly zero
+// everywhere they're both defined (coplanar) or zero only on a line — a
+// candidate landing near that line, with no other candidate clearing the
+// threshold, means there's no pixel where their order is actually decided,
+// not that the algorithm failed to find one.
+function compareFaceDepths(polyA, depthFnA, polyB, depthFnB) {
+  for (const [x, y] of findOverlapCandidates(polyA, polyB)) {
+    const delta = depthFnA(x, y) - depthFnB(x, y);
+    if (Math.abs(delta) > FACE_DEPTH_TIE_EPS) return delta;
+  }
+  return null;
+}
+
+// Kahn's algorithm, modified to never fail: `edges` are [fartherIdx, nearerIdx]
+// pairs (farther must draw before nearer). When stuck with a real cycle
+// (genuine mutual occlusion — out of scope for Phase 1's simple layering),
+// breaks it by force-picking the remaining node with the smallest average
+// depth (farthest — depth is larger when nearer) rather than failing to
+// produce an order at all.
+function topoSortFaces(n, edges, avgDepth) {
+  const inDegree = new Array(n).fill(0);
+  const adj = Array.from({ length: n }, () => []);
+  for (const [farther, nearer] of edges) { adj[farther].push(nearer); inDegree[nearer]++; }
+  const remaining = new Set(Array.from({ length: n }, (_, i) => i));
+  const order = [];
+  while (remaining.size > 0) {
+    let next = [...remaining].find(i => inDegree[i] === 0);
+    if (next === undefined) {
+      next = [...remaining].sort((a, b) => avgDepth[a] - avgDepth[b])[0];
+    }
+    order.push(next);
+    remaining.delete(next);
+    for (const nb of adj[next]) inDegree[nb]--;
+  }
+  return order;
+}
+
+// The pluggable ordering step: given projected+depth-annotated face items,
+// returns a back-to-front draw order (indices into `items`). Everything else
+// in drawFaces (projection, screen coordinates, the actual fill calls) is
+// fixed pipeline around this — an alternate strategy (e.g. a precomputed
+// BSP-tree traversal) can replace this function's body without touching
+// anything else.
+function computeFaceDrawOrder(items) {
+  const edges = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const delta = compareFaceDepths(items[i].poly2D, items[i].depthFn, items[j].poly2D, items[j].depthFn);
+      if (delta === null) continue; // no pixel where their order is decided
+      // depth = a1*h1 + a2*h2 + a3*h3 is LARGER when a point is nearer the
+      // observer. Farther (smaller depth) must draw first (painter's algorithm).
+      if (delta > 0) edges.push([j, i]); else edges.push([i, j]);
+    }
+  }
+  return topoSortFaces(items.length, edges, items.map(it => it.avgDepth));
+}
+
+// Projects every visible face's vertices, derives each one's affine depth
+// formula, computes a back-to-front draw order via computeFaceDrawOrder, and
+// fills each face in that order. Drawn before drawSegments/drawVertices in
+// draw() — faces are a simple base layer for Phase 1, not yet interleaved in
+// depth with the wireframe (see plan).
+function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
+  const items = [];
+  for (const f of facesArr) {
+    if (!f.visible) continue;
+    const vs = f.vertexIds.map(id => vertsArr.find(v => v.id === id));
+    if (vs.some(v => !v)) continue;
+    const pts2D = [];      // [x, y, depth] pre-perspective, for ordering
+    const screenPts = [];  // {x,y} post-perspective, for the actual fill path
+    let bad = false;
+    for (const v of vs) {
+      const { pt, depth } = projectPoint(v.coords, vecs, heights);
+      if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) { bad = true; break; }
+      pts2D.push([pt.re, pt.im, depth]);
+      const a = applyPerspective(pt, depth, normS);
+      if (!a.ok) { bad = true; break; }
+      screenPts.push(toScreen(a.pt, scale));
+    }
+    if (bad) continue;
+    const depthFn = faceAffineDepth(pts2D);
+    if (!depthFn) continue; // degenerate (all vertices collinear in projection)
+    items.push({
+      face: f,
+      poly2D: pts2D.map(([x, y]) => [x, y]),
+      screenPts,
+      depthFn,
+      avgDepth: pts2D.reduce((s, p) => s + p[2], 0) / pts2D.length,
+    });
+  }
+  if (items.length === 0) return;
+
+  const order = computeFaceDrawOrder(items);
+
+  for (const idx of order) {
+    const { face: f, screenPts: sp } = items[idx];
+    ctx.beginPath();
+    ctx.moveTo(sp[0].x, sp[0].y);
+    for (let k = 1; k < sp.length; k++) ctx.lineTo(sp[k].x, sp[k].y);
+    ctx.closePath();
+    ctx.fillStyle = themeColor(f.color);
+    ctx.fill();
+  }
 }
 
 function drawSegments(segs, verts, vecs, heights, scale, normS) {
@@ -1412,8 +1716,10 @@ function draw() {
   const { vecs, heights, s } = getProjectionState();
   const activeVerts = codeOpen && previewOverride ? previewOverride.vertices : vertices;
   const activeSegs  = codeOpen && previewOverride ? previewOverride.segments : segments;
+  const activeFaces = codeOpen && previewOverride ? previewOverride.faces : faces;
   if (displayMode === 'B') drawDiskBoundary(base);
   if (showAxes) drawAxes(vecs, display);
+  drawFaces(activeFaces, activeVerts, vecs, heights, display, s);
   drawSegments(activeSegs, activeVerts, vecs, heights, display, s);
   drawVertices(activeVerts, vecs, heights, display, s);
   drawControlPoint(base);
@@ -1648,6 +1954,7 @@ function enterEditMode(id) {
   updateSciKeyboard();
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   renderConstList();
   draw();
 }
@@ -2424,6 +2731,7 @@ function enterSegmentEditMode(id) {
   editingSegmentOriginal = captureState();
   updateUndoButtons();
   renderSegmentList();
+  renderFaceList();
 }
 
 function commitSegmentEdit() {
@@ -2434,6 +2742,7 @@ function commitSegmentEdit() {
   editingSegmentOriginal = null;
   updateUndoButtons();
   renderSegmentList();
+  renderFaceList();
   draw();
 }
 
@@ -2450,6 +2759,7 @@ function cancelSegmentEdit() {
   editingSegmentOriginal = null;
   updateUndoButtons();
   renderSegmentList();
+  renderFaceList();
   draw();
 }
 
@@ -2611,6 +2921,56 @@ function renderSegmentList() {
   }
 }
 
+// Read-only for Phase 1 (per plan) — visibility toggle + delete only, no
+// edit mode, no color popover, no canvas selection. Faces are defined in the
+// code file only; this list is for quick control, not creation.
+function renderFaceList() {
+  const list   = document.getElementById('face-list');
+  list.innerHTML = '';
+  const inEdit = editingVertexId !== null || editingSegmentId !== null;
+
+  for (const f of faces) {
+    const entry = document.createElement('div');
+    entry.className = 'segment-entry';
+
+    const swatch = document.createElement('span');
+    swatch.className = 's-swatch';
+    swatch.style.background = f.color;
+
+    const label = document.createElement('span');
+    label.className = 's-name';
+    label.textContent = f.name;
+
+    const toggle = document.createElement('button');
+    toggle.className = 'v-toggle';
+    toggle.textContent = f.visible ? '●' : '○';
+    toggle.title = f.visible ? 'Hide' : 'Show';
+    toggle.disabled = inEdit;
+    toggle.addEventListener('click', () => {
+      snapshot();
+      f.visible = !f.visible;
+      f.visibleExpr = String(f.visible);
+      renderFaceList();
+      draw();
+    });
+
+    const del = document.createElement('button');
+    del.className = 'v-delete';
+    del.textContent = '×';
+    del.title = 'Delete';
+    del.disabled = inEdit;
+    del.addEventListener('click', () => {
+      snapshot();
+      faces = faces.filter(x => x.id !== f.id);
+      renderFaceList();
+      draw();
+    });
+
+    entry.append(swatch, label, toggle, del);
+    list.appendChild(entry);
+  }
+}
+
 document.getElementById('btn-segment').addEventListener('click', () => {
   if      (segmentMode === 'off')  segmentMode = 'on';
   else if (segmentMode === 'on')   segmentMode = 'on++';
@@ -2702,7 +3062,14 @@ function buildCommittedArraysFromStaged(staged) {
     lineWidth: s.lineWidth, widthExpr: s.widthExpr,
     visible: s.visible,     visibleExpr: s.visibleExpr,
   }));
-  return { newVertices, newConstants, newSegments };
+  const newFaces = staged.stagedFaces.map((f, i) => ({
+    id: i,
+    name: f.name,
+    vertexIds: f.vertexNames.map(n => nameToId.get(n)),
+    color: f.color,     colorExpr: f.colorExpr,
+    visible: f.visible, visibleExpr: f.visibleExpr,
+  }));
+  return { newVertices, newConstants, newSegments, newFaces };
 }
 
 function refreshCodeGutterAndErrors() {
@@ -2748,8 +3115,8 @@ function reparseAndPreview() {
   const textarea = document.getElementById('code-textarea');
   const staged = parseCodeText(textarea.value);
   codeLineRecords = staged.lines;
-  const { newVertices, newSegments } = buildCommittedArraysFromStaged(staged);
-  previewOverride = { vertices: newVertices, segments: newSegments };
+  const { newVertices, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
+  previewOverride = { vertices: newVertices, segments: newSegments, faces: newFaces };
   refreshCodeGutterAndErrors();
   draw();
 }
@@ -2780,12 +3147,13 @@ function codeSave() {
   codeSort();
   const textarea = document.getElementById('code-textarea');
   const staged = parseCodeText(textarea.value);
-  const { newVertices, newConstants, newSegments } = buildCommittedArraysFromStaged(staged);
+  const { newVertices, newConstants, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
 
   // Remember this save's governing `set` values so the next Load starts
   // from here instead of resetting to the built-in defaults.
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
+  lastSetFace    = { ...staged.finalSet.face };
 
   snapshot();
   vertices          = newVertices;
@@ -2794,6 +3162,8 @@ function codeSave() {
   nextConstantId    = newConstants.length;
   segments          = newSegments;
   nextSegmentId     = newSegments.length;
+  faces             = newFaces;
+  nextFaceId        = newFaces.length;
   selectedVertexIds = new Set();
   focusedVertexId   = null;
   selectedSegmentId = null;
@@ -2802,6 +3172,7 @@ function codeSave() {
   renderConstList();
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   previewOverride = null;
   draw();
 
@@ -2826,7 +3197,7 @@ function openCodeSubmenu() {
   document.getElementById('btn-sub-code').classList.add('active');
 
   const textarea = document.getElementById('code-textarea');
-  textarea.value = serializeState(vertices, constants, segments);
+  textarea.value = serializeState(vertices, constants, segments, faces);
   reparseAndPreview();
   resetCodeLineTracking();
   updateUndoButtons();
@@ -3032,4 +3403,5 @@ document.addEventListener('keydown',     clearNameError, true);
 updateUndoButtons();
 syncAddRowDefaultsFromLastSet();
 renderConstList();
+renderFaceList();
 resize();
