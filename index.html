@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=29">
+  <link rel="stylesheet" href="style.css?v=34">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -31,9 +31,10 @@
         <button id="btn-dark">☾</button>
         <button id="btn-toggle-controls" class="active">☰</button>
       </div>
-      <div id="controls-body">
+      <div id="controls-main">
 
-        <!-- Top row: undo/redo (left) + submenu navigation (right) -->
+        <!-- Top row: undo/redo (left) + submenu navigation (right) — fixed,
+             never scrolls out of view. -->
         <div id="top-row">
           <div class="toggle-group">
             <button id="btn-undo" disabled>undo</button>
@@ -45,6 +46,8 @@
             <button id="btn-sub-disp" class="submenu-btn active" title="Display objects">△</button>
           </div>
         </div>
+
+      <div id="controls-body">
 
         <!-- View submenu -->
         <div id="sub-view" class="submenu">
@@ -126,7 +129,10 @@
             <button id="v-add-label"   class="v-toggle" title="New vertices show label">A</button>
             <button id="v-add-visible" class="v-toggle" title="New vertices visible">●</button>
           </div>
-          <div id="vertex-list"></div>
+          <div class="list-section" data-list="vertex">
+            <button class="list-toggle" data-list="vertex" data-label="Vertices">▾ Vertices</button>
+            <div id="vertex-list"></div>
+          </div>
           <div class="section-divider"></div>
           <div class="toggle-group">
             <span class="label">create</span>
@@ -149,9 +155,15 @@
             <span class="label"></span>
             <button id="seg-add-visible" class="v-toggle" title="New segments visible">●</button>
           </div>
-          <div id="segment-list"></div>
+          <div class="list-section" data-list="segment">
+            <button class="list-toggle" data-list="segment" data-label="Segments">▾ Segments</button>
+            <div id="segment-list"></div>
+          </div>
           <div class="section-divider"></div>
-          <div id="face-list"></div>
+          <div class="list-section" data-list="face">
+            <button class="list-toggle" data-list="face" data-label="Faces">▾ Faces</button>
+            <div id="face-list"></div>
+          </div>
         </div>
 
         <!-- Code submenu -->
@@ -170,7 +182,10 @@
           <div id="code-error-list"></div>
         </div>
 
-        <!-- Interpreter row (placeholder — wired up with Code submenu later) -->
+      </div>
+
+        <!-- Interpreter row (placeholder — wired up with Code submenu later)
+             — fixed, never scrolls out of view. -->
         <div id="interpreter-row">
           <input type="text" id="interpreter-input" class="expr-input" placeholder="define object…" autocapitalize="none" autocorrect="off" spellcheck="false" disabled>
           <button id="btn-sub-code" class="submenu-btn" title="Code">⌨</button>
@@ -180,6 +195,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=48"></script>
+  <script src="main.js?v=54"></script>
 </body>
 </html>

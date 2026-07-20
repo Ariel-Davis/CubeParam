@@ -36,6 +36,8 @@ canvas {
 
 #sci-keyboard,
 #controls-header,
+#top-row,
+#interpreter-row,
 #controls-body > * {
   pointer-events: auto;
 }
@@ -103,18 +105,39 @@ body.dark-mode .coord-value {
   color: rgba(255, 255, 255, 0.55);
 }
 
-#controls-body {
+/* Wraps top-row + controls-body + interpreter-row so the top/bottom button
+   rows stay fixed while only controls-body (the current submenu's content)
+   scrolls — and so a single .collapsed toggle still hides all three at once. */
+#controls-main {
   display: flex;
   flex-direction: column;
   gap: 10px;
   width: 354px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
 }
 
-#controls-body.collapsed {
+#controls-main.collapsed {
   display: none;
+}
+
+/* overflow-y:auto stays unconditional (tried making it visible/no-scroll
+   outside Code — confirmed empirically that overflowing content then
+   renders past #controls-wrapper's fixed bounds with no way to reach it,
+   since body itself is overflow:hidden and #controls-wrapper is
+   position:fixed, removed from normal flow — there is no scroll fallback
+   above this level). Collapsibility on each object list (see
+   updateListToggle) is what actually prevents the ambiguity in practice:
+   each list's own bounded max-height + independent scroll handles the
+   common case, and the outer scroll here is a rare safety net rather than
+   something competing with them day to day. */
+#controls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 #top-row {
@@ -147,11 +170,14 @@ body.dark-mode .coord-value {
   padding-top: 6px;
 }
 
-/* Unlike the other submenus (sized to their content, with #controls-body
-   scrolling if needed), Code should always claim whatever vertical space is
-   left over — regardless of which other submenus happen to be open — so the
-   editor itself grows/shrinks rather than leaving dead space below it. */
-#sub-code {
+/* Unlike View/Aux (sized to their content), Code and Display both claim
+   whatever vertical space is left over in #controls-body — Code so its
+   editor grows/shrinks rather than leaving dead space below it, Display so
+   its object lists (see #vertex-list etc.) can divide that space among
+   themselves instead of each claiming a fixed height regardless of how many
+   are open. */
+#sub-code,
+#sub-disp {
   flex: 1;
   min-height: 0;
 }
@@ -563,11 +589,77 @@ body.dark-mode .color-const-row.empty {
   padding: 0;
 }
 
+/* Wraps a toggle button + its list so the button can be absolutely
+   positioned into the list's own left gutter once open (see
+   .list-toggle-compact) instead of spending a whole row on a label that's
+   no longer needed once the list itself is visible. Only grows (flex:1) —
+   competing with the other lists for #sub-disp's available space — while
+   open; a closed section is just its (small, natural-height) toggle row. */
+.list-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.list-section.list-open {
+  flex: 1;
+}
+
+.list-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-family: sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.list-toggle:hover {
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.list-toggle:disabled {
+  cursor: default;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* Open state: the label+count give way to a small marker overlaid in the
+   list's own 49px left gutter (see #vertex-list's padding-left) — lined up
+   with its first row instead of claiming a separate header row. */
+.list-toggle.list-toggle-compact {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 44px;
+  text-align: right;
+  padding: 0;
+}
+
+body.dark-mode .list-toggle {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+body.dark-mode .list-toggle:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* flex:1 (not a fixed max-height) so open lists divide whatever space
+   #sub-disp has left among themselves — fewer open lists means more room
+   each; a collapsed (display:none) list takes none. min-height is a floor
+   so a squeezed list still shows something rather than vanishing; its own
+   overflow-y:auto is what actually handles "more rows than that floor
+   allows," never an ancestor's scroll. */
 #vertex-list {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-height: 180px;
+  flex: 1;
+  min-height: 44px;
   overflow-y: auto;
   padding-left: 49px;
 }
@@ -734,11 +826,13 @@ body.dark-mode .color-const-row.empty {
   flex-shrink: 0;
 }
 
-#segment-list {
+#segment-list,
+#face-list {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-height: 120px;
+  flex: 1;
+  min-height: 44px;
   overflow-y: auto;
   padding-left: 49px;
 }

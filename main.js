@@ -158,6 +158,11 @@ let editingOriginal        = null;  // captureState() snapshot taken on vertex e
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
 let editingSegmentOriginal = null;  // captureState() snapshot taken on segment edit entry
 
+// Collapse state for the Display submenu's object lists — pure UI/view
+// state (like showAxes/darkMode/userScale), not object-model data, so it's
+// excluded from captureState/restoreState and undo/redo.
+let listSectionOpen = { vertex: true, segment: true, face: true };
+
 // ─── Code submenu state ────────────────────────────────────────────────────────
 
 let codeOpen         = false;  // true while the Code submenu is open
@@ -2193,6 +2198,9 @@ function renderConstList() {
       renderConstValSpan(valSpan, c);
       exprInp.classList.toggle('expr-invalid', c.kind === 'number' && isNaN(c.value) && c.expr.trim() !== '');
       reEvalObjects();
+      renderVertexList();
+      renderSegmentList();
+      renderFaceList();
       draw();
     });
 
@@ -2208,7 +2216,7 @@ function renderConstList() {
     del.addEventListener('click', () => {
       snapshot();
       constants = constants.filter(x => x.id !== c.id);
-      reEvalObjects(); renderConstList(); draw();
+      reEvalObjects(); renderConstList(); renderVertexList(); renderSegmentList(); renderFaceList(); draw();
     });
 
     entry.append(btnSlot, nameInp, eq, exprInp, valSpan, del);
@@ -2482,8 +2490,8 @@ function renderVertexList() {
         name => { v.colorExpr = name; },
         hex => { v.color = hex; v.colorExpr = hex; colorBtn.style.background = hex; draw(); },
         () => {
-          const c = constants.find(cc => cc.name === v.colorExpr);
-          if (c) v.color = c.value;
+          const r = resolveColorAttr(v.colorExpr, buildEnvs().colorEnv);
+          if (r.ok) v.color = r.value;
           draw();
           renderVertexList();
         }
@@ -2685,6 +2693,7 @@ function renderVertexList() {
   } else {
     list.scrollTop = savedScroll;
   }
+  updateListToggle('vertex');
 }
 
 function addVertexFromInputs() {
@@ -2868,8 +2877,8 @@ function renderSegmentList() {
         name => { seg.colorExpr = name; },
         hex => { seg.color = hex; seg.colorExpr = hex; colorBtn.style.background = hex; draw(); },
         () => {
-          const c = constants.find(cc => cc.name === seg.colorExpr);
-          if (c) seg.color = c.value;
+          const r = resolveColorAttr(seg.colorExpr, buildEnvs().colorEnv);
+          if (r.ok) seg.color = r.value;
           draw();
           renderSegmentList();
         }
@@ -2959,6 +2968,7 @@ function renderSegmentList() {
     list.appendChild(entry);
     if (seg.id === selectedSegmentId) entry.scrollIntoView({ block: 'nearest' });
   }
+  updateListToggle('segment');
 }
 
 // Read-only for Phase 1 (per plan) — visibility toggle + delete only, no
@@ -2966,6 +2976,7 @@ function renderSegmentList() {
 // code file only; this list is for quick control, not creation.
 function renderFaceList() {
   const list   = document.getElementById('face-list');
+  const savedScroll = list.scrollTop;
   list.innerHTML = '';
   const inEdit = editingVertexId !== null || editingSegmentId !== null;
 
@@ -3009,7 +3020,36 @@ function renderFaceList() {
     entry.append(swatch, label, toggle, del);
     list.appendChild(entry);
   }
+  list.scrollTop = savedScroll;
+  updateListToggle('face');
 }
+
+// ─── Collapsible object-list sections (Display submenu) ───────────────────────
+
+const LIST_SECTION_COUNTS = { vertex: () => vertices.length, segment: () => segments.length, face: () => faces.length };
+
+function updateListToggle(key) {
+  const btn     = document.querySelector(`.list-toggle[data-list="${key}"]`);
+  const section = document.querySelector(`.list-section[data-list="${key}"]`);
+  const list    = document.getElementById(`${key}-list`);
+  const open    = listSectionOpen[key];
+  // Open: just a compact arrow overlaid in the list's own gutter (see
+  // .list-toggle-compact) — the label+count only earn a full row when
+  // closed, since that's the only state where nothing else is showing.
+  btn.textContent = open ? '▾' : `▸ ${btn.dataset.label} (${LIST_SECTION_COUNTS[key]()})`;
+  btn.classList.toggle('list-toggle-compact', open);
+  section.classList.toggle('list-open', open);
+  list.style.display = open ? '' : 'none';
+  btn.disabled = editingVertexId !== null || editingSegmentId !== null;
+}
+
+document.querySelectorAll('.list-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.list;
+    listSectionOpen[key] = !listSectionOpen[key];
+    updateListToggle(key);
+  });
+});
 
 document.getElementById('btn-segment').addEventListener('click', () => {
   if      (segmentMode === 'off')  segmentMode = 'on';
@@ -3049,7 +3089,7 @@ document.getElementById('seg-add-visible').addEventListener('click', () => {
 // ─── Controls panel toggle ────────────────────────────────────────────────────
 
 document.getElementById('btn-toggle-controls').addEventListener('click', () => {
-  const body = document.getElementById('controls-body');
+  const body = document.getElementById('controls-main');
   const btn  = document.getElementById('btn-toggle-controls');
   body.classList.toggle('collapsed');
   btn.classList.toggle('active', !body.classList.contains('collapsed'));
@@ -3221,9 +3261,19 @@ function codeSave() {
   resetCodeLineTracking();
 }
 
+// Remembers which of Aux/Display were open before the Code submenu forced
+// them shut, so closeCodeSubmenu() can restore exactly that state instead of
+// leaving them permanently hidden.
+let _preCodeSubVisibility = null;
+
 function openCodeSubmenu() {
   if (editingVertexId !== null)  cancelEdit();
   if (editingSegmentId !== null) cancelSegmentEdit();
+
+  _preCodeSubVisibility = {
+    aux:  document.getElementById('sub-aux').style.display  !== 'none',
+    disp: document.getElementById('sub-disp').style.display !== 'none',
+  };
 
   document.getElementById('sub-aux').style.display = 'none';
   document.getElementById('btn-sub-aux').classList.remove('active');
@@ -3261,6 +3311,14 @@ function closeCodeSubmenu() {
 
   document.getElementById('btn-sub-aux').disabled  = false;
   document.getElementById('btn-sub-disp').disabled = false;
+
+  if (_preCodeSubVisibility) {
+    document.getElementById('sub-aux').style.display = _preCodeSubVisibility.aux ? '' : 'none';
+    document.getElementById('btn-sub-aux').classList.toggle('active', _preCodeSubVisibility.aux);
+    document.getElementById('sub-disp').style.display = _preCodeSubVisibility.disp ? '' : 'none';
+    document.getElementById('btn-sub-disp').classList.toggle('active', _preCodeSubVisibility.disp);
+    _preCodeSubVisibility = null;
+  }
 
   // The add-rows should show whatever was last actually saved — whether this
   // particular exit came via Save+Exit or a plain Exit that discarded
@@ -3441,5 +3499,7 @@ document.addEventListener('keydown',     clearNameError, true);
 updateUndoButtons();
 syncAddRowDefaultsFromLastSet();
 renderConstList();
+renderVertexList();
+renderSegmentList();
 renderFaceList();
 resize();
