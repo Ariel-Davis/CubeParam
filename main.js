@@ -503,33 +503,48 @@ function renameInExpr(expr, oldName, newName) {
   return expr.replace(new RegExp('(?<!\\\\)\\b' + esc + '\\b', 'g'), newName);
 }
 
+// Renames every reference to a constant, wherever one might be hiding —
+// deliberately driven by naming *convention* rather than a hardcoded field
+// list per object type, so a future attribute on an existing object (or a
+// whole new object type, once its array is added to the two lists below)
+// needs no update here to stay correct. Two conventions this relies on,
+// both already established throughout the codebase:
+//   - any object field named `<name>Expr` holds raw expression text that
+//     may reference a constant by name (colorExpr, radiusExpr, ...);
+//   - lastSet*/pendingDefaults objects' fields are always bare identifiers
+//     or literals, never compound expressions, when they came from a `set`
+//     line — so a plain equality check (not renameInExpr's regex) applies
+//     uniformly across whatever fields each one happens to have.
 function renameConstantEverywhere(oldName, newName) {
   for (const c of constants)
     c.expr = renameInExpr(c.expr, oldName, newName);
+
+  // Which object types exist, and their per-instance/singleton state, comes
+  // from OBJECT_TYPES — a type with no `list` (constants, and functions/
+  // curves until implemented) simply has nothing to walk here. The actual
+  // per-field scan stays driven by the `*Expr` naming convention rather
+  // than each type's explicit `attrs` list: that's what lets it stay
+  // correct automatically as attributes are added, with nothing to
+  // remember to update in this function specifically.
+  for (const t of OBJECT_TYPES) {
+    if (!t.list) continue;
+    for (const obj of t.list()) {
+      for (const f of Object.keys(obj)) {
+        if (f.endsWith('Expr') && obj[f]) obj[f] = renameInExpr(obj[f], oldName, newName);
+      }
+    }
+    for (const stateObj of [t.lastSet?.(), t.pendingDefaults?.()]) {
+      if (!stateObj) continue;
+      for (const f of Object.keys(stateObj)) {
+        if (stateObj[f] === oldName) stateObj[f] = newName;
+      }
+    }
+  }
+  // Vertex coordinates (`exprs`) are the one exception: a plain array, not
+  // a `*Expr`-suffixed field, so they need their own pass.
   for (const v of vertices) {
     if (v.exprs) v.exprs = v.exprs.map(e => renameInExpr(e, oldName, newName));
-    for (const f of ['colorExpr', 'radiusExpr', 'visibleExpr', 'labelExpr'])
-      if (v[f]) v[f] = renameInExpr(v[f], oldName, newName);
   }
-  for (const s of segments) {
-    for (const f of ['colorExpr', 'widthExpr', 'visibleExpr'])
-      if (s[f]) s[f] = renameInExpr(s[f], oldName, newName);
-  }
-  for (const fc of faces) {
-    for (const f of ['colorExpr', 'visibleExpr'])
-      if (fc[f]) fc[f] = renameInExpr(fc[f], oldName, newName);
-  }
-  // lastSetVertex/lastSetSegment (what a fresh code-file Load shows) and
-  // pendingVertexDefaults/pendingSegmentDefaults (what the GUI add-rows
-  // currently link to) can also hold a bare constant-name reference in
-  // `color` — always a single identifier, never a compound expression, so a
-  // plain equality check is correct (renameInExpr's word-boundary regex is
-  // overkill here).
-  if (lastSetVertex.color === oldName)         lastSetVertex.color = newName;
-  if (lastSetSegment.color === oldName)        lastSetSegment.color = newName;
-  if (lastSetFace.color === oldName)           lastSetFace.color = newName;
-  if (pendingVertexDefaults.color === oldName)  pendingVertexDefaults.color = newName;
-  if (pendingSegmentDefaults.color === oldName) pendingSegmentDefaults.color = newName;
 }
 
 function isNameTakenIn(name, vertexList, constList, faceList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null) {
@@ -636,15 +651,56 @@ let vColorPicker, segColorPicker;
 // calls evalExpr()/isNameTakenIn(), so it can build a fully independent staged
 // object set without touching the live vertices/constants/segments arrays.
 
-const SECTION_DEFS = [
+// The canonical registry of section/object kinds — the "big shiny list"
+// every future object type (and every future attribute of an existing one)
+// gets added to exactly once, rather than remembering to update several
+// separate hardcoded lists scattered around the file (that was the actual
+// shape of the bug renameConstantEverywhere used to have).
+//
+// constants/functions/curves aren't (yet, or ever, for constants) real
+// displayable object types with their own array — they keep only the
+// section-parsing fields (key/title/style/match) they've always needed.
+// vertices/segments/faces additionally carry:
+//   - list: () => the live array, for anything that needs to walk every
+//     instance (rename propagation today; re-eval, undo-capture, etc. are
+//     candidates to migrate onto this later, opportunistically)
+//   - attrs: the explicit, human-maintained checklist of this type's
+//     per-instance settable fields and what kind of value each holds
+//     (color / bool / number) — populated for a type once its attributes
+//     are actually designed, not guessed ahead of time (curves stays [] —
+//     see below — until that design happens)
+//   - lastSet / pendingDefaults: accessors for the two pieces of singleton
+//     "current defaults" state each of these types has (see lastSetVertex
+//     and pendingVertexDefaults below) — faces have no add-row, so no
+//     pendingDefaults
+const OBJECT_TYPES = [
   { key: 'constants', title: 'CONSTANTS', style: 'eq',   match: /CONSTANT/i },
   { key: 'functions', title: 'FUNCTIONS', style: 'eq',   match: /FUNCTION/i },
-  { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i },
-  { key: 'segments',  title: 'SEGMENTS',  style: 'dash', match: /SEGMENT/i },
-  { key: 'faces',     title: 'FACES',     style: 'dash', match: /FACE/i },
-  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i },
+  { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i,
+    list: () => vertices, attrs: [
+      { field: 'colorExpr',   kind: 'color'  },
+      { field: 'radiusExpr',  kind: 'number' },
+      { field: 'visibleExpr', kind: 'bool'   },
+      { field: 'labelExpr',   kind: 'bool'   },
+    ], lastSet: () => lastSetVertex, pendingDefaults: () => pendingVertexDefaults },
+  { key: 'segments',  title: 'SEGMENTS',  style: 'dash', match: /SEGMENT/i,
+    list: () => segments, attrs: [
+      { field: 'colorExpr',   kind: 'color'  },
+      { field: 'widthExpr',   kind: 'number' },
+      { field: 'visibleExpr', kind: 'bool'   },
+    ], lastSet: () => lastSetSegment, pendingDefaults: () => pendingSegmentDefaults },
+  { key: 'faces',     title: 'FACES',     style: 'dash', match: /FACE/i,
+    list: () => faces, attrs: [
+      { field: 'colorExpr',   kind: 'color' },
+      { field: 'visibleExpr', kind: 'bool'  },
+    ], lastSet: () => lastSetFace },
+  // No `list`/`attrs` yet — curves aren't implemented, and their attributes
+  // (if any beyond the ones above) haven't been designed. Add both once
+  // that design happens; this entry existing at all is what makes it hard
+  // to forget the section-parsing side of introducing them.
+  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i, attrs: [] },
 ];
-const SECTION_ORDER = SECTION_DEFS.map(d => d.key);
+const SECTION_ORDER = OBJECT_TYPES.map(d => d.key);
 
 const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
@@ -661,7 +717,7 @@ function formatFieldToken(field, value) {
 }
 
 function classifyHeaderSection(headerText) {
-  const def = SECTION_DEFS.find(d => d.match.test(headerText));
+  const def = OBJECT_TYPES.find(d => d.match.test(headerText));
   return def ? def.key : null;
 }
 
@@ -1246,7 +1302,7 @@ function sortCodeText(text) {
 
   const out = [];
   for (const key of SECTION_ORDER) {
-    const def = SECTION_DEFS.find(d => d.key === key);
+    const def = OBJECT_TYPES.find(d => d.key === key);
     const objectLines = perSection[key].map(formatLineForOutput);
     if (key === 'vertices') {
       emitSection(out, def.style, def.title, buildSetBlock('vertex', finalSet.vertex), objectLines);
@@ -3410,6 +3466,21 @@ document.getElementById('btn-code-save-exit').addEventListener('click', codeSave
     const start = codeTextareaEl.selectionStart;
     const end   = codeTextareaEl.selectionEnd;
     codeTextareaEl.setRangeText('\t', start, end, 'end');
+  });
+
+  // Some browsers (notably Safari on macOS) "smart"-insert an extra space on
+  // either side of text pasted mid-line — tuned for prose, where you don't
+  // want pasted words gluing onto their neighbors, but a real nuisance in
+  // this space-sensitive syntax. Take over paste entirely and insert the
+  // clipboard text exactly as copied, bypassing whatever smart-insertion
+  // logic the browser would otherwise apply.
+  codeTextareaEl.addEventListener('paste', e => {
+    e.preventDefault();
+    const text  = e.clipboardData.getData('text/plain');
+    const start = codeTextareaEl.selectionStart;
+    const end   = codeTextareaEl.selectionEnd;
+    codeTextareaEl.setRangeText(text, start, end, 'end');
+    codeCheckLineLeave(false);
   });
 }
 
