@@ -671,6 +671,10 @@ body.dark-mode .list-toggle:hover {
   gap: 5px;
 }
 
+.vertex-entry:not(.vertex-editing) {
+  cursor: pointer;
+}
+
 .v-swatch {
   width: 10px;
   height: 10px;

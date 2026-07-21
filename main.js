@@ -1898,6 +1898,27 @@ function distToSegmentPx(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t*dx), py - (ay + t*dy));
 }
 
+// Shared by canvas vertex hits and vertex-list row clicks so the two entry
+// points can never drift apart: off mode replace-selects (single-vertex
+// priming), draw/draw+ mode toggles membership and may complete a segment.
+function selectVertexById(id) {
+  if (isEditingBlocked()) return;
+  if (segmentMode !== 'off') {
+    if (selectedVertexIds.has(id)) selectedVertexIds.delete(id);
+    else selectedVertexIds.add(id);
+    checkSelectionComplete();
+  } else {
+    // Off mode: single-vertex priming — replace any prior selection
+    if (selectedVertexIds.has(id)) selectedVertexIds.delete(id);
+    else { selectedVertexIds.clear(); selectedVertexIds.add(id); }
+  }
+  focusedVertexId   = id;
+  selectedSegmentId = null;
+  renderVertexList();
+  renderSegmentList();
+  draw();
+}
+
 function handleCanvasClick(px, py, pointerType) {
   if (isEditingBlocked()) return;
   const display              = getDisplayScale();
@@ -1913,20 +1934,7 @@ function handleCanvasClick(px, py, pointerType) {
     if (!ok) continue;
     const scr = toScreen(ppt, display);
     if (Math.hypot(px - scr.x, py - scr.y) <= hitR) {
-      if (segmentMode !== 'off') {
-        if (selectedVertexIds.has(v.id)) selectedVertexIds.delete(v.id);
-        else selectedVertexIds.add(v.id);
-        checkSelectionComplete();
-      } else {
-        // Off mode: single-vertex priming — replace any prior selection
-        if (selectedVertexIds.has(v.id)) selectedVertexIds.delete(v.id);
-        else { selectedVertexIds.clear(); selectedVertexIds.add(v.id); }
-      }
-      focusedVertexId   = v.id;
-      selectedSegmentId = null;
-      renderVertexList();
-      renderSegmentList();
-      draw();
+      selectVertexById(v.id);
       return;
     }
   }
@@ -2689,6 +2697,8 @@ function renderVertexList() {
       }
       if (v.id === focusedVertexId) focusedEntry = entry;
 
+      entry.addEventListener('click', () => selectVertexById(v.id));
+
       const swatch = document.createElement('span');
       swatch.className = 'v-swatch';
       swatch.style.background = v.color;
@@ -2708,7 +2718,8 @@ function renderVertexList() {
       labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
       labelToggle.style.opacity = v.showLabel ? '1' : '0.3';
       labelToggle.disabled = inEdit;
-      labelToggle.addEventListener('click', () => {
+      labelToggle.addEventListener('click', e => {
+        e.stopPropagation();
         snapshot();
         v.showLabel = !v.showLabel;
         v.labelExpr = String(v.showLabel);
@@ -2721,14 +2732,15 @@ function renderVertexList() {
       editBtn.className = 'v-toggle';
       editBtn.title = 'Edit';
       editBtn.disabled = inEdit;
-      editBtn.addEventListener('click', () => enterEditMode(v.id));
+      editBtn.addEventListener('click', e => { e.stopPropagation(); enterEditMode(v.id); });
 
       const toggle = document.createElement('button');
       toggle.className = 'v-toggle';
       toggle.textContent = v.visible ? '●' : '○';
       toggle.title = v.visible ? 'Hide' : 'Show';
       toggle.disabled = inEdit;
-      toggle.addEventListener('click', () => {
+      toggle.addEventListener('click', e => {
+        e.stopPropagation();
         snapshot();
         v.visible = !v.visible;
         v.visibleExpr = String(v.visible);
@@ -2741,7 +2753,8 @@ function renderVertexList() {
       del.textContent = '×';
       del.title = 'Delete';
       del.disabled = inEdit;
-      del.addEventListener('click', () => {
+      del.addEventListener('click', e => {
+        e.stopPropagation();
         snapshot();
         segments = segments.filter(s => !s.vertexIds.includes(v.id));
         vertices = vertices.filter(u => u.id !== v.id);
