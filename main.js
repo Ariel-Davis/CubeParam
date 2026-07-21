@@ -1918,12 +1918,18 @@ function checkSelectionComplete() {
   const color      = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
   const lineWidth = Math.max(0.5, parseFloat(document.getElementById('seg-width').value) || 1.5);
   const visible   = pendingSegmentDefaults.visible === 'true';
+  // Clear the selection *before* snapshotting — otherwise the undo-captured
+  // "before" state still has both vertices selected, and undoing restores
+  // that stale selection, corrupting the next segment (its two leftover
+  // members get silently reused as the "first two" the next time a third
+  // vertex is clicked, recreating the just-undone segment instead of
+  // forming a new one).
+  selectedVertexIds.clear();
   snapshot();
   segments.push({
     id: nextSegmentId++, vertexIds: [id1, id2], color, lineWidth, visible,
     colorExpr, widthExpr: String(lineWidth), visibleExpr: String(visible),
   });
-  selectedVertexIds.clear();
   if (segmentMode === 'on') segmentMode = 'off';
   updateSegmentButton();
   renderSegmentList();
