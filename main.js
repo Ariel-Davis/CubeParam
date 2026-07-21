@@ -2876,6 +2876,7 @@ function cancelSegmentEdit() {
     if (orig && seg) {
       seg.color = orig.color; seg.colorExpr = orig.colorExpr;
       seg.lineWidth = orig.lineWidth ?? 1.5; seg.widthExpr = orig.widthExpr;
+      seg.vertexIds = [...orig.vertexIds];
     }
   }
   editingSegmentId       = null;
@@ -2892,7 +2893,7 @@ function updateSegmentButton() {
   const btn = document.getElementById('btn-segment');
   btn.classList.toggle('active',      segmentMode === 'on');
   btn.classList.toggle('active-loop', segmentMode === 'on++');
-  btn.textContent = segmentMode === 'on++' ? 'segment +' : 'segment';
+  btn.textContent = segmentMode === 'on++' ? 'draw +' : 'draw';
 }
 
 function renderSegmentList() {
@@ -2910,6 +2911,8 @@ function renderSegmentList() {
     if (seg.id === editingSegmentId) {
       // ── Edit row ──────────────────────────────────────────────────────────
       entry.className = 'segment-entry vertex-editing';
+      const mainRow = document.createElement('div');
+      mainRow.className = 'vertex-edit-row';
 
       const colorBtn = document.createElement('button');
       colorBtn.className = 'color-picker-btn';
@@ -2958,9 +2961,36 @@ function renderSegmentList() {
         }
       ).refresh();
 
-      const label = document.createElement('span');
-      label.className = 's-name';
-      label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
+      // Endpoint pickers — let the user re-point either end of the segment
+      // at a different vertex instead of it being fixed at creation time.
+      // Plain text, live-validated: goes .expr-invalid (red) on an unknown
+      // name or one that would collapse the segment onto a single vertex,
+      // and only applies (+draws) once it resolves to a real, distinct
+      // vertex — same discipline as color/width, reverted wholesale by
+      // cancelSegmentEdit if the user backs out. A dropdown/typeahead is
+      // still worth revisiting, but not until iPad Safari's rendering of
+      // one is sorted out (native <datalist> and a hand-built popover both
+      // fell over there) — this sidesteps that entirely in the meantime.
+      function makeEndpointInput(endpointIdx) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'seg-endpoint-input';
+        input.value = vertices.find(v => v.id === seg.vertexIds[endpointIdx])?.name ?? '';
+        input.addEventListener('input', () => {
+          const otherIdx = 1 - endpointIdx;
+          const match = vertices.find(v => v.name === input.value.trim());
+          const bad = !match || match.id === seg.vertexIds[otherIdx];
+          input.classList.toggle('expr-invalid', bad);
+          if (!bad) { seg.vertexIds[endpointIdx] = match.id; draw(); }
+        });
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') commitSegmentEdit(); });
+        return input;
+      }
+      const v1Input = makeEndpointInput(0);
+      const dash = document.createElement('span');
+      dash.className = 'seg-endpoint-dash';
+      dash.textContent = '–';
+      const v2Input = makeEndpointInput(1);
 
       const widthInp = document.createElement('input');
       widthInp.type = 'number';
@@ -2988,7 +3018,8 @@ function renderSegmentList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelSegmentEdit);
 
-      entry.append(colorBtn, colorPopover, label, widthInp, commitBtn, cancelBtn);
+      mainRow.append(colorBtn, colorPopover, v1Input, dash, v2Input, widthInp, commitBtn, cancelBtn);
+      entry.appendChild(mainRow);
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────

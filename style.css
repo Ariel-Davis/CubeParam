@@ -101,7 +101,8 @@ body.dark-mode .s-name,
 body.dark-mode .const-eq,
 body.dark-mode .const-value,
 body.dark-mode .coord-label,
-body.dark-mode .coord-value {
+body.dark-mode .coord-value,
+body.dark-mode .seg-endpoint-dash {
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -715,6 +716,18 @@ body.dark-mode .list-toggle:hover {
   gap: 8px;
 }
 
+/* Flex items default to min-width:auto — refusing to shrink below their own
+   natural content size no matter how cramped the row gets. Touch-optimized
+   form controls (seen specifically on iPadOS, both Safari and Chrome, since
+   every iOS browser shares the same WebKit engine underneath) can have a
+   larger natural size than their desktop rendering, pushing this row's
+   total content past what fits and wrapping — not something desktop testing
+   alone would reveal. Overriding min-width removes that floor so shrinking
+   actually kicks in instead. */
+.vertex-edit-row > * {
+  min-width: 0;
+}
+
 .coord-btn-slot {
   width: 40px;
   flex-shrink: 0;
@@ -754,7 +767,8 @@ body.dark-mode .list-toggle:hover {
 .expr-input.expr-invalid,
 .v-coord.expr-invalid,
 .v-name-input.expr-invalid,
-.const-name-input.expr-invalid {
+.const-name-input.expr-invalid,
+.seg-endpoint-input.expr-invalid {
   border-color: rgba(200, 50, 50, 0.60);
   background: rgba(255, 220, 220, 0.50);
 }
@@ -841,6 +855,23 @@ body.dark-mode .list-toggle:hover {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+.seg-endpoint-input {
+  width: 52px;
+  padding: 4px;
+  background: #f0f0f0;
+  color: rgba(0, 0, 0, 0.90);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.seg-endpoint-dash {
+  font-family: monospace;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
 }
 
 .s-swatch {
