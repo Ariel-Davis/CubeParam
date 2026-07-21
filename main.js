@@ -610,15 +610,17 @@ let vColorPicker, segColorPicker;
 
 // ─── Code submenu: parser & serializer ─────────────────────────────────────────
 //
-// Canonical text format (see NOTES2.md for the full spec). Two literal
-// backslashes open a section header — '=' bars for the two auxiliary
-// (non-drawn) sections, '-' bars for the three display (drawn) sections:
-//   \\======== CONSTANTS ========
-//   \\======== FUNCTIONS ========
-//   \\-------- VERTICES --------
-//   \\-------- SEGMENTS --------
-//   \\-------- CURVES --------
-//   \\----------------------------------------     (divider — no name)
+// Canonical text format (see NOTES2.md for the full spec). A leading '#'
+// opens a section header — '=' bars for the two auxiliary (non-drawn)
+// sections, '-' bars for the three display (drawn) sections:
+//   #======== CONSTANTS ========
+//   #======== FUNCTIONS ========
+//   #-------- VERTICES --------
+//   #-------- SEGMENTS --------
+//   #-------- CURVES --------
+//   #----------------------------------------     (divider — no name)
+// A '#' line that isn't one of those header-bar shapes is a plain comment —
+// ignored by parsing, left exactly where it is by Sort.
 // Below the divider is the scratch area: a place to type new objects of any
 // kind without caring which section they belong in. Sort always relocates
 // every *valid* recognized object out of the scratch area into its home
@@ -644,8 +646,8 @@ const SECTION_DEFS = [
 ];
 const SECTION_ORDER = SECTION_DEFS.map(d => d.key);
 
-const CODE_HEADER_EQ_RE   = /^\\\\=+\s*(.*?)\s*=+$/;
-const CODE_HEADER_DASH_RE = /^\\\\-+\s*(.*?)\s*-+$/;
+const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
+const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
 const CODE_OBJECT_RE = /^(const|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
 const CODE_SET_RE    = /^set\s+(vertex|segment|face)\s+(.+)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -665,11 +667,11 @@ function classifyHeaderSection(headerText) {
 
 function makeHeaderLine(style, title) {
   const bar = style === 'eq' ? '========' : '--------';
-  return `\\\\${bar} ${title} ${bar}`;
+  return `#${bar} ${title} ${bar}`;
 }
 
 function makeDividerLine() {
-  return '\\\\----------------------------------------';
+  return '#----------------------------------------';
 }
 
 // Pushes one canonical section: header, exactly one blank line, then each
@@ -810,6 +812,16 @@ function parseCodeText(text) {
         rec.kind = 'header';
         rec.headerSection = classifyHeaderSection(captured);
       }
+      lines.push(rec);
+      continue;
+    }
+
+    // A bare `#` line that isn't one of the header-bar patterns above is a
+    // plain comment — ignored by parsing/validation, and (via targetSection
+    // staying null, same as 'set'/'header'/'divider') left exactly where it
+    // is by Sort rather than being treated as an error or relocated.
+    if (trimmed.startsWith('#')) {
+      rec.kind = 'comment';
       lines.push(rec);
       continue;
     }
