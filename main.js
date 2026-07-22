@@ -3530,24 +3530,31 @@ function resizeInterpreterInput() {
   input.style.height = input.scrollHeight + 'px';
 }
 
-// Closed mode: resolves the single typed line against the current fully-
+// Closed mode: resolves the typed/pasted content — normally one line, but a
+// multi-line paste is handled the same way — against the current fully-
 // archived state (serializeState is always canonical) and commits it
-// immediately as a first-class object, or updates the governing `set`
-// defaults — same tail as codeSave(), just fed one line instead of a whole
-// edited file. Invalid input is rejected outright: held in the box, flagged,
-// never written anywhere, since closed mode has no code view to show an
-// error in.
+// immediately as first-class objects, or updates the governing `set`
+// defaults — same tail as codeSave(), just fed this content instead of a
+// whole edited file. All-or-nothing: every submitted line must be valid, or
+// nothing is committed — held in the box, flagged, never written anywhere,
+// since closed mode has no code view to show a partial result in.
 function submitInterpreterLine() {
   const input = document.getElementById('interpreter-input');
   const line  = input.value;
   if (line.trim() === '') return;
 
-  const staged = parseCodeText(serializeState(vertices, constants, segments, faces) + '\n' + line);
-  const rec    = staged.lines[staged.lines.length - 1];
+  const staged    = parseCodeText(serializeState(vertices, constants, segments, faces) + '\n' + line);
+  // The submitted content is always exactly the tail of the combined text —
+  // serializeState(...) supplies everything before it — so its own line
+  // count pinpoints which staged.lines entries are newly submitted, however
+  // many there are.
+  const newRecs   = staged.lines.slice(-line.split('\n').length);
+  const badIdx    = newRecs.findIndex(r => !r.valid);
 
-  if (!rec.valid) {
+  if (badIdx !== -1) {
     input.classList.add('expr-invalid');
-    input.title = rec.errorMsg ?? 'invalid line';
+    const msg = newRecs[badIdx].errorMsg ?? 'invalid line';
+    input.title = newRecs.length > 1 ? `Line ${badIdx + 1}: ${msg}` : msg;
     return;
   }
 
@@ -3629,11 +3636,13 @@ document.getElementById('btn-code-save-exit').addEventListener('click', codeSave
     interpreterEl.removeAttribute('title');
     resizeInterpreterInput();
   });
-  // Closed: Enter submits the single line immediately. Open: Enter is a
-  // normal newline — the interpreter is a multi-line staging area there,
-  // committed only via the explicit submit button.
+  // Closed: Enter — with or without Shift/Ctrl/etc. — always submits the
+  // single line immediately; no keyboard combination is allowed to insert a
+  // newline here (paste is still unaffected, since it never fires a
+  // keydown). Open: Enter is a normal newline — the interpreter is a
+  // multi-line staging area there, committed only via the submit button.
   interpreterEl.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || e.shiftKey || codeOpen) return;
+    if (e.key !== 'Enter' || codeOpen) return;
     e.preventDefault();
     submitInterpreterLine();
   });
