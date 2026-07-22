@@ -3559,6 +3559,15 @@ function submitInterpreterLine() {
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
   lastSetFace    = { ...staged.finalSet.face };
+  // lastSet* just changed — the add-row defaults the controls actually read
+  // (pendingVertexDefaults/pendingSegmentDefaults) need the same sync
+  // closeCodeSubmenu() already does. codeSave() skips this safely (the
+  // add-row controls are unreachable while Code is open, since Aux/Display
+  // are locked closed), but the interpreter is reachable exactly while
+  // closed, right after this commit — so without this, a `set` line typed
+  // here would silently have no effect on anything drawn via the controls
+  // until some unrelated later action happened to trigger the sync.
+  syncAddRowDefaultsFromLastSet();
 
   snapshot();
   vertices          = newVertices;
