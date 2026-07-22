@@ -137,6 +137,7 @@ let constants      = [];   // [{ id, name, expr, value }]
 let nextConstantId = 0;
 let omegaMode      = 'off';  // 'off' | 'on' | 'on++'
 let activeExprInput    = null;   // the coord input currently focused in edit mode
+let activeEndpointInput = null;  // segment endpoint input currently focused; a canvas/list vertex pick fills it instead of selecting
 let _pendingScrollToEdit = false; // trigger scroll-to-edit-entry on next renderVertexList
 let _rejectedVertexId = null;    // vertex whose last rename was rejected; shows red in list
 let _errorNameEl      = null;    // name input/span currently highlighted red
@@ -225,6 +226,7 @@ function restoreState(state) {
   focusedVertexId        = null;
   selectedSegmentId      = null;
   activeExprInput        = null;
+  activeEndpointInput    = null;
   reEvalObjects();
   renderConstList();
   renderVertexList();
@@ -259,6 +261,15 @@ function updateUndoButtons() {
   document.getElementById('btn-redo').disabled       = inEdit || redoStack.length === 0;
   document.getElementById('btn-add-vertex').disabled = inEdit;
   document.getElementById('btn-segment').disabled    = inEdit;
+  // Deliberately NOT isEditingBlocked() — that also covers codeOpen, and the
+  // interpreter must stay live while the code file is open (that's its
+  // primary mode). Only a genuine vertex/segment edit-in-progress disables
+  // it: submitInterpreterLine()'s commit reassigns every id from scratch
+  // (buildCommittedArraysFromStaged), which would silently corrupt an open
+  // edit form's editingVertexId/editingSegmentId reference. codeOpen can
+  // never coincide with either anyway — openCodeSubmenu() force-cancels both
+  // before it sets codeOpen — so this is never blocked while Code is open.
+  document.getElementById('interpreter-input').disabled = editingVertexId !== null || editingSegmentId !== null;
 }
 
 // ─── Object math ──────────────────────────────────────────────────────────────
@@ -1902,6 +1913,15 @@ function distToSegmentPx(px, py, ax, ay, bx, by) {
 // points can never drift apart: off mode replace-selects (single-vertex
 // priming), draw/draw+ mode toggles membership and may complete a segment.
 function selectVertexById(id) {
+  if (activeEndpointInput) {
+    const v = vertices.find(u => u.id === id);
+    if (!v) return;
+    const next = activeEndpointInput._nextEndpointInput;
+    activeEndpointInput.value = v.name;
+    activeEndpointInput.dispatchEvent(new Event('input'));
+    if (next) next.focus();
+    return;
+  }
   if (isEditingBlocked()) return;
   if (segmentMode !== 'off') {
     if (selectedVertexIds.has(id)) selectedVertexIds.delete(id);
@@ -1920,7 +1940,10 @@ function selectVertexById(id) {
 }
 
 function handleCanvasClick(px, py, pointerType) {
-  if (isEditingBlocked()) return;
+  // Normally all clicks are blocked while editing, but a focused segment
+  // endpoint box is an exception: a vertex pick should fill it rather than
+  // being swallowed, so the vertex hit test below is allowed to run.
+  if (isEditingBlocked() && !activeEndpointInput) return;
   const display              = getDisplayScale();
   const { vecs, heights, s } = getProjectionState();
   const hitR = pointerType === 'touch' ? 28 : 14;
@@ -1938,6 +1961,10 @@ function handleCanvasClick(px, py, pointerType) {
       return;
     }
   }
+
+  // A miss with a focused endpoint box: still fully editing-blocked below,
+  // same as any other click that isn't a vertex pick.
+  if (isEditingBlocked()) return;
 
   // Segment hit test (perpendicular distance to screen-space line)
   for (const seg of segments) {
@@ -2098,6 +2125,7 @@ function commitEdit() {
   updateUndoButtons();
   updateSciKeyboard();
   renderVertexList();
+  renderSegmentList();
   renderConstList();
   draw();
 }
@@ -2128,6 +2156,7 @@ function cancelEdit() {
   updateUndoButtons();
   updateSciKeyboard();
   renderVertexList();
+  renderSegmentList();
   renderConstList();
   draw();
 }
@@ -2865,7 +2894,9 @@ document.getElementById('v-add-visible').addEventListener('click', () => {
 function enterSegmentEditMode(id) {
   editingSegmentId       = id;
   editingSegmentOriginal = captureState();
+  activeEndpointInput    = null;
   updateUndoButtons();
+  renderVertexList();
   renderSegmentList();
   renderFaceList();
 }
@@ -2876,7 +2907,9 @@ function commitSegmentEdit() {
   redoStack              = [];
   editingSegmentId       = null;
   editingSegmentOriginal = null;
+  activeEndpointInput    = null;
   updateUndoButtons();
+  renderVertexList();
   renderSegmentList();
   renderFaceList();
   draw();
@@ -2894,7 +2927,9 @@ function cancelSegmentEdit() {
   }
   editingSegmentId       = null;
   editingSegmentOriginal = null;
+  activeEndpointInput    = null;
   updateUndoButtons();
+  renderVertexList();
   renderSegmentList();
   renderFaceList();
   draw();
@@ -2997,6 +3032,13 @@ function renderSegmentList() {
           if (!bad) { seg.vertexIds[endpointIdx] = match.id; draw(); }
         });
         input.addEventListener('keydown', e => { if (e.key === 'Enter') commitSegmentEdit(); });
+        input.addEventListener('focus', () => { activeEndpointInput = input; });
+        input.addEventListener('blur', () => {
+          // Deferred: a canvas/list click blurs this input before its own
+          // click handler runs, and that handler needs activeEndpointInput
+          // to still point here — same discipline as activeExprInput.
+          setTimeout(() => { if (activeEndpointInput === input) activeEndpointInput = null; }, 0);
+        });
         return input;
       }
       const v1Input = makeEndpointInput(0);
@@ -3004,6 +3046,9 @@ function renderSegmentList() {
       dash.className = 'seg-endpoint-dash';
       dash.textContent = '–';
       const v2Input = makeEndpointInput(1);
+      // A vertex pick that fills v1 advances focus to v2, so "click A, click
+      // B" fills both ends without the user tabbing between the boxes.
+      v1Input._nextEndpointInput = v2Input;
 
       const widthInp = document.createElement('input');
       widthInp.type = 'number';
@@ -3404,6 +3449,10 @@ function openCodeSubmenu() {
   document.getElementById('sub-code').style.display = '';
   document.getElementById('btn-sub-code').classList.add('active');
 
+  document.getElementById('interpreter-input').classList.add('interpreter-expanded');
+  document.getElementById('btn-interpreter-submit').style.display = '';
+  resizeInterpreterInput();
+
   const textarea = document.getElementById('code-textarea');
   textarea.value = serializeState(vertices, constants, segments, faces);
   reparseAndPreview();
@@ -3427,6 +3476,10 @@ function closeCodeSubmenu() {
   document.getElementById('sub-code').style.display = 'none';
   document.getElementById('btn-sub-code').classList.remove('active');
 
+  document.getElementById('interpreter-input').classList.remove('interpreter-expanded');
+  document.getElementById('interpreter-input').style.height = '';
+  document.getElementById('btn-interpreter-submit').style.display = 'none';
+
   document.getElementById('btn-sub-aux').disabled  = false;
   document.getElementById('btn-sub-disp').disabled = false;
 
@@ -3449,13 +3502,105 @@ function closeCodeSubmenu() {
 }
 
 function codeExit() {
+  submitInterpreterToFile();
   codeSort();
   closeCodeSubmenu();
 }
 
 function codeSaveExit() {
+  submitInterpreterToFile();
   codeSave();
   closeCodeSubmenu();
+}
+
+// ─── Interpreter (command line) ────────────────────────────────────────────
+//
+// Single shared textarea (#interpreter-input): one row while the code file
+// is closed, a capped/scrollable staging area at its tail while open. Both
+// modes feed the exact same parsing/commit machinery the Code submenu
+// already uses — no separate resolution logic of its own.
+
+// Grows the textarea to fit its content (typed content can only ever be
+// multi-line in open mode, since closed mode's Enter always submits instead
+// of inserting a newline) — CSS max-height/overflow does the actual capping
+// and scroll once content exceeds it.
+function resizeInterpreterInput() {
+  const input = document.getElementById('interpreter-input');
+  input.style.height = 'auto';
+  input.style.height = input.scrollHeight + 'px';
+}
+
+// Closed mode: resolves the single typed line against the current fully-
+// archived state (serializeState is always canonical) and commits it
+// immediately as a first-class object, or updates the governing `set`
+// defaults — same tail as codeSave(), just fed one line instead of a whole
+// edited file. Invalid input is rejected outright: held in the box, flagged,
+// never written anywhere, since closed mode has no code view to show an
+// error in.
+function submitInterpreterLine() {
+  const input = document.getElementById('interpreter-input');
+  const line  = input.value;
+  if (line.trim() === '') return;
+
+  const staged = parseCodeText(serializeState(vertices, constants, segments, faces) + '\n' + line);
+  const rec    = staged.lines[staged.lines.length - 1];
+
+  if (!rec.valid) {
+    input.classList.add('expr-invalid');
+    input.title = rec.errorMsg ?? 'invalid line';
+    return;
+  }
+
+  input.classList.remove('expr-invalid');
+  input.removeAttribute('title');
+
+  const { newVertices, newConstants, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
+
+  lastSetVertex  = { ...staged.finalSet.vertex };
+  lastSetSegment = { ...staged.finalSet.segment };
+  lastSetFace    = { ...staged.finalSet.face };
+
+  snapshot();
+  vertices          = newVertices;
+  nextVertexId      = newVertices.length;
+  constants         = newConstants;
+  nextConstantId    = newConstants.length;
+  segments          = newSegments;
+  nextSegmentId     = newSegments.length;
+  faces             = newFaces;
+  nextFaceId        = newFaces.length;
+  selectedVertexIds = new Set();
+  focusedVertexId   = null;
+  selectedSegmentId = null;
+
+  reEvalObjects();
+  renderConstList();
+  renderVertexList();
+  renderSegmentList();
+  renderFaceList();
+  draw();
+
+  input.value = '';
+  resizeInterpreterInput();
+}
+
+// Open mode: pure relocation, no parsing/sorting — appends the interpreter's
+// raw text to the bottom of the code file verbatim (valid or not; the code
+// editor's own error display takes over once it's there). Sorting stays a
+// separate, deliberate action ("archiving"), never a side effect of this.
+function submitInterpreterToFile() {
+  const input = document.getElementById('interpreter-input');
+  const text  = input.value;
+  if (text.trim() === '') return;
+
+  const textarea = document.getElementById('code-textarea');
+  textarea.value = textarea.value.replace(/\n*$/, '') + '\n\n' + text;
+
+  input.value = '';
+  resizeInterpreterInput();
+
+  reparseAndPreview();
+  resetCodeLineTracking();
 }
 
 document.getElementById('btn-sub-code').addEventListener('click', () => {
@@ -3467,6 +3612,24 @@ document.getElementById('btn-code-sort').addEventListener('click', codeSort);
 document.getElementById('btn-code-save').addEventListener('click', codeSave);
 document.getElementById('btn-code-exit').addEventListener('click', codeExit);
 document.getElementById('btn-code-save-exit').addEventListener('click', codeSaveExit);
+
+{
+  const interpreterEl = document.getElementById('interpreter-input');
+  interpreterEl.addEventListener('input', () => {
+    interpreterEl.classList.remove('expr-invalid');
+    interpreterEl.removeAttribute('title');
+    resizeInterpreterInput();
+  });
+  // Closed: Enter submits the single line immediately. Open: Enter is a
+  // normal newline — the interpreter is a multi-line staging area there,
+  // committed only via the explicit submit button.
+  interpreterEl.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey || codeOpen) return;
+    e.preventDefault();
+    submitInterpreterLine();
+  });
+  document.getElementById('btn-interpreter-submit').addEventListener('click', submitInterpreterToFile);
+}
 
 // Validation/live-preview is gated on "leaving a line after changing it" —
 // not on every keystroke — so errors don't flash up mid-edit. Arrow keys,

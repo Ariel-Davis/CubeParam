@@ -214,10 +214,25 @@ body.dark-mode #interpreter-row {
   border-top-color: rgba(255, 255, 255, 0.10);
 }
 
+/* Closed default: capped to one row (16px line-height + .expr-input's 4px
+   top/bottom padding + 1px border) so a stray multi-line paste can't grow it
+   past that — Enter always submits in this mode, so typed content alone
+   never exceeds one line anyway. */
 #interpreter-input {
   flex: 1;
   min-width: 0;
-  opacity: 0.45;
+  line-height: 16px;
+  resize: none;
+  max-height: 26px;
+  overflow-y: hidden;
+}
+
+/* Applied while the code file is open: the interpreter becomes a capped,
+   scrollable staging area (the growing tail of the code file) instead of a
+   single row. ~5 rows at the shared 16px line-height, plus padding/border. */
+#interpreter-input.interpreter-expanded {
+  max-height: 90px;
+  overflow-y: auto;
 }
 
 .code-toolbar {

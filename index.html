@@ -184,10 +184,12 @@
 
       </div>
 
-        <!-- Interpreter row (placeholder — wired up with Code submenu later)
-             — fixed, never scrolls out of view. -->
+        <!-- Interpreter row — fixed, never scrolls out of view. Single shared
+             textarea: one row (closed code file) or capped multi-row staging
+             area at the tail of the code file (code file open). -->
         <div id="interpreter-row">
-          <input type="text" id="interpreter-input" class="expr-input" placeholder="define object…" autocapitalize="none" autocorrect="off" spellcheck="false" disabled>
+          <textarea id="interpreter-input" class="expr-input" rows="1" placeholder="define object…" autocapitalize="none" autocorrect="off" spellcheck="false"></textarea>
+          <button id="btn-interpreter-submit" class="submenu-btn" title="Submit to code file" style="display:none">↵</button>
           <button id="btn-sub-code" class="submenu-btn" title="Code">⌨</button>
         </div>
 
