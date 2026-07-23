@@ -1849,6 +1849,16 @@ function drawVertices(verts, vecs, heights, scale, normS) {
         ctx.stroke();
       }
       ctx.restore();
+    } else if (facePickOrder.includes(v.id)) {
+      // faceMode is 'off' here but the pick survived (paused, resumable via
+      // "draw") — same soft-glow-instead-of-rim treatment segment mode
+      // already gets when paused, just in green to stay a face vertex.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(30, 150, 90, 0.20)';
+      ctx.fill();
+      ctx.restore();
     } else if (selectedVertexIds.has(v.id) && segmentMode !== 'off') {
       // Rim: crisp ring(s) to signal segment-creation selection
       ctx.save();
@@ -2078,10 +2088,14 @@ function handleCanvasClick(px, py, pointerType) {
     }
   }
 
-  // Empty space: clear all focus; also clear primed vertex selection in off mode
+  // Empty space: clear all focus; also clear primed vertex selection in off
+  // mode, and — mirroring that same rule — a paused face pick, since
+  // faceMode === 'off' is the only state where there's no other resume-vs-
+  // abandon signal for facePickOrder to react to.
   focusedVertexId   = null;
   selectedSegmentId = null;
   if (segmentMode === 'off') selectedVertexIds.clear();
+  if (faceMode === 'off') { facePickOrder = []; clearPendingListPick(); }
   renderVertexList();
   renderSegmentList();
   draw();
@@ -2917,7 +2931,9 @@ function renderVertexList() {
       if (pendingListPick && pendingListPick.vertexId === v.id) {
         const action = getFacePickAction(v.id);
         entry.classList.add(action.kind === 'reject' ? 'list-pending-error' : 'list-pending-use');
-      } else if (facePickOrder[0] === v.id && faceMode !== 'off') {
+      } else if (facePickOrder[0] === v.id) {
+        // No faceMode gate — the first pick's green highlight also survives
+        // a pause, matching the canvas's paused-glow treatment.
         entry.classList.add('list-face-first');
       }
       if (v.id === focusedVertexId) focusedEntry = entry;
@@ -3425,9 +3441,10 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   else if (segmentMode === 'on')   segmentMode = 'on++';
   else                             segmentMode = 'off';
   if (segmentMode !== 'off') selectedSegmentId = null;
-  // Mutually exclusive with face mode — cancel any in-progress face pick.
-  faceMode      = 'off';
-  facePickOrder = [];
+  // Mutually exclusive with face mode, but only pauses it — facePickOrder
+  // is preserved (same as segmentMode itself never clearing
+  // selectedVertexIds), resumable later by clicking "draw" on the face row.
+  faceMode = 'off';
   clearPendingListPick();
   updateSegmentButton();
   updateFaceButton();
@@ -3441,19 +3458,27 @@ document.getElementById('btn-face').addEventListener('click', () => {
   if      (faceMode === 'off')  faceMode = 'on';
   else if (faceMode === 'on')   faceMode = 'on++';
   else                          faceMode = 'off';
-  if (faceMode === 'off') {
-    // Cancelling — clear whatever was picked, same as segment's off-mode
-    // canvas click clearing selectedVertexIds.
-    facePickOrder = [];
-    clearPendingListPick();
-  } else if (wasOff) {
-    // Starting fresh (not cycling on -> on++, which preserves the current
-    // pick — same precedent as segment's on -> on++ leaving
-    // selectedVertexIds untouched). Mutually exclusive with segment mode.
+  // facePickOrder itself is never touched here, on any transition — same
+  // precedent as segmentMode never clearing selectedVertexIds, so on++ can
+  // step back down to on (or pause at off and resume) without losing
+  // progress. Only the transient "still deciding" list UI gets dismissed,
+  // since a floating confirm button describing a now-stale action would be
+  // confusing.
+  clearPendingListPick();
+  if (wasOff && faceMode !== 'off') {
+    // Starting fresh or resuming a paused pick — mutually exclusive with
+    // segment mode either way.
     segmentMode       = 'off';
-    selectedVertexIds.clear();
     selectedSegmentId = null;
     updateSegmentButton();
+    // Off-mode single-vertex priming carries over as the first pick, same
+    // as segment mode already carries selectedVertexIds forward — but only
+    // when there's no paused pick already waiting to be resumed.
+    if (facePickOrder.length === 0 && selectedVertexIds.size === 1) {
+      facePickOrder = [...selectedVertexIds];
+    }
+    selectedVertexIds.clear();
+    focusedVertexId = null;
   }
   updateFaceButton();
   renderVertexList();
