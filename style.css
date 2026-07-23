@@ -848,12 +848,22 @@ body.dark-mode .list-toggle:hover {
   border-radius: 4px;
 }
 
-/* A vertex row clicked from the list while face-drawing, awaiting the
-   floating confirm button — distinct amber from .list-selected's blue so
-   "pending, not yet part of the face" reads differently from ordinary
-   selection. */
-.list-pending {
-  background: rgba(210, 140, 20, 0.14);
+/* Face-picking list highlights — colors match what confirming would do:
+   green mirrors the canvas rim for the in-progress face's first vertex;
+   blue/red match the floating button's own "use"/"close?" vs "error"
+   colors, so the row and the button always agree at a glance. */
+.list-face-first {
+  background: rgba(30, 150, 90, 0.15);
+  border-radius: 4px;
+}
+
+.list-pending-use {
+  background: rgba(30, 100, 220, 0.18);
+  border-radius: 4px;
+}
+
+.list-pending-error {
+  background: rgba(200, 50, 50, 0.15);
   border-radius: 4px;
 }
 

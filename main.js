@@ -1810,12 +1810,15 @@ function drawVertices(verts, vecs, heights, scale, normS) {
     const r     = perspScaleNodes ? Math.min(baseR * factor, 30) : baseR;
 
     if (pendingListPick && pendingListPick.vertexId === v.id) {
-      // Amber glow: vertex clicked from the list, awaiting its floating
-      // confirm button — matches .list-pending's color for the same vertex.
+      // Glow matches the floating button's own color (blue = use/close,
+      // red = error) — fully overrides whatever static highlight this
+      // vertex would otherwise show (e.g. the first-pick green), since
+      // "pending confirmation" supersedes it until resolved either way.
+      const isError = getFacePickAction(v.id).kind === 'reject';
       ctx.save();
       ctx.beginPath();
       ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(210, 140, 20, 0.30)';
+      ctx.fillStyle = isError ? 'rgba(200, 50, 50, 0.30)' : 'rgba(30, 100, 220, 0.30)';
       ctx.fill();
       ctx.restore();
     } else if (facePickOrder.includes(v.id) && faceMode !== 'off') {
@@ -1829,6 +1832,16 @@ function drawVertices(verts, vecs, heights, scale, normS) {
       ctx.lineWidth = 2;
       ctx.stroke();
       if (v.id === facePickOrder[0]) {
+        if (faceMode === 'on++') {
+          // Fills the annulus between the two rings rather than adding a
+          // third one, to indicate draw+ (stays primed for the next face)
+          // without over-cluttering the first vertex's marker.
+          ctx.beginPath();
+          ctx.arc(scr.x, scr.y, r + 6.5, 0, 2 * Math.PI);
+          ctx.strokeStyle = 'rgba(30, 150, 90, 0.55)';
+          ctx.lineWidth = 5;
+          ctx.stroke();
+        }
         ctx.beginPath();
         ctx.arc(scr.x, scr.y, r + 9, 0, 2 * Math.PI);
         ctx.strokeStyle = 'rgba(30, 150, 90, 0.50)';
@@ -2136,7 +2149,7 @@ function checkFaceComplete() {
   // checkSelectionComplete(): the undo-captured "before" state must not
   // still hold an in-progress pick, or undoing would resurrect it.
   facePickOrder = [];
-  faceMode      = 'off';
+  if (faceMode === 'on') faceMode = 'off'; // 'on++' stays primed for another face
   snapshot();
   faces.push({
     id: nextFaceId++, name, vertexIds, color, visible,
@@ -2892,11 +2905,20 @@ function renderVertexList() {
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
-      if (selectedVertexIds.has(v.id) || v.id === focusedVertexId || facePickOrder.includes(v.id)) {
+      if (selectedVertexIds.has(v.id) || v.id === focusedVertexId) {
         entry.classList.add('list-selected');
       }
+      // Accumulated middle picks get no list highlight at all — with the
+      // canvas already showing every pick, repeating that in the list adds
+      // little. The first pick is the one exception (it's the vertex that
+      // closes the loop), highlighted green to match its canvas rim —
+      // unless it's currently the pending candidate, in which case blue/red
+      // (matching the floating button) takes over entirely.
       if (pendingListPick && pendingListPick.vertexId === v.id) {
-        entry.classList.add('list-pending');
+        const action = getFacePickAction(v.id);
+        entry.classList.add(action.kind === 'reject' ? 'list-pending-error' : 'list-pending-use');
+      } else if (facePickOrder[0] === v.id && faceMode !== 'off') {
+        entry.classList.add('list-face-first');
       }
       if (v.id === focusedVertexId) focusedEntry = entry;
 
@@ -3121,12 +3143,11 @@ function updateSegmentButton() {
   btn.textContent = segmentMode === 'on++' ? 'draw +' : 'draw';
 }
 
-// No 'on++' yet — kept as its own function (rather than inlined at the
-// call sites) so adding one later is the same one-line pattern
-// updateSegmentButton() already shows, not a restructure.
 function updateFaceButton() {
   const btn = document.getElementById('btn-face');
-  btn.classList.toggle('active', faceMode === 'on');
+  btn.classList.toggle('active',      faceMode === 'on');
+  btn.classList.toggle('active-loop', faceMode === 'on++');
+  btn.textContent = faceMode === 'on++' ? 'draw +' : 'draw';
 }
 
 function renderSegmentList() {
@@ -3416,11 +3437,19 @@ document.getElementById('btn-segment').addEventListener('click', () => {
 });
 
 document.getElementById('btn-face').addEventListener('click', () => {
-  faceMode      = faceMode === 'off' ? 'on' : 'off';
-  facePickOrder = [];
-  clearPendingListPick();
-  if (faceMode === 'on') {
-    // Mutually exclusive with segment mode — cancel any in-progress segment pick.
+  const wasOff = faceMode === 'off';
+  if      (faceMode === 'off')  faceMode = 'on';
+  else if (faceMode === 'on')   faceMode = 'on++';
+  else                          faceMode = 'off';
+  if (faceMode === 'off') {
+    // Cancelling — clear whatever was picked, same as segment's off-mode
+    // canvas click clearing selectedVertexIds.
+    facePickOrder = [];
+    clearPendingListPick();
+  } else if (wasOff) {
+    // Starting fresh (not cycling on -> on++, which preserves the current
+    // pick — same precedent as segment's on -> on++ leaving
+    // selectedVertexIds untouched). Mutually exclusive with segment mode.
     segmentMode       = 'off';
     selectedVertexIds.clear();
     selectedSegmentId = null;
