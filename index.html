@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -160,6 +160,26 @@
             <div id="segment-list"></div>
           </div>
           <div class="section-divider"></div>
+          <div class="toggle-group">
+            <span class="label">face</span>
+            <button id="face-color-btn" class="color-picker-btn" title="Color" style="background:#4d4d4d"></button>
+            <div id="face-color-popover" class="color-popover" style="display:none">
+              <div class="color-section-label">Presets</div>
+              <div id="face-color-presets" class="color-preset-list"></div>
+              <div class="color-section-label">Constants</div>
+              <div id="face-color-grid" class="color-const-list"></div>
+              <div class="color-custom-wrap">
+                <div class="color-custom-btn">Custom…</div>
+                <input type="color" id="face-color" class="color-native-overlay" value="#4d4d4d">
+              </div>
+            </div>
+            <button id="face-add-more" class="v-toggle" title="More options">⋯</button>
+            <button id="btn-face">draw</button>
+          </div>
+          <div class="toggle-group" id="face-add-extra" style="display:none">
+            <span class="label"></span>
+            <button id="face-add-visible" class="v-toggle" title="New faces visible">●</button>
+          </div>
           <div class="list-section" data-list="face">
             <button class="list-toggle" data-list="face" data-label="Faces">▾ Faces</button>
             <div id="face-list"></div>
@@ -197,6 +217,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=68"></script>
+  <script src="main.js?v=69"></script>
 </body>
 </html>

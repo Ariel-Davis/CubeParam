@@ -154,6 +154,9 @@ let selectedVertexIds = new Set();
 let segmentMode       = 'off';     // 'off' | 'on' | 'on++'
 let focusedVertexId   = null;      // vertex id highlighted in the list (canvas click)
 let selectedSegmentId = null;      // segment id highlighted in the list (canvas click)
+let faceMode          = 'off';     // 'off' | 'on' — no 'on++' yet, see getFacePickAction() area
+let facePickOrder     = [];        // ordered vertex ids picked so far for a new face (order matters, unlike selectedVertexIds)
+let pendingListPick   = null;      // { vertexId, rowEl, btnEl } | null — a face vertex clicked from the list, awaiting its floating confirm button
 let editingVertexId        = null;  // id of vertex currently in edit mode, or null
 let editingOriginal        = null;  // captureState() snapshot taken on vertex edit entry
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
@@ -227,6 +230,14 @@ function restoreState(state) {
   selectedSegmentId      = null;
   activeExprInput        = null;
   activeEndpointInput    = null;
+  // Undo/redo isn't blocked by faceMode the way it's blocked by an actual
+  // edit — facePickOrder holds vertex ids that could now be stale once
+  // vertices/faces get replaced wholesale below, same risk as the other
+  // transient state reset here.
+  faceMode               = 'off';
+  facePickOrder          = [];
+  clearPendingListPick();
+  updateFaceButton();
   reEvalObjects();
   renderConstList();
   renderVertexList();
@@ -261,6 +272,7 @@ function updateUndoButtons() {
   document.getElementById('btn-redo').disabled       = inEdit || redoStack.length === 0;
   document.getElementById('btn-add-vertex').disabled = inEdit;
   document.getElementById('btn-segment').disabled    = inEdit;
+  document.getElementById('btn-face').disabled       = inEdit;
   // Deliberately NOT isEditingBlocked() — that also covers codeOpen, and the
   // interpreter must stay live while the code file is open (that's its
   // primary mode). Only a genuine vertex/segment edit-in-progress disables
@@ -629,10 +641,11 @@ const PRESET_COLORS = [
 // link exactly like one typed in the code file with `set ... color=c` can.
 let pendingVertexDefaults  = { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true' };
 let pendingSegmentDefaults = { color: DEFAULT_COLOR, width: '1.5', visible: 'true' };
+let pendingFaceDefaults    = { color: DEFAULT_COLOR, visible: 'true' };
 
 // The two add-row color pickers (see setupColorPicker) — static DOM, wired
 // once at init, refreshed on demand from renderAddRowDefaults().
-let vColorPicker, segColorPicker;
+let vColorPicker, segColorPicker, faceColorPicker;
 
 // ─── Code submenu: parser & serializer ─────────────────────────────────────────
 //
@@ -1756,6 +1769,34 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
   }
 }
 
+// Dashed preview line through the vertices picked so far for an in-progress
+// face (canvas- or list-driven) — not closed back to the first vertex, since
+// the face isn't committed yet. A vertex that fails to project is just
+// skipped from the polyline; this is a preview aid, not a rendered object.
+function drawFacePickPreview(verts, vecs, heights, scale, normS) {
+  if (faceMode === 'off' || facePickOrder.length < 2) return;
+  const pts = [];
+  for (const id of facePickOrder) {
+    const v = verts.find(u => u.id === id);
+    if (!v) continue;
+    const { pt, depth } = projectPoint(v.coords, vecs, heights);
+    if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) continue;
+    const a = applyPerspective(pt, depth, normS);
+    if (!a.ok) continue;
+    pts.push(toScreen(a.pt, scale));
+  }
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = 'rgba(30, 150, 90, 0.70)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawVertices(verts, vecs, heights, scale, normS) {
   for (const v of verts) {
     if (!v.visible) continue;
@@ -1768,7 +1809,34 @@ function drawVertices(verts, vecs, heights, scale, normS) {
     const baseR = v.radius ?? 5;
     const r     = perspScaleNodes ? Math.min(baseR * factor, 30) : baseR;
 
-    if (selectedVertexIds.has(v.id) && segmentMode !== 'off') {
+    if (pendingListPick && pendingListPick.vertexId === v.id) {
+      // Amber glow: vertex clicked from the list, awaiting its floating
+      // confirm button — matches .list-pending's color for the same vertex.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(210, 140, 20, 0.30)';
+      ctx.fill();
+      ctx.restore();
+    } else if (facePickOrder.includes(v.id) && faceMode !== 'off') {
+      // Rim: green ring(s) to signal an in-progress face pick, distinct from
+      // segment's blue. Double ring on the first-picked vertex — re-clicking
+      // it is what closes the loop.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(scr.x, scr.y, r + 4, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(30, 150, 90, 0.90)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      if (v.id === facePickOrder[0]) {
+        ctx.beginPath();
+        ctx.arc(scr.x, scr.y, r + 9, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(30, 150, 90, 0.50)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (selectedVertexIds.has(v.id) && segmentMode !== 'off') {
       // Rim: crisp ring(s) to signal segment-creation selection
       ctx.save();
       ctx.beginPath();
@@ -1839,6 +1907,7 @@ function draw() {
   if (showAxes) drawAxes(vecs, display);
   drawFaces(activeFaces, activeVerts, vecs, heights, display, s);
   drawSegments(activeSegs, activeVerts, vecs, heights, display, s);
+  drawFacePickPreview(activeVerts, vecs, heights, display, s);
   drawVertices(activeVerts, vecs, heights, display, s);
   if (showPointer) drawControlPoint(base);
 }
@@ -1923,6 +1992,10 @@ function selectVertexById(id) {
     return;
   }
   if (isEditingBlocked()) return;
+  if (faceMode !== 'off') {
+    applyFacePick(id);
+    return;
+  }
   if (segmentMode !== 'off') {
     if (selectedVertexIds.has(id)) selectedVertexIds.delete(id);
     else selectedVertexIds.add(id);
@@ -2024,6 +2097,90 @@ function checkSelectionComplete() {
   if (segmentMode === 'on') segmentMode = 'off';
   updateSegmentButton();
   renderSegmentList();
+}
+
+// Pure rule for what clicking `vertexId` would do to the in-progress face
+// pick — shared by the direct canvas path (applyFacePick, below) and the
+// list's pending-button label/enabled-state (renderVertexList), so the two
+// can never disagree about what a given click means.
+//   'append' — first pick, or a fresh vertex: add it to the end.
+//   'close'  — re-picking the first vertex with >=3 already picked: complete the face.
+//   'reject' — re-picking the first vertex too early, or any other already-picked vertex.
+function getFacePickAction(vertexId) {
+  if (facePickOrder.length > 0 && vertexId === facePickOrder[0]) {
+    return facePickOrder.length >= 3 ? { kind: 'close' } : { kind: 'reject' };
+  }
+  if (facePickOrder.includes(vertexId)) return { kind: 'reject' };
+  return { kind: 'append' };
+}
+
+// Canvas path: applies getFacePickAction's rule directly, no confirmation
+// step — a canvas click already shows you exactly what you're clicking.
+function applyFacePick(id) {
+  const action = getFacePickAction(id);
+  if (action.kind === 'reject') return;
+  if (action.kind === 'close') { checkFaceComplete(); return; }
+  facePickOrder.push(id);
+  renderVertexList();
+  draw();
+}
+
+function checkFaceComplete() {
+  const colorExpr = pendingFaceDefaults.color;
+  const colorRes  = resolveColorAttr(colorExpr, buildEnvs().colorEnv);
+  const color     = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
+  const visible   = pendingFaceDefaults.visible === 'true';
+  const vertexIds = [...facePickOrder];
+  const name      = `F${nextFaceId}`;
+  // Clear the pick *before* snapshotting — same reasoning as
+  // checkSelectionComplete(): the undo-captured "before" state must not
+  // still hold an in-progress pick, or undoing would resurrect it.
+  facePickOrder = [];
+  faceMode      = 'off';
+  snapshot();
+  faces.push({
+    id: nextFaceId++, name, vertexIds, color, visible,
+    colorExpr, visibleExpr: String(visible),
+  });
+  updateFaceButton();
+  renderFaceList();
+  renderVertexList();
+  draw();
+}
+
+// List-driven face picking gets a confirm step canvas doesn't need — the
+// list doesn't show you *where* a vertex is until you look, so a click
+// there previews (highlight on canvas + list, floating button) rather than
+// acting immediately. Cleared by the global pointerdown listener below on
+// any other click, or explicitly when its own button is used.
+function clearPendingListPick() {
+  if (!pendingListPick) return;
+  pendingListPick.btnEl.remove();
+  pendingListPick = null;
+}
+
+function handleFaceListPick(vertexId, rowEl) {
+  clearPendingListPick();
+  const action = getFacePickAction(vertexId);
+  const btn = document.createElement('button');
+  btn.className = 'face-pick-btn';
+  btn.textContent = action.kind === 'close' ? 'close?' : action.kind === 'reject' ? 'error' : 'use';
+  btn.disabled = action.kind === 'reject';
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    clearPendingListPick();
+    applyFacePick(vertexId);
+    renderVertexList();
+  });
+  document.body.appendChild(btn);
+  // Positioned to the left of the row, vertically centered on it — measured
+  // only after appending, since offsetWidth needs the button actually laid out.
+  const rowRect = rowEl.getBoundingClientRect();
+  const btnRect = btn.getBoundingClientRect();
+  btn.style.left = (rowRect.left - btnRect.width - 6) + 'px';
+  btn.style.top  = (rowRect.top + rowRect.height / 2 - btnRect.height / 2) + 'px';
+  pendingListPick = { vertexId, btnEl: btn };
+  renderVertexList();
 }
 
 // ─── Toggle buttons ───────────────────────────────────────────────────────────
@@ -2372,14 +2529,17 @@ document.getElementById('c-expr').addEventListener('keydown', e => {
 // vs. render (frequent — called via the renderConstList() hook below so a
 // color linked to a constant stays live as that constant is edited).
 
-// Copies lastSetVertex/lastSetSegment (raw expr text, possibly undefined per
-// field) into the pending-defaults state, falling back to BUILTIN_SET_DEFAULTS
-// exactly like buildSetBlock() does for the code file's own display.
+// Copies lastSetVertex/lastSetSegment/lastSetFace (raw expr text, possibly
+// undefined per field) into the pending-defaults state, falling back to
+// BUILTIN_SET_DEFAULTS exactly like buildSetBlock() does for the code file's
+// own display.
 function syncAddRowDefaultsFromLastSet() {
   for (const field of SET_FIELD_ORDER.vertex)
     pendingVertexDefaults[field] = lastSetVertex[field] ?? BUILTIN_SET_DEFAULTS.vertex[field];
   for (const field of SET_FIELD_ORDER.segment)
     pendingSegmentDefaults[field] = lastSetSegment[field] ?? BUILTIN_SET_DEFAULTS.segment[field];
+  for (const field of SET_FIELD_ORDER.face)
+    pendingFaceDefaults[field] = lastSetFace[field] ?? BUILTIN_SET_DEFAULTS.face[field];
 }
 
 // Shared by all 4 "color picker" locations (vertex/segment x add-row/edit-
@@ -2535,6 +2695,17 @@ function renderAddRowDefaults() {
   sVisibleBtn.textContent   = pendingSegmentDefaults.visible === 'true' ? '●' : '○';
   sVisibleBtn.style.opacity = pendingSegmentDefaults.visible === 'true' ? '1' : '0.3';
   segColorPicker.refresh();
+
+  const fColorRes = resolveColorAttr(pendingFaceDefaults.color, colorEnv);
+  const fColorResolved = fColorRes.ok ? fColorRes.value : DEFAULT_COLOR;
+  document.getElementById('face-color').value = fColorResolved;
+  document.getElementById('face-color-btn').style.background = fColorResolved;
+  const fVisibleRes = resolveBoolAttr(pendingFaceDefaults.visible, boolEnv);
+  pendingFaceDefaults.visible = String(fVisibleRes.ok ? fVisibleRes.value : true);
+  const fVisibleBtn = document.getElementById('face-add-visible');
+  fVisibleBtn.textContent   = pendingFaceDefaults.visible === 'true' ? '●' : '○';
+  fVisibleBtn.style.opacity = pendingFaceDefaults.visible === 'true' ? '1' : '0.3';
+  faceColorPicker.refresh();
 }
 
 // ─── Vertex controls ──────────────────────────────────────────────────────────
@@ -2721,12 +2892,18 @@ function renderVertexList() {
 
     } else {
       // ── Display row ───────────────────────────────────────────────────────
-      if (selectedVertexIds.has(v.id) || v.id === focusedVertexId) {
+      if (selectedVertexIds.has(v.id) || v.id === focusedVertexId || facePickOrder.includes(v.id)) {
         entry.classList.add('list-selected');
+      }
+      if (pendingListPick && pendingListPick.vertexId === v.id) {
+        entry.classList.add('list-pending');
       }
       if (v.id === focusedVertexId) focusedEntry = entry;
 
-      entry.addEventListener('click', () => selectVertexById(v.id));
+      entry.addEventListener('click', () => {
+        if (faceMode !== 'off') handleFaceListPick(v.id, entry);
+        else                    selectVertexById(v.id);
+      });
 
       const swatch = document.createElement('span');
       swatch.className = 'v-swatch';
@@ -2942,6 +3119,14 @@ function updateSegmentButton() {
   btn.classList.toggle('active',      segmentMode === 'on');
   btn.classList.toggle('active-loop', segmentMode === 'on++');
   btn.textContent = segmentMode === 'on++' ? 'draw +' : 'draw';
+}
+
+// No 'on++' yet — kept as its own function (rather than inlined at the
+// call sites) so adding one later is the same one-line pattern
+// updateSegmentButton() already shows, not a restructure.
+function updateFaceButton() {
+  const btn = document.getElementById('btn-face');
+  btn.classList.toggle('active', faceMode === 'on');
 }
 
 function renderSegmentList() {
@@ -3219,7 +3404,29 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   else if (segmentMode === 'on')   segmentMode = 'on++';
   else                             segmentMode = 'off';
   if (segmentMode !== 'off') selectedSegmentId = null;
+  // Mutually exclusive with face mode — cancel any in-progress face pick.
+  faceMode      = 'off';
+  facePickOrder = [];
+  clearPendingListPick();
   updateSegmentButton();
+  updateFaceButton();
+  renderVertexList();
+  renderSegmentList();
+  draw();
+});
+
+document.getElementById('btn-face').addEventListener('click', () => {
+  faceMode      = faceMode === 'off' ? 'on' : 'off';
+  facePickOrder = [];
+  clearPendingListPick();
+  if (faceMode === 'on') {
+    // Mutually exclusive with segment mode — cancel any in-progress segment pick.
+    segmentMode       = 'off';
+    selectedVertexIds.clear();
+    selectedSegmentId = null;
+    updateSegmentButton();
+  }
+  updateFaceButton();
   renderVertexList();
   renderSegmentList();
   draw();
@@ -3236,6 +3443,30 @@ segColorPicker = setupColorPicker(
   hex => { pendingSegmentDefaults.color = hex; document.getElementById('seg-color-btn').style.background = hex; },
   renderAddRowDefaults
 );
+
+faceColorPicker = setupColorPicker(
+  document.getElementById('face-color-btn'),
+  document.getElementById('face-color-popover'),
+  document.getElementById('face-color-presets'),
+  document.getElementById('face-color-grid'),
+  document.getElementById('face-color'),
+  () => pendingFaceDefaults.color,
+  name => { pendingFaceDefaults.color = name; },
+  hex => { pendingFaceDefaults.color = hex; document.getElementById('face-color-btn').style.background = hex; },
+  renderAddRowDefaults
+);
+
+document.getElementById('face-add-more').addEventListener('click', () => {
+  const row  = document.getElementById('face-add-extra');
+  const btn  = document.getElementById('face-add-more');
+  const open = row.style.display === 'none';
+  row.style.display = open ? '' : 'none';
+  btn.classList.toggle('active', open);
+});
+document.getElementById('face-add-visible').addEventListener('click', () => {
+  pendingFaceDefaults.visible = pendingFaceDefaults.visible === 'true' ? 'false' : 'true';
+  renderAddRowDefaults();
+});
 
 document.getElementById('seg-add-more').addEventListener('click', () => {
   const row  = document.getElementById('seg-add-extra');
@@ -3809,6 +4040,15 @@ document.getElementById('btn-dark').addEventListener('click', () => {
 
 document.addEventListener('pointerdown', clearNameError, true);
 document.addEventListener('keydown',     clearNameError, true);
+
+// Any click anywhere except the pending button itself clears an in-progress
+// list face-pick — capture phase, same idiom as onOutsideClick/clearNameError
+// above, and the e.target guard is what lets the button's own click still
+// land (pointerdown fires first and would otherwise remove it from the DOM
+// before its click handler ever runs).
+document.addEventListener('pointerdown', e => {
+  if (pendingListPick && e.target !== pendingListPick.btnEl) clearPendingListPick();
+}, true);
 
 updateUndoButtons();
 syncAddRowDefaultsFromLastSet();

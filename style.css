@@ -848,6 +848,41 @@ body.dark-mode .list-toggle:hover {
   border-radius: 4px;
 }
 
+/* A vertex row clicked from the list while face-drawing, awaiting the
+   floating confirm button — distinct amber from .list-selected's blue so
+   "pending, not yet part of the face" reads differently from ordinary
+   selection. */
+.list-pending {
+  background: rgba(210, 140, 20, 0.14);
+  border-radius: 4px;
+}
+
+/* Floating "use"/"close?"/"error" button for list-driven face-vertex
+   picking — positioned via JS (getBoundingClientRect on the target row),
+   fixed so it tracks the viewport rather than list scroll. */
+.face-pick-btn {
+  position: fixed;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+  border: 1px solid rgba(30, 100, 220, 0.60);
+  background: rgba(30, 100, 220, 0.90);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  /* Must beat #controls-wrapper's z-index:100 — this button intentionally
+     floats outside the panel's bounds (to the left of a row, over canvas),
+     and needs to win the stacking comparison wherever it overlaps the
+     panel, not just render after it in DOM order. */
+  z-index: 200;
+}
+
+.face-pick-btn:disabled {
+  border-color: rgba(200, 50, 50, 0.55);
+  background: rgba(220, 90, 90, 0.85);
+  cursor: default;
+}
+
 .v-edit-color {
   width: 24px;
   height: 24px;
