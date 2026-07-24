@@ -718,6 +718,27 @@ body.dark-mode .list-toggle:hover {
   min-width: 0;
 }
 
+/* Wraps a governing-default toggle button (visible/label) together with its
+   constant-name subscript — position:relative anchor for the sub, which sits
+   empty (zero footprint) when the field is a plain literal, not a constant. */
+.v-toggle-wrap {
+  position: relative;
+  display: inline-block;
+}
+.v-toggle-const {
+  position: absolute;
+  right: -2px;
+  bottom: -4px;
+  font-size: 8px;
+  line-height: 1;
+  color: rgba(60, 130, 255, 0.85);
+  pointer-events: none;
+  max-width: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .vertex-editing {
   background: rgba(60, 130, 255, 0.06);
   border-radius: 5px;

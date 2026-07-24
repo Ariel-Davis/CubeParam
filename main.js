@@ -468,6 +468,37 @@ function resolveBoolAttr(exprText, boolEnv) {
   return { ok: false };
 }
 
+// Resolves one object's full attribute set (per ATTR_DEFS[type]) against
+// whatever's currently governing: an explicit per-line override first
+// (`explicitAttrs` — a parsed line's own tok.attrs, or {} for the controls,
+// which have no per-object override concept), then `governingText` (the
+// order-dependent walk's currentSet[type] during parsing, or lastSetVertex/
+// lastSetSegment/lastSetFace for the controls — identical raw-expr-text
+// shape either way), then the built-in fallback. Returns { ok:true, fields }
+// with both the *Expr text and the resolved value for every attribute,
+// ready to spread into a vertex/segment/face literal, or { ok:false,
+// errorMsg } naming the first attribute that failed to resolve.
+function resolveGoverningAttrs(type, explicitAttrs, governingText, envs) {
+  const fields = {};
+  for (const def of ATTR_DEFS[type]) {
+    const exprText = explicitAttrs[def.token] ?? governingText[def.token] ?? BUILTIN_SET_DEFAULTS[type][def.token];
+    const res =
+      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv) :
+                               resolveBoolAttr(exprText, envs.boolEnv);
+    if (!res.ok) {
+      const errorMsg =
+        def.kind === 'color'  ? `unknown color '${exprText}'` :
+        def.kind === 'number' ? `invalid ${def.label} expression '${exprText}'` :
+                                 `invalid ${def.token} value '${exprText}'`;
+      return { ok: false, errorMsg };
+    }
+    fields[def.expr] = exprText;
+    fields[def.value] = res.value;
+  }
+  return { ok: true, fields };
+}
+
 // Builds all three constant environments in one order-dependent left-to-
 // right pass (a constant can only reference an earlier constant of the same
 // kind) — kind is inferred from the expression's shape: `#rrggbb` is always
@@ -534,10 +565,10 @@ function renameInExpr(expr, oldName, newName) {
 // both already established throughout the codebase:
 //   - any object field named `<name>Expr` holds raw expression text that
 //     may reference a constant by name (colorExpr, radiusExpr, ...);
-//   - lastSet*/pendingDefaults objects' fields are always bare identifiers
-//     or literals, never compound expressions, when they came from a `set`
-//     line — so a plain equality check (not renameInExpr's regex) applies
-//     uniformly across whatever fields each one happens to have.
+//   - lastSet* objects' fields are always bare identifiers or literals,
+//     never compound expressions, when they came from a `set` line — so a
+//     plain equality check (not renameInExpr's regex) applies uniformly
+//     across whatever fields each one happens to have.
 function renameConstantEverywhere(oldName, newName) {
   for (const c of constants)
     c.expr = renameInExpr(c.expr, oldName, newName);
@@ -545,10 +576,11 @@ function renameConstantEverywhere(oldName, newName) {
   // Which object types exist, and their per-instance/singleton state, comes
   // from OBJECT_TYPES — a type with no `list` (constants, and functions/
   // curves until implemented) simply has nothing to walk here. The actual
-  // per-field scan stays driven by the `*Expr` naming convention rather
-  // than each type's explicit `attrs` list: that's what lets it stay
-  // correct automatically as attributes are added, with nothing to
-  // remember to update in this function specifically.
+  // per-field scan stays driven by the `*Expr` naming convention rather than
+  // any explicit per-type field list (see ATTR_DEFS, used elsewhere for
+  // resolution, not renaming): that's what lets it stay correct
+  // automatically as attributes are added, with nothing to remember to
+  // update in this function specifically.
   for (const t of OBJECT_TYPES) {
     if (!t.list) continue;
     for (const obj of t.list()) {
@@ -556,11 +588,10 @@ function renameConstantEverywhere(oldName, newName) {
         if (f.endsWith('Expr') && obj[f]) obj[f] = renameInExpr(obj[f], oldName, newName);
       }
     }
-    for (const stateObj of [t.lastSet?.(), t.pendingDefaults?.()]) {
-      if (!stateObj) continue;
-      for (const f of Object.keys(stateObj)) {
-        if (stateObj[f] === oldName) stateObj[f] = newName;
-      }
+    const stateObj = t.lastSet?.();
+    if (!stateObj) continue;
+    for (const f of Object.keys(stateObj)) {
+      if (stateObj[f] === oldName) stateObj[f] = newName;
     }
   }
   // Vertex coordinates (`exprs`) are the one exception: a plain array, not
@@ -630,19 +661,6 @@ const PRESET_COLORS = [
   { name: 'Brown',       hex: '#6d4c41' },
 ];
 
-// What the GUI "add vertex"/"create segment" rows currently default to —
-// raw expr text per field (a literal, or a constant reference for color),
-// mirroring lastSetVertex/lastSetSegment's shape. Synced from lastSet* on
-// every code-file exit (syncAddRowDefaultsFromLastSet), and mutated directly
-// by touching the add-row's own controls (native color input flattens,
-// color-constant grid links, visible/label expander toggles). This is what
-// addVertexFromInputs()/checkSelectionComplete() actually read when creating
-// a new object, so a GUI-created vertex/segment can inherit a live constant
-// link exactly like one typed in the code file with `set ... color=c` can.
-let pendingVertexDefaults  = { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true' };
-let pendingSegmentDefaults = { color: DEFAULT_COLOR, width: '1.5', visible: 'true' };
-let pendingFaceDefaults    = { color: DEFAULT_COLOR, visible: 'true' };
-
 // The two add-row color pickers (see setupColorPicker) — static DOM, wired
 // once at init, refreshed on demand from renderAddRowDefaults().
 let vColorPicker, segColorPicker, faceColorPicker;
@@ -688,41 +706,22 @@ let vColorPicker, segColorPicker, faceColorPicker;
 //   - list: () => the live array, for anything that needs to walk every
 //     instance (rename propagation today; re-eval, undo-capture, etc. are
 //     candidates to migrate onto this later, opportunistically)
-//   - attrs: the explicit, human-maintained checklist of this type's
-//     per-instance settable fields and what kind of value each holds
-//     (color / bool / number) — populated for a type once its attributes
-//     are actually designed, not guessed ahead of time (curves stays [] —
-//     see below — until that design happens)
-//   - lastSet / pendingDefaults: accessors for the two pieces of singleton
-//     "current defaults" state each of these types has (see lastSetVertex
-//     and pendingVertexDefaults below) — faces have no add-row, so no
-//     pendingDefaults
+//   - lastSet: accessor for the type's "currently governing defaults" state
+//     (see lastSetVertex below, and ATTR_DEFS/resolveGoverningAttrs, which
+//     is the single source of truth for per-type settable attributes now —
+//     faces have no add-row, but lastSetFace still governs bare face lines)
 const OBJECT_TYPES = [
   { key: 'constants', title: 'CONSTANTS', style: 'eq',   match: /CONSTANT/i },
   { key: 'functions', title: 'FUNCTIONS', style: 'eq',   match: /FUNCTION/i },
   { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i,
-    list: () => vertices, attrs: [
-      { field: 'colorExpr',   kind: 'color'  },
-      { field: 'radiusExpr',  kind: 'number' },
-      { field: 'visibleExpr', kind: 'bool'   },
-      { field: 'labelExpr',   kind: 'bool'   },
-    ], lastSet: () => lastSetVertex, pendingDefaults: () => pendingVertexDefaults },
+    list: () => vertices, lastSet: () => lastSetVertex },
   { key: 'segments',  title: 'SEGMENTS',  style: 'dash', match: /SEGMENT/i,
-    list: () => segments, attrs: [
-      { field: 'colorExpr',   kind: 'color'  },
-      { field: 'widthExpr',   kind: 'number' },
-      { field: 'visibleExpr', kind: 'bool'   },
-    ], lastSet: () => lastSetSegment, pendingDefaults: () => pendingSegmentDefaults },
+    list: () => segments, lastSet: () => lastSetSegment },
   { key: 'faces',     title: 'FACES',     style: 'dash', match: /FACE/i,
-    list: () => faces, attrs: [
-      { field: 'colorExpr',   kind: 'color' },
-      { field: 'visibleExpr', kind: 'bool'  },
-    ], lastSet: () => lastSetFace },
-  // No `list`/`attrs` yet — curves aren't implemented, and their attributes
-  // (if any beyond the ones above) haven't been designed. Add both once
-  // that design happens; this entry existing at all is what makes it hard
-  // to forget the section-parsing side of introducing them.
-  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i, attrs: [] },
+    list: () => faces, lastSet: () => lastSetFace },
+  // No `list` yet — curves aren't implemented. This entry existing at all is
+  // what makes it hard to forget the section-parsing side of introducing them.
+  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i },
 ];
 const SECTION_ORDER = OBJECT_TYPES.map(d => d.key);
 
@@ -783,6 +782,31 @@ const BUILTIN_SET_DEFAULTS = {
   vertex:  { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true' },
   segment: { color: DEFAULT_COLOR, width: '1.5', visible: 'true' },
   face:    { color: DEFAULT_COLOR, visible: 'true' },
+};
+
+// Per-type table of settable attributes: the set/object-line token (matches
+// SET_FIELD_ORDER), the raw-text *Expr field it's stored as, the resolved-
+// value field it feeds, and which resolver kind applies. resolveGoverningAttrs()
+// below is the only thing that walks this — it's the single source of truth
+// shared by parseCodeText (the code-file/interpreter path) and the controls'
+// object-creation functions, so the two can never resolve an attribute
+// differently from each other.
+const ATTR_DEFS = {
+  vertex: [
+    { token: 'color',   expr: 'colorExpr',   value: 'color',     kind: 'color'  },
+    { token: 'r',       expr: 'radiusExpr',  value: 'radius',    kind: 'number', label: 'radius' },
+    { token: 'visible', expr: 'visibleExpr', value: 'visible',   kind: 'bool'   },
+    { token: 'label',   expr: 'labelExpr',   value: 'showLabel', kind: 'bool'   },
+  ],
+  segment: [
+    { token: 'color',   expr: 'colorExpr',   value: 'color',     kind: 'color'  },
+    { token: 'width',   expr: 'widthExpr',   value: 'lineWidth', kind: 'number', label: 'width' },
+    { token: 'visible', expr: 'visibleExpr', value: 'visible',   kind: 'bool'   },
+  ],
+  face: [
+    { token: 'color',   expr: 'colorExpr',   value: 'color',   kind: 'color' },
+    { token: 'visible', expr: 'visibleExpr', value: 'visible', kind: 'bool'  },
+  ],
 };
 
 // Builds the consolidated "set" cluster for one type from the *final* state
@@ -1047,28 +1071,14 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = 'invalid coordinate expression'; lines.push(rec); continue;
       }
 
-      const colorExprText   = tok.attrs.color   ?? currentSet.vertex.color   ?? DEFAULT_COLOR;
-      const radiusExprText  = tok.attrs.r       ?? currentSet.vertex.r       ?? '5';
-      const visibleExprText = tok.attrs.visible ?? currentSet.vertex.visible ?? 'true';
-      const labelExprText   = tok.attrs.label   ?? currentSet.vertex.label   ?? 'true';
-
-      const colorRes = resolveColorAttr(colorExprText, colorEnv);
-      if (!colorRes.ok) { rec.valid = false; rec.errorMsg = `unknown color '${colorExprText}'`; lines.push(rec); continue; }
-      const radiusRes = resolveNumAttr(radiusExprText, numericEnv);
-      if (!radiusRes.ok) { rec.valid = false; rec.errorMsg = `invalid radius expression '${radiusExprText}'`; lines.push(rec); continue; }
-      const visibleRes = resolveBoolAttr(visibleExprText, boolEnv);
-      if (!visibleRes.ok) { rec.valid = false; rec.errorMsg = `invalid visible value '${visibleExprText}'`; lines.push(rec); continue; }
-      const labelRes = resolveBoolAttr(labelExprText, boolEnv);
-      if (!labelRes.ok) { rec.valid = false; rec.errorMsg = `invalid label value '${labelExprText}'`; lines.push(rec); continue; }
+      const attrRes = resolveGoverningAttrs('vertex', tok.attrs, currentSet.vertex, { numericEnv, colorEnv, boolEnv });
+      if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
       const obj = {
         name: finalName,
         coords,
         exprs: coordExprs.slice(),
-        color: colorRes.value,     colorExpr: colorExprText,
-        radius: radiusRes.value,   radiusExpr: radiusExprText,
-        visible: visibleRes.value, visibleExpr: visibleExprText,
-        showLabel: labelRes.value, labelExpr: labelExprText,
+        ...attrRes.fields,
       };
       stagedVertices.push(obj);
       vertexByName.set(finalName, obj);
@@ -1100,19 +1110,13 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      const faceColorExprText   = tok.attrs.color   ?? currentSet.face.color   ?? DEFAULT_COLOR;
-      const faceVisibleExprText = tok.attrs.visible ?? currentSet.face.visible ?? 'true';
-
-      const faceColorRes = resolveColorAttr(faceColorExprText, colorEnv);
-      if (!faceColorRes.ok) { rec.valid = false; rec.errorMsg = `unknown color '${faceColorExprText}'`; lines.push(rec); continue; }
-      const faceVisibleRes = resolveBoolAttr(faceVisibleExprText, boolEnv);
-      if (!faceVisibleRes.ok) { rec.valid = false; rec.errorMsg = `invalid visible value '${faceVisibleExprText}'`; lines.push(rec); continue; }
+      const attrRes = resolveGoverningAttrs('face', tok.attrs, currentSet.face, { numericEnv, colorEnv, boolEnv });
+      if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
       const obj = {
         name: finalName,
         vertexNames: faceVerts.map(v => v.name),
-        color: faceColorRes.value,     colorExpr: faceColorExprText,
-        visible: faceVisibleRes.value, visibleExpr: faceVisibleExprText,
+        ...attrRes.fields,
       };
       stagedFaces.push(obj);
       rec.parsed = obj;
@@ -1134,23 +1138,13 @@ function parseCodeText(text) {
     if (!v1 || !v2) {
       rec.valid = false; rec.errorMsg = `unknown vertex '${!v1 ? tok.positional[0] : tok.positional[1]}'`; lines.push(rec); continue;
     }
-    const segColorExprText   = tok.attrs.color   ?? currentSet.segment.color   ?? DEFAULT_COLOR;
-    const segWidthExprText   = tok.attrs.width   ?? currentSet.segment.width   ?? '1.5';
-    const segVisibleExprText = tok.attrs.visible ?? currentSet.segment.visible ?? 'true';
-
-    const segColorRes = resolveColorAttr(segColorExprText, colorEnv);
-    if (!segColorRes.ok) { rec.valid = false; rec.errorMsg = `unknown color '${segColorExprText}'`; lines.push(rec); continue; }
-    const segWidthRes = resolveNumAttr(segWidthExprText, numericEnv);
-    if (!segWidthRes.ok) { rec.valid = false; rec.errorMsg = `invalid width expression '${segWidthExprText}'`; lines.push(rec); continue; }
-    const segVisibleRes = resolveBoolAttr(segVisibleExprText, boolEnv);
-    if (!segVisibleRes.ok) { rec.valid = false; rec.errorMsg = `invalid visible value '${segVisibleExprText}'`; lines.push(rec); continue; }
+    const attrRes = resolveGoverningAttrs('segment', tok.attrs, currentSet.segment, { numericEnv, colorEnv, boolEnv });
+    if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
     const obj = {
       v1Name: v1.name,
       v2Name: v2.name,
-      color: segColorRes.value,     colorExpr: segColorExprText,
-      lineWidth: segWidthRes.value, widthExpr: segWidthExprText,
-      visible: segVisibleRes.value, visibleExpr: segVisibleExprText,
+      ...attrRes.fields,
     };
     stagedSegments.push(obj);
     rec.parsed = obj;
@@ -2104,11 +2098,10 @@ function handleCanvasClick(px, py, pointerType) {
 function checkSelectionComplete() {
   if (selectedVertexIds.size < 2) return;
   const [id1, id2] = [...selectedVertexIds];
-  const colorExpr = pendingSegmentDefaults.color;
-  const colorRes   = resolveColorAttr(colorExpr, buildEnvs().colorEnv);
-  const color      = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
-  const lineWidth = Math.max(0.5, parseFloat(document.getElementById('seg-width').value) || 1.5);
-  const visible   = pendingSegmentDefaults.visible === 'true';
+  const attrRes = resolveGoverningAttrs('segment', {}, lastSetSegment, buildEnvs());
+  // lastSetSegment/BUILTIN_SET_DEFAULTS.segment are always independently
+  // valid — every write path validates before storing — so attrRes.ok is
+  // guaranteed here.
   // Clear the selection *before* snapshotting — otherwise the undo-captured
   // "before" state still has both vertices selected, and undoing restores
   // that stale selection, corrupting the next segment (its two leftover
@@ -2118,8 +2111,7 @@ function checkSelectionComplete() {
   selectedVertexIds.clear();
   snapshot();
   segments.push({
-    id: nextSegmentId++, vertexIds: [id1, id2], color, lineWidth, visible,
-    colorExpr, widthExpr: String(lineWidth), visibleExpr: String(visible),
+    id: nextSegmentId++, vertexIds: [id1, id2], ...attrRes.fields,
   });
   if (segmentMode === 'on') segmentMode = 'off';
   updateSegmentButton();
@@ -2153,10 +2145,7 @@ function applyFacePick(id) {
 }
 
 function checkFaceComplete() {
-  const colorExpr = pendingFaceDefaults.color;
-  const colorRes  = resolveColorAttr(colorExpr, buildEnvs().colorEnv);
-  const color     = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
-  const visible   = pendingFaceDefaults.visible === 'true';
+  const attrRes   = resolveGoverningAttrs('face', {}, lastSetFace, buildEnvs());
   const vertexIds = [...facePickOrder];
   const name      = `F${nextFaceId}`;
   // Clear the pick *before* snapshotting — same reasoning as
@@ -2166,8 +2155,7 @@ function checkFaceComplete() {
   if (faceMode === 'on') faceMode = 'off'; // 'on++' stays primed for another face
   snapshot();
   faces.push({
-    id: nextFaceId++, name, vertexIds, color, visible,
-    colorExpr, visibleExpr: String(visible),
+    id: nextFaceId++, name, vertexIds, ...attrRes.fields,
   });
   updateFaceButton();
   renderFaceList();
@@ -2549,25 +2537,12 @@ document.getElementById('c-expr').addEventListener('keydown', e => {
 
 // ─── Add-row defaults (mirrors code-file `set` values) ─────────────────────────
 //
-// pendingVertexDefaults/pendingSegmentDefaults are what addVertexFromInputs()/
-// checkSelectionComplete() actually use when creating a new object — a two-
-// step refresh mirroring the buildEnvs()/reEvalObjects() split: sync (rare —
-// only when the underlying last-saved values change, i.e. on code-file exit)
-// vs. render (frequent — called via the renderConstList() hook below so a
-// color linked to a constant stays live as that constant is edited).
-
-// Copies lastSetVertex/lastSetSegment/lastSetFace (raw expr text, possibly
-// undefined per field) into the pending-defaults state, falling back to
-// BUILTIN_SET_DEFAULTS exactly like buildSetBlock() does for the code file's
-// own display.
-function syncAddRowDefaultsFromLastSet() {
-  for (const field of SET_FIELD_ORDER.vertex)
-    pendingVertexDefaults[field] = lastSetVertex[field] ?? BUILTIN_SET_DEFAULTS.vertex[field];
-  for (const field of SET_FIELD_ORDER.segment)
-    pendingSegmentDefaults[field] = lastSetSegment[field] ?? BUILTIN_SET_DEFAULTS.segment[field];
-  for (const field of SET_FIELD_ORDER.face)
-    pendingFaceDefaults[field] = lastSetFace[field] ?? BUILTIN_SET_DEFAULTS.face[field];
-}
+// The add-rows read/write lastSetVertex/lastSetSegment/lastSetFace directly —
+// the exact same state a `set` line in the code file/interpreter populates —
+// so there's one governing-defaults object per type, not a separately-synced
+// shadow copy that can drift out of date. renderAddRowDefaults() (below) is
+// the only thing that *displays* it; touching a control is the only thing
+// that *writes* it.
 
 // Shared by all 4 "color picker" locations (vertex/segment x add-row/edit-
 // mode): one row button (rowBtn) opens a small popover showing, all at once
@@ -2583,7 +2558,7 @@ function syncAddRowDefaultsFromLastSet() {
 // behavior at all, only its input/change events.
 //
 // getExpr()/setExpr(value) read/write whatever the caller's linkable field is
-// (pendingVertexDefaults.color, or a live vertex/segment's colorExpr) — this
+// (lastSetVertex.color, or a live vertex/segment's colorExpr) — this
 // function only knows about the DOM. onLiteralChange(hex) fires on every
 // native-input tick (cheap: model + rowBtn preview + draw() only, no DOM
 // rebuild, since a rebuild mid-drag could close the OS color picker).
@@ -2687,51 +2662,91 @@ function setupColorPicker(rowBtn, popoverEl, presetListEl, constListEl, nativeIn
   return { refresh, close };
 }
 
-function renderAddRowDefaults() {
-  const { numericEnv, colorEnv, boolEnv } = buildEnvs();
+// Displays one governing boolean field's resolved state (dot fill/opacity)
+// and, when it's currently linked to a constant rather than a literal, the
+// constant's name as a small subscript. Read-only — write-back happens only
+// in toggleGoverningBool()'s own click handler, never here, so calling this
+// on every render (e.g. from the renderConstList() hook, so a linked dot
+// stays live as the constant is edited) can never silently detach anything.
+function renderBoolToggle(btnId, subId, exprText, boolEnv) {
+  const res = resolveBoolAttr(exprText, boolEnv);
+  const val = res.ok ? res.value : true;
+  const btn = document.getElementById(btnId);
+  const sub = document.getElementById(subId);
+  btn.textContent   = val ? '●' : '○';
+  btn.style.opacity = val ? '1' : '0.3';
+  sub.textContent   = (exprText === 'true' || exprText === 'false') ? '' : exprText;
+}
 
-  const vColorRes = resolveColorAttr(pendingVertexDefaults.color, colorEnv);
+// Click handler for a governing boolean toggle: always sets a literal equal
+// to the opposite of whatever's currently resolving — the exact same rule
+// whether that means flipping an existing literal or detaching a constant
+// link, matching the numeric widget's "direct interaction always yields a
+// literal" behavior (see wireNumericAttrInput). The only way to (re)link a
+// constant is via the interpreter or code file.
+function toggleGoverningBool(governingText, field, builtinDefault, boolEnv) {
+  const exprText = governingText[field] ?? builtinDefault;
+  const res      = resolveBoolAttr(exprText, boolEnv);
+  governingText[field] = String(!(res.ok ? res.value : true));
+  renderAddRowDefaults();
+}
+
+// A governing numeric field's box (v-radius/seg-width): structurally can
+// only ever produce a literal on direct edit — beforeinput rejects any
+// insertion (typed or pasted) that wouldn't leave a valid in-progress
+// signed-decimal string in the box, so a keystroke can never turn it into
+// anything resembling a constant name. Unfocused, it always shows the true
+// governing expr text (via the returned refresh function) — a number when a
+// literal governs, the constant's name when one does — same discipline as
+// makeEndpointInput's plain-text-plus-live-validation pattern, just with a
+// numeric grammar instead of a vertex-name lookup.
+function wireNumericAttrInput(input, getExprText, setLiteral) {
+  function refresh() {
+    if (document.activeElement === input) return; // don't fight an in-progress edit
+    input.value = getExprText();
+  }
+  input.addEventListener('beforeinput', e => {
+    if (e.data == null) return; // deletions etc. always pass through
+    const prospective = input.value.slice(0, input.selectionStart) + e.data + input.value.slice(input.selectionEnd);
+    if (!/^-?\d*\.?\d*$/.test(prospective)) e.preventDefault();
+  });
+  input.addEventListener('input', () => {
+    const n   = parseFloat(input.value);
+    const bad = input.value.trim() !== '' && isNaN(n);
+    input.classList.toggle('expr-invalid', bad);
+    if (!isNaN(n)) setLiteral(n);
+  });
+  input.addEventListener('blur', refresh);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+  refresh();
+  return refresh;
+}
+
+function renderAddRowDefaults() {
+  const { colorEnv, boolEnv } = buildEnvs();
+
+  const vColorRes = resolveColorAttr(lastSetVertex.color ?? DEFAULT_COLOR, colorEnv);
   const vColorResolved = vColorRes.ok ? vColorRes.value : DEFAULT_COLOR;
   document.getElementById('v-color').value = vColorResolved;
   document.getElementById('v-color-btn').style.background = vColorResolved;
-  const vRadiusRes = resolveNumAttr(pendingVertexDefaults.r, numericEnv);
-  document.getElementById('v-radius').value = vRadiusRes.ok ? vRadiusRes.value : 5;
-  // visible/label have no constant-linking UI (snapshot-only) — collapse
-  // straight to a resolved literal 'true'/'false', there's no raw reference
-  // worth preserving once resolved.
-  const vVisibleRes = resolveBoolAttr(pendingVertexDefaults.visible, boolEnv);
-  const vLabelRes   = resolveBoolAttr(pendingVertexDefaults.label, boolEnv);
-  pendingVertexDefaults.visible = String(vVisibleRes.ok ? vVisibleRes.value : true);
-  pendingVertexDefaults.label   = String(vLabelRes.ok   ? vLabelRes.value   : true);
-  const vVisibleBtn = document.getElementById('v-add-visible');
-  const vLabelBtn   = document.getElementById('v-add-label');
-  vVisibleBtn.textContent   = pendingVertexDefaults.visible === 'true' ? '●' : '○';
-  vVisibleBtn.style.opacity = pendingVertexDefaults.visible === 'true' ? '1' : '0.3';
-  vLabelBtn.style.opacity   = pendingVertexDefaults.label   === 'true' ? '1' : '0.3';
+  refreshVRadius();
+  renderBoolToggle('v-add-visible', 'v-add-visible-sub', lastSetVertex.visible ?? BUILTIN_SET_DEFAULTS.vertex.visible, boolEnv);
+  renderBoolToggle('v-add-label',   'v-add-label-sub',   lastSetVertex.label   ?? BUILTIN_SET_DEFAULTS.vertex.label,   boolEnv);
   vColorPicker.refresh();
 
-  const sColorRes = resolveColorAttr(pendingSegmentDefaults.color, colorEnv);
+  const sColorRes = resolveColorAttr(lastSetSegment.color ?? DEFAULT_COLOR, colorEnv);
   const sColorResolved = sColorRes.ok ? sColorRes.value : DEFAULT_COLOR;
   document.getElementById('seg-color').value = sColorResolved;
   document.getElementById('seg-color-btn').style.background = sColorResolved;
-  const sWidthRes = resolveNumAttr(pendingSegmentDefaults.width, numericEnv);
-  document.getElementById('seg-width').value = sWidthRes.ok ? sWidthRes.value : 1.5;
-  const sVisibleRes = resolveBoolAttr(pendingSegmentDefaults.visible, boolEnv);
-  pendingSegmentDefaults.visible = String(sVisibleRes.ok ? sVisibleRes.value : true);
-  const sVisibleBtn = document.getElementById('seg-add-visible');
-  sVisibleBtn.textContent   = pendingSegmentDefaults.visible === 'true' ? '●' : '○';
-  sVisibleBtn.style.opacity = pendingSegmentDefaults.visible === 'true' ? '1' : '0.3';
+  refreshSegWidth();
+  renderBoolToggle('seg-add-visible', 'seg-add-visible-sub', lastSetSegment.visible ?? BUILTIN_SET_DEFAULTS.segment.visible, boolEnv);
   segColorPicker.refresh();
 
-  const fColorRes = resolveColorAttr(pendingFaceDefaults.color, colorEnv);
+  const fColorRes = resolveColorAttr(lastSetFace.color ?? DEFAULT_COLOR, colorEnv);
   const fColorResolved = fColorRes.ok ? fColorRes.value : DEFAULT_COLOR;
   document.getElementById('face-color').value = fColorResolved;
   document.getElementById('face-color-btn').style.background = fColorResolved;
-  const fVisibleRes = resolveBoolAttr(pendingFaceDefaults.visible, boolEnv);
-  pendingFaceDefaults.visible = String(fVisibleRes.ok ? fVisibleRes.value : true);
-  const fVisibleBtn = document.getElementById('face-add-visible');
-  fVisibleBtn.textContent   = pendingFaceDefaults.visible === 'true' ? '●' : '○';
-  fVisibleBtn.style.opacity = pendingFaceDefaults.visible === 'true' ? '1' : '0.3';
+  renderBoolToggle('face-add-visible', 'face-add-visible-sub', lastSetFace.visible ?? BUILTIN_SET_DEFAULTS.face.visible, boolEnv);
   faceColorPicker.refresh();
 }
 
@@ -3038,20 +3053,10 @@ function addVertexFromInputs() {
   if (vals.some(isNaN)) return;
   const name   = nameInput.value.trim() || `P${nextVertexId}`;
   if (isNameTaken(name)) { setNameError(nameInput); return; }
-  // Color comes from pendingVertexDefaults (not the native input directly) so
-  // a constant link survives into the new vertex's colorExpr — the native
-  // input can only ever show the resolved literal preview. Radius has no
-  // linking UI, so it's read straight off its own live input as always.
-  const colorExpr = pendingVertexDefaults.color;
-  const colorRes   = resolveColorAttr(colorExpr, buildEnvs().colorEnv);
-  const color      = colorRes.ok ? colorRes.value : DEFAULT_COLOR;
-  const radius     = Math.max(1, parseFloat(document.getElementById('v-radius').value) || 5);
-  const visible    = pendingVertexDefaults.visible === 'true';
-  const showLabel  = pendingVertexDefaults.label   === 'true';
+  const attrRes = resolveGoverningAttrs('vertex', {}, lastSetVertex, buildEnvs());
   snapshot();
   vertices.push({
-    id: nextVertexId++, name, coords: vals, exprs, color, radius, visible, showLabel,
-    colorExpr, radiusExpr: String(radius), visibleExpr: String(visible), labelExpr: String(showLabel),
+    id: nextVertexId++, name, coords: vals, exprs, ...attrRes.fields,
   });
   nameInput.value = '';
   coordInps.forEach(inp => { inp.value = '0'; inp.classList.remove('expr-invalid'); });
@@ -3067,7 +3072,7 @@ document.getElementById('btn-add-vertex').addEventListener('click', addVertexFro
   });
 });
 
-['v-a1', 'v-a2', 'v-a3', 'v-radius'].forEach(id => {
+['v-a1', 'v-a2', 'v-a3', 'v-radius', 'seg-width'].forEach(id => {
   document.getElementById(id).addEventListener('focus', function() {
     const el = this;
     setTimeout(() => el.select(), 0);
@@ -3082,11 +3087,15 @@ vColorPicker = setupColorPicker(
   document.getElementById('v-color-presets'),
   document.getElementById('v-color-grid'),
   document.getElementById('v-color'),
-  () => pendingVertexDefaults.color,
-  name => { pendingVertexDefaults.color = name; },
-  hex => { pendingVertexDefaults.color = hex; document.getElementById('v-color-btn').style.background = hex; },
+  () => lastSetVertex.color ?? DEFAULT_COLOR,
+  name => { lastSetVertex.color = name; },
+  hex => { lastSetVertex.color = hex; document.getElementById('v-color-btn').style.background = hex; },
   renderAddRowDefaults
 );
+
+const refreshVRadius = wireNumericAttrInput(document.getElementById('v-radius'),
+  () => lastSetVertex.r ?? BUILTIN_SET_DEFAULTS.vertex.r,
+  n  => { lastSetVertex.r = String(n); });
 
 document.getElementById('v-add-more').addEventListener('click', () => {
   const row  = document.getElementById('v-add-extra');
@@ -3096,12 +3105,10 @@ document.getElementById('v-add-more').addEventListener('click', () => {
   btn.classList.toggle('active', open);
 });
 document.getElementById('v-add-label').addEventListener('click', () => {
-  pendingVertexDefaults.label = pendingVertexDefaults.label === 'true' ? 'false' : 'true';
-  renderAddRowDefaults();
+  toggleGoverningBool(lastSetVertex, 'label', BUILTIN_SET_DEFAULTS.vertex.label, buildEnvs().boolEnv);
 });
 document.getElementById('v-add-visible').addEventListener('click', () => {
-  pendingVertexDefaults.visible = pendingVertexDefaults.visible === 'true' ? 'false' : 'true';
-  renderAddRowDefaults();
+  toggleGoverningBool(lastSetVertex, 'visible', BUILTIN_SET_DEFAULTS.vertex.visible, buildEnvs().boolEnv);
 });
 
 // ─── Segment edit mode ────────────────────────────────────────────────────────
@@ -3492,11 +3499,15 @@ segColorPicker = setupColorPicker(
   document.getElementById('seg-color-presets'),
   document.getElementById('seg-color-grid'),
   document.getElementById('seg-color'),
-  () => pendingSegmentDefaults.color,
-  name => { pendingSegmentDefaults.color = name; },
-  hex => { pendingSegmentDefaults.color = hex; document.getElementById('seg-color-btn').style.background = hex; },
+  () => lastSetSegment.color ?? DEFAULT_COLOR,
+  name => { lastSetSegment.color = name; },
+  hex => { lastSetSegment.color = hex; document.getElementById('seg-color-btn').style.background = hex; },
   renderAddRowDefaults
 );
+
+const refreshSegWidth = wireNumericAttrInput(document.getElementById('seg-width'),
+  () => lastSetSegment.width ?? BUILTIN_SET_DEFAULTS.segment.width,
+  n  => { lastSetSegment.width = String(n); });
 
 faceColorPicker = setupColorPicker(
   document.getElementById('face-color-btn'),
@@ -3504,9 +3515,9 @@ faceColorPicker = setupColorPicker(
   document.getElementById('face-color-presets'),
   document.getElementById('face-color-grid'),
   document.getElementById('face-color'),
-  () => pendingFaceDefaults.color,
-  name => { pendingFaceDefaults.color = name; },
-  hex => { pendingFaceDefaults.color = hex; document.getElementById('face-color-btn').style.background = hex; },
+  () => lastSetFace.color ?? DEFAULT_COLOR,
+  name => { lastSetFace.color = name; },
+  hex => { lastSetFace.color = hex; document.getElementById('face-color-btn').style.background = hex; },
   renderAddRowDefaults
 );
 
@@ -3518,8 +3529,7 @@ document.getElementById('face-add-more').addEventListener('click', () => {
   btn.classList.toggle('active', open);
 });
 document.getElementById('face-add-visible').addEventListener('click', () => {
-  pendingFaceDefaults.visible = pendingFaceDefaults.visible === 'true' ? 'false' : 'true';
-  renderAddRowDefaults();
+  toggleGoverningBool(lastSetFace, 'visible', BUILTIN_SET_DEFAULTS.face.visible, buildEnvs().boolEnv);
 });
 
 document.getElementById('seg-add-more').addEventListener('click', () => {
@@ -3530,8 +3540,7 @@ document.getElementById('seg-add-more').addEventListener('click', () => {
   btn.classList.toggle('active', open);
 });
 document.getElementById('seg-add-visible').addEventListener('click', () => {
-  pendingSegmentDefaults.visible = pendingSegmentDefaults.visible === 'true' ? 'false' : 'true';
-  renderAddRowDefaults();
+  toggleGoverningBool(lastSetSegment, 'visible', BUILTIN_SET_DEFAULTS.segment.visible, buildEnvs().boolEnv);
 });
 
 // ─── Controls panel toggle ────────────────────────────────────────────────────
@@ -3778,8 +3787,8 @@ function closeCodeSubmenu() {
 
   // The add-rows should show whatever was last actually saved — whether this
   // particular exit came via Save+Exit or a plain Exit that discarded
-  // unsaved edits, lastSetVertex/lastSetSegment already reflect that.
-  syncAddRowDefaultsFromLastSet();
+  // unsaved edits, lastSetVertex/lastSetSegment already reflect that, and
+  // renderAddRowDefaults() reads them directly (no separate sync needed).
   renderAddRowDefaults();
 
   updateUndoButtons();
@@ -3851,15 +3860,10 @@ function submitInterpreterLine() {
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
   lastSetFace    = { ...staged.finalSet.face };
-  // lastSet* just changed — the add-row defaults the controls actually read
-  // (pendingVertexDefaults/pendingSegmentDefaults) need the same sync
-  // closeCodeSubmenu() already does. codeSave() skips this safely (the
-  // add-row controls are unreachable while Code is open, since Aux/Display
-  // are locked closed), but the interpreter is reachable exactly while
-  // closed, right after this commit — so without this, a `set` line typed
-  // here would silently have no effect on anything drawn via the controls
-  // until some unrelated later action happened to trigger the sync.
-  syncAddRowDefaultsFromLastSet();
+  // lastSet* just changed — renderConstList() below (via its own
+  // renderAddRowDefaults() call) picks it up automatically, since the
+  // add-rows now read lastSetVertex/lastSetSegment/lastSetFace directly
+  // rather than a separately-synced shadow copy.
 
   snapshot();
   vertices          = newVertices;
@@ -4105,7 +4109,6 @@ document.addEventListener('pointerdown', e => {
 }, true);
 
 updateUndoButtons();
-syncAddRowDefaultsFromLastSet();
 renderConstList();
 renderVertexList();
 renderSegmentList();
