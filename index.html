@@ -26,6 +26,16 @@
         <button class="sk-btn" data-insert="^" data-offset="0">^</button>
       </div>
     </div>
+    <!-- Logic keyboard: sibling of the math keyboard above, not a repurposing
+         of it — a bool-kind constant's box takes a different grammar. Starts
+         minimal (correctly-cased true/false, guarding against a True/False
+         typo); room to grow into boolean operators once that syntax exists. -->
+    <div id="logic-keyboard" style="display:none">
+      <div class="sk-row">
+        <button class="sk-btn" data-insert="true"  data-offset="0">true</button>
+        <button class="sk-btn" data-insert="false" data-offset="0">false</button>
+      </div>
+    </div>
     <div id="controls">
       <div id="controls-header">
         <button id="btn-dark">☾</button>
@@ -94,7 +104,32 @@
           <div class="toggle-group">
             <span class="label">const</span>
             <input type="text" id="c-name" class="v-name-input" placeholder="name" autocapitalize="none" autocorrect="off" spellcheck="false">
-            <input type="text" id="c-expr" class="expr-input"   placeholder="= expr" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <input type="text" id="c-expr" class="expr-input"   placeholder="select aux type ---->" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <!-- Kind picker: shown only while c-expr is empty (see
+                 refreshConstAddRowAux) — picking a kind never hides it by
+                 itself, only typing a value does. -->
+            <div id="c-kind-picker" class="toggle-group">
+              <button type="button" class="v-toggle c-kind-btn" data-kind="number" title="Number">N</button>
+              <button type="button" class="v-toggle c-kind-btn" data-kind="color"  title="Color">C</button>
+              <button type="button" class="v-toggle c-kind-btn" data-kind="bool"   title="Bool">B</button>
+            </div>
+            <!-- Auxiliary-button slot: exactly one of these three shows,
+                 matching whichever kind is currently selected. -->
+            <div class="const-btn-slot">
+              <button id="c-add-omega" class="v-toggle const-omega-btn" style="display:none">Ω</button>
+              <button id="c-add-color-btn" class="color-picker-btn" title="Color" style="display:none"></button>
+              <button id="c-add-logic" class="v-toggle const-logic-btn" style="display:none">𝔹</button>
+            </div>
+            <div id="c-add-color-popover" class="color-popover" style="display:none">
+              <div class="color-section-label">Presets</div>
+              <div id="c-add-color-presets" class="color-preset-list"></div>
+              <div class="color-section-label">Constants</div>
+              <div id="c-add-color-grid" class="color-const-list"></div>
+              <div class="color-custom-wrap">
+                <div class="color-custom-btn">Custom…</div>
+                <input type="color" id="c-add-color-native" class="color-native-overlay" value="#4d4d4d">
+              </div>
+            </div>
             <button id="btn-add-const">+</button>
           </div>
           <div id="const-list"></div>
@@ -217,6 +252,6 @@
     </div>
   </div>
 
-  <script src="main.js?v=77"></script>
+  <script src="main.js?v=78"></script>
 </body>
 </html>

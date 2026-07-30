@@ -135,7 +135,9 @@ let darkMode        = false;
 
 let constants      = [];   // [{ id, name, expr, value }]
 let nextConstantId = 0;
-let omegaMode      = 'off';  // 'off' | 'on' | 'on++'
+let omegaMode      = 'off';  // 'off' | 'on' | 'on++' — math keyboard
+let logicMode      = 'off';  // 'off' | 'on' — logic keyboard (bool-kind consts only)
+let addConstKind   = null;   // 'number' | 'color' | 'boolean' | null — add-row's currently picked kind
 let activeExprInput    = null;   // the coord input currently focused in edit mode
 let activeEndpointInput = null;  // segment endpoint input currently focused; a canvas/list vertex pick fills it instead of selecting
 let _pendingScrollToEdit = false; // trigger scroll-to-edit-entry on next renderVertexList
@@ -468,6 +470,17 @@ function resolveBoolAttr(exprText, boolEnv) {
   return { ok: false };
 }
 
+// One dispatch point for "does this expression fit this *locked* const
+// kind" — shared by buildEnvs (per-render cache refresh), parseCodeText's
+// 'const' branch when a kind is declared, `edit const`'s validation, and
+// the constants list row's direct value edit, so the answer is identical
+// everywhere a constant's kind can no longer change but its value can.
+function resolveConstByKind(kind, exprText, envs) {
+  return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv) :
+         kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv) :
+                               resolveNumAttr(exprText, envs.numericEnv);
+}
+
 // Resolves one object's full attribute set (per ATTR_DEFS[type]) against
 // whatever's currently governing: an explicit per-line override first
 // (`explicitAttrs` — a parsed line's own tok.attrs, or {} for the controls,
@@ -530,28 +543,27 @@ function resolveEditFields(type, explicitAttrs, envs) {
 
 // Builds all three constant environments in one order-dependent left-to-
 // right pass (a constant can only reference an earlier constant of the same
-// kind) — kind is inferred from the expression's shape: `#rrggbb` is always
-// a color, `true`/`false` is always boolean, everything else is numeric.
-// `#rrggbb` can never collide with an identifier (CODE_IDENT_RE requires a
-// leading letter/underscore); `true`/`false` are handled as a reserved-name
-// exception at the constant-name-validation sites instead (see NOTES2.md).
+// kind). Kind is no longer guessed here — it's declared once at creation
+// and stored on `c.kind` for life (see the 'const' branch of parseCodeText
+// and resolveEditFields's `edit const` handling), so this just resolves
+// each constant's current expression against its own already-known kind,
+// mirroring the `def.kind` dispatch used throughout ATTR_DEFS-driven code.
+// An expression that fails to resolve under its locked kind (e.g. a
+// dangling reference after something it depended on was deleted) leaves
+// `c.value` at NaN/undefined and is simply not registered in that kind's
+// env, so anything referencing it fails with a clear "unknown identifier"
+// rather than silently propagating a broken value.
 function buildEnvs() {
-  const numericEnv = {}, colorEnv = {}, boolEnv = {};
+  const envs = { numericEnv: {}, colorEnv: {}, boolEnv: {} };
   for (const c of constants) {
-    const rest = c.expr.trim();
-    const asColor = resolveColorAttr(rest, colorEnv);
-    const asBool  = resolveBoolAttr(rest, boolEnv);
-    if (CODE_COLOR_RE.test(rest) || (asColor.ok && CODE_IDENT_RE.test(rest))) {
-      c.kind = 'color'; c.value = asColor.value; colorEnv[c.name] = c.value;
-    } else if (rest === 'true' || rest === 'false' || (asBool.ok && CODE_IDENT_RE.test(rest))) {
-      c.kind = 'boolean'; c.value = asBool.value; boolEnv[c.name] = c.value;
-    } else {
-      c.kind = 'number';
-      c.value = evalExpr(rest, numericEnv);
-      if (!isNaN(c.value)) numericEnv[c.name] = c.value;
-    }
+    const res = resolveConstByKind(c.kind, c.expr.trim(), envs);
+    c.value = res.ok ? res.value : undefined;
+    if (!res.ok) continue;
+    if (c.kind === 'color') envs.colorEnv[c.name] = c.value;
+    else if (c.kind === 'boolean') envs.boolEnv[c.name] = c.value;
+    else envs.numericEnv[c.name] = c.value;
   }
-  return { numericEnv, colorEnv, boolEnv };
+  return envs;
 }
 
 // Re-resolves every expression-backed field (coordinates plus color/radius/
@@ -693,7 +705,7 @@ const PRESET_COLORS = [
 
 // The two add-row color pickers (see setupColorPicker) — static DOM, wired
 // once at init, refreshed on demand from renderAddRowDefaults().
-let vColorPicker, segColorPicker, faceColorPicker;
+let vColorPicker, segColorPicker, faceColorPicker, cAddColorPicker;
 
 // ─── Code submenu: parser & serializer ─────────────────────────────────────────
 //
@@ -759,9 +771,16 @@ const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
 const CODE_OBJECT_RE = /^(const|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
 const CODE_SET_RE    = /^set\s+(vertex|segment|face)\s+(.+)$/;
-const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face)\b\s*([^:]*):(.*)$/;
+const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|const)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
+// A const's kind (number/color/bool) is declared once at creation and
+// locked forever after — see the 'const' branch below and resolveConstKind.
+// 'bool' is the DSL-facing keyword; internally a boolean-kind constant's
+// `.kind` is still stored as 'boolean', matching every existing reader of
+// that field (renderConstValSpan, buildEnvs, etc.) — only the parser needs
+// to know about the shorter keyword.
+const CONST_KIND_KEYWORDS = ['number', 'color', 'bool'];
 
 // field -> canonical syntax token name (also used by tokenizeAttrs' error text)
 const FIELD_TOKEN_NAME = { color: 'color', r: 'r', width: 'w', visible: 'visible', label: 'label', x: 'x', y: 'y', z: 'z' };
@@ -923,6 +942,7 @@ function parseCodeText(text) {
   const vertexByName    = new Map(); // name -> staged vertex, built incrementally
   const segmentByName   = new Map(); // name -> staged segment, built incrementally (edit target lookup)
   const faceByName      = new Map(); // name -> staged face, built incrementally (edit target lookup)
+  const constByName     = new Map(); // name -> staged constant, built incrementally (edit target lookup)
   let autoVertexN  = 0;
   let autoConstN   = 0;
   let autoFaceN    = 0;
@@ -987,11 +1007,44 @@ function parseCodeText(text) {
       if (targetName === '') {
         rec.valid = false; rec.errorMsg = 'edit requires an object name'; lines.push(rec); continue;
       }
-      const byName = editType === 'vertex' ? vertexByName : editType === 'segment' ? segmentByName : faceByName;
+      const byName = editType === 'vertex' ? vertexByName : editType === 'segment' ? segmentByName : editType === 'face' ? faceByName : constByName;
       const target = byName.get(targetName);
       if (!target) {
         rec.valid = false; rec.errorMsg = `unknown ${editType} '${targetName}'`; lines.push(rec); continue;
       }
+
+      // A constant only ever has one editable thing — its value — so
+      // `edit const NAME: value` takes a bare expression, not field=value
+      // tokens like the other three types, and never touches the
+      // constant's own locked kind: the new expression is resolved against
+      // whatever kind this constant already has (resolveConstByKind),
+      // rejected if it doesn't fit. Kind can't move between environments
+      // mid-parse now that it's locked, so a later line in the same parse
+      // just needs this one env entry refreshed to see the new value.
+      if (editType === 'const') {
+        const newExpr = editRest.trim();
+        if (newExpr === '') {
+          rec.valid = false; rec.errorMsg = 'edit const requires a value'; lines.push(rec); continue;
+        }
+        const res = resolveConstByKind(target.kind, newExpr, { numericEnv, colorEnv, boolEnv });
+        if (!res.ok) {
+          rec.valid = false;
+          rec.errorMsg =
+            target.kind === 'color'   ? `unknown color '${newExpr}'` :
+            target.kind === 'boolean' ? `invalid bool value '${newExpr}'` :
+                                         `invalid expression '${newExpr}'`;
+          lines.push(rec); continue;
+        }
+        target.expr = newExpr;
+        target.value = res.value;
+        if (target.kind === 'color') colorEnv[target.name] = res.value;
+        else if (target.kind === 'boolean') boolEnv[target.name] = res.value;
+        else numericEnv[target.name] = res.value;
+        rec.parsed = { editType, targetName, newExpr, newValue: res.value };
+        lines.push(rec);
+        continue;
+      }
+
       const allowed = ATTR_DEFS[editType].map(d => d.token);
       if (editType === 'vertex')  allowed.push('x', 'y', 'z');
       if (editType === 'segment') allowed.push('v0', 'v1');
@@ -1098,7 +1151,13 @@ function parseCodeText(text) {
       continue;
     }
 
-    const objMatch = trimmed.match(CODE_OBJECT_RE);
+    // "new" is optional, purely-cosmetic sugar on any creation line ("new
+    // const number c: 5", "new vertex P0: ...") — stripped here before
+    // matching, and never re-emitted by the canonical formatters (see
+    // formatConstLine/formatVertexLine/etc.), so it never round-trips
+    // through Sort/Save even when the user typed it.
+    const objLine  = trimmed.replace(/^new\b\s*/, '');
+    const objMatch = objLine.match(CODE_OBJECT_RE);
     if (!objMatch) {
       rec.kind = 'unrecognized';
       rec.valid = false;
@@ -1125,39 +1184,61 @@ function parseCodeText(text) {
     if (keyword === 'const') {
       rec.kind = 'const';
       rec.targetSection = 'constants';
-      let finalName = name;
+
+      // An optional kind token (number/color/bool) may lead the name field
+      // — "const number c: 5". Declaring it locks the constant's kind for
+      // life (see buildEnvs/resolveEditFields's `edit const` branch below);
+      // omitting it falls back to the old shape-inference behavior, run
+      // once here at creation instead of on every render, which is what
+      // makes the shorter legacy forms ("const c: 5") keep working.
+      const nameTokens = name === '' ? [] : name.split(/\s+/);
+      let declaredKind = null;
+      if (nameTokens.length && CONST_KIND_KEYWORDS.includes(nameTokens[0])) {
+        const kindTok = nameTokens.shift();
+        declaredKind = kindTok === 'bool' ? 'boolean' : kindTok; // 'number' | 'color'
+      }
+      let finalName = nameTokens.join(' ');
+
       if (finalName === '') {
         do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid constant name '${finalName}'`; lines.push(rec); continue;
-      } else if (finalName === 'true' || finalName === 'false') {
+      } else if (finalName === 'true' || finalName === 'false' || CONST_KIND_KEYWORDS.includes(finalName)) {
         rec.valid = false; rec.errorMsg = `'${finalName}' is reserved and cannot be used as a constant name`; lines.push(rec); continue;
       } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      // Kind is inferred from rest's shape: #rrggbb -> color, true/false ->
-      // boolean, an identifier already known in colorEnv/boolEnv -> aliases
-      // that kind, otherwise numeric (existing behavior, unchanged).
-      let kind, value;
-      const asColor = resolveColorAttr(rest, colorEnv);
-      const asBool  = resolveBoolAttr(rest, boolEnv);
-      if (CODE_COLOR_RE.test(rest) || (asColor.ok && CODE_IDENT_RE.test(rest))) {
-        kind = 'color'; value = asColor.value;
-      } else if (rest === 'true' || rest === 'false' || (asBool.ok && CODE_IDENT_RE.test(rest))) {
-        kind = 'boolean'; value = asBool.value;
+      let kind, value, resOk = true, errMsg = 'invalid expression';
+      if (declaredKind) {
+        kind = declaredKind;
+        const res = resolveConstByKind(kind, rest, { numericEnv, colorEnv, boolEnv });
+        value = res.value; resOk = res.ok;
+        errMsg = kind === 'color' ? `unknown color '${rest}'` : kind === 'boolean' ? `invalid bool value '${rest}'` : 'invalid expression';
       } else {
-        kind = 'number';
-        value = evalExpr(rest, numericEnv);
-        if (isNaN(value)) {
-          rec.valid = false; rec.errorMsg = 'invalid expression'; lines.push(rec); continue;
+        // No kind declared — infer once from rest's shape: #rrggbb -> color,
+        // true/false -> boolean, an identifier already known in colorEnv/
+        // boolEnv -> aliases that kind, otherwise numeric.
+        const asColor = resolveColorAttr(rest, colorEnv);
+        const asBool  = resolveBoolAttr(rest, boolEnv);
+        if (CODE_COLOR_RE.test(rest) || (asColor.ok && CODE_IDENT_RE.test(rest))) {
+          kind = 'color'; value = asColor.value;
+        } else if (rest === 'true' || rest === 'false' || (asBool.ok && CODE_IDENT_RE.test(rest))) {
+          kind = 'boolean'; value = asBool.value;
+        } else {
+          kind = 'number';
+          value = evalExpr(rest, numericEnv);
+          resOk = !isNaN(value);
         }
       }
+      if (!resOk) { rec.valid = false; rec.errorMsg = errMsg; lines.push(rec); continue; }
+
       const obj = { name: finalName, expr: rest, value, kind };
       if (kind === 'number') numericEnv[finalName] = value;
       else if (kind === 'color') colorEnv[finalName] = value;
       else boolEnv[finalName] = value;
       stagedConstants.push(obj);
+      constByName.set(finalName, obj);
       rec.parsed = obj;
       lines.push(rec);
       continue;
@@ -1302,7 +1383,8 @@ function formatCoordExpr(v, i) {
 }
 
 function formatConstLine(c) {
-  return `const ${c.name}: ${c.expr}`;
+  const kindTok = c.kind === 'boolean' ? 'bool' : c.kind; // 'number' | 'color' | 'bool'
+  return `const ${kindTok} ${c.name}: ${c.expr}`;
 }
 
 // Every field is always written out explicitly — necessary now that a
@@ -2508,9 +2590,17 @@ function positionSciKeyboard() {
 }
 
 
+// `activeExprInput` is shared across every expression-holding box in the
+// app (vertex coords, segment endpoints, const values of any kind) — a
+// bool-kind const box also sets it (see refreshConstAddRowAux / the const
+// list rows below) so the logic keyboard can find it, but the *math*
+// keyboard must not show for one. Every box that isn't specifically a
+// bool-kind const box leaves `dataset.exprKind` unset, so this check never
+// affects vertex/segment fields or number/color const boxes.
 function updateSciKeyboard() {
   const kbd  = document.getElementById('sci-keyboard');
-  const show = omegaMode !== 'off' && (editingVertexId !== null || activeExprInput !== null);
+  const isBoolBox = activeExprInput?.dataset.exprKind === 'boolean';
+  const show = omegaMode !== 'off' && (editingVertexId !== null || (activeExprInput !== null && !isBoolBox));
   kbd.style.display = show ? '' : 'none';
   const omegaText  = omegaMode === 'on++' ? 'Ω+' : 'Ω';
   const omegaSuffix = omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '';
@@ -2536,6 +2626,48 @@ document.getElementById('sci-keyboard').querySelectorAll('.sk-btn').forEach(btn 
   });
 });
 
+// ─── Logic keyboard ───────────────────────────────────────────────────────────
+// Sibling of the science keyboard above, not a repurposing of it — a bool-
+// kind const box has a different grammar (for now: just `true`/`false`).
+// Mirrors positionSciKeyboard/updateSciKeyboard exactly, one level simpler
+// (no on++ variant — there's nothing here yet for a loop-style mode to mean).
+
+function positionLogicKeyboard() {
+  const kbd = document.getElementById('logic-keyboard');
+  if (kbd.style.display === 'none') return;
+  if (kbd.offsetHeight === 0) { requestAnimationFrame(positionLogicKeyboard); return; }
+  const wrapper = document.getElementById('controls-wrapper');
+  if (!wrapper) return;
+  let logicBtn = null;
+  for (const btn of document.querySelectorAll('.const-logic-btn')) {
+    if (btn.style.visibility !== 'hidden') { logicBtn = btn; break; }
+  }
+  if (!logicBtn) return;
+  const wRect = wrapper.getBoundingClientRect();
+  const bRect = logicBtn.getBoundingClientRect();
+  const mid = bRect.top - wRect.top + bRect.height / 2;
+  kbd.style.marginTop = Math.max(0, mid - kbd.offsetHeight / 2) + 'px';
+}
+
+function updateLogicKeyboard() {
+  const kbd  = document.getElementById('logic-keyboard');
+  const isBoolBox = activeExprInput?.dataset.exprKind === 'boolean';
+  const show = logicMode !== 'off' && activeExprInput !== null && isBoolBox;
+  kbd.style.display = show ? '' : 'none';
+  document.querySelectorAll('.const-logic-btn').forEach(btn => {
+    btn.className = 'v-toggle const-logic-btn' + (logicMode === 'on' ? ' active' : '');
+  });
+  if (show) requestAnimationFrame(positionLogicKeyboard);
+}
+
+document.getElementById('logic-keyboard').querySelectorAll('.sk-btn').forEach(btn => {
+  btn.addEventListener('mousedown', e => {
+    e.preventDefault();
+    if (!activeExprInput) return;
+    insertAtCursor(activeExprInput, btn.dataset.insert, parseInt(btn.dataset.offset ?? '0'));
+  });
+});
+
 // ─── Constants controls ───────────────────────────────────────────────────────
 
 // Renders a constant's resolved value into `valSpan`, branching on kind —
@@ -2545,6 +2677,7 @@ document.getElementById('sci-keyboard').querySelectorAll('.sk-btn').forEach(btn 
 function renderConstValSpan(valSpan, c) {
   valSpan.innerHTML = '';
   if (c.kind === 'color') {
+    if (c.value === undefined) { valSpan.textContent = '?'; return; }
     const swatch = document.createElement('span');
     swatch.className = 'v-swatch';
     swatch.style.background = c.value;
@@ -2552,7 +2685,7 @@ function renderConstValSpan(valSpan, c) {
     valSpan.appendChild(swatch);
     valSpan.appendChild(document.createTextNode(' ' + c.value));
   } else if (c.kind === 'boolean') {
-    valSpan.textContent = String(c.value);
+    valSpan.textContent = c.value === undefined ? '?' : String(c.value);
   } else {
     valSpan.textContent = isNaN(c.value) ? '?' : +c.value.toFixed(4);
   }
@@ -2567,21 +2700,13 @@ function renderConstList() {
     const entry = document.createElement('div');
     entry.className = 'const-entry';
 
-    // Ω button slot — visible only while this entry's expr input is focused
+    // Auxiliary-button slot: exactly one widget, chosen by this constant's
+    // own locked kind (never a picker here — kind can't change post-
+    // creation) — math keyboard toggle for number, a color-picker button
+    // for color, a logic keyboard toggle for boolean. Filled in below,
+    // after exprInp/valSpan exist, since each kind's wiring touches them.
     const btnSlot = document.createElement('div');
     btnSlot.className = 'const-btn-slot';
-    const omegaBtn = document.createElement('button');
-    omegaBtn.className = 'v-toggle const-omega-btn' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
-    omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
-    omegaBtn.style.visibility = 'hidden';
-    omegaBtn.addEventListener('mousedown', e => e.preventDefault());
-    omegaBtn.addEventListener('click', () => {
-      if      (omegaMode === 'off')  omegaMode = 'on';
-      else if (omegaMode === 'on')   omegaMode = 'on++';
-      else                           omegaMode = 'off';
-      updateSciKeyboard();
-    });
-    btnSlot.appendChild(omegaBtn);
 
     const nameInp = document.createElement('input');
     nameInp.type = 'text';
@@ -2591,7 +2716,7 @@ function renderConstList() {
     nameInp.addEventListener('change', () => {
       const n = nameInp.value.trim();
       if (n && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n)) {
-        if (n === 'true' || n === 'false') { nameInp.value = c.name; setNameError(nameInp); return; }
+        if (n === 'true' || n === 'false' || CONST_KIND_KEYWORDS.includes(n)) { nameInp.value = c.name; setNameError(nameInp); return; }
         if (isNameTaken(n, null, c.id)) { nameInp.value = c.name; setNameError(nameInp); return; }
         snapshot();
         const oldName = c.name;
@@ -2614,35 +2739,124 @@ function renderConstList() {
     exprInp.className = 'expr-input';
     exprInp.value = c.expr;
     exprInp.disabled = editingVertexId !== null;
-
-    exprInp.addEventListener('focus', () => {
-      activeExprInput = exprInp;
-      omegaBtn.style.visibility = '';
-      updateSciKeyboard();
-      requestAnimationFrame(positionSciKeyboard);
-    });
-    exprInp.addEventListener('blur', () => {
-      setTimeout(() => {
-        omegaBtn.style.visibility = 'hidden';
-        if (activeExprInput === exprInp) { activeExprInput = null; updateSciKeyboard(); }
-      }, 0);
-    });
-    exprInp.addEventListener('change', () => {
-      c.expr = exprInp.value;
-      buildEnvs();
-      renderConstValSpan(valSpan, c);
-      exprInp.classList.toggle('expr-invalid', c.kind === 'number' && isNaN(c.value) && c.expr.trim() !== '');
-      reEvalObjects();
-      renderVertexList();
-      renderSegmentList();
-      renderFaceList();
-      draw();
-    });
+    exprInp.dataset.exprKind = c.kind === 'boolean' ? 'boolean' : '';
 
     const valSpan = document.createElement('span');
     valSpan.className = 'const-value';
     valSpan.dataset.constVal = c.id;
     renderConstValSpan(valSpan, c);
+
+    // The value can still change freely; the kind it must resolve under
+    // cannot — resolveConstByKind is the same check `edit const` uses, so
+    // a wrong-kind edit is rejected here exactly as it would be from the
+    // code file/interpreter, closing the hole a plain always-accepting text
+    // box used to leave open (see the const-editing design notes).
+    const commitExprChange = newExpr => {
+      const res = resolveConstByKind(c.kind, newExpr, buildEnvs());
+      if (!res.ok) { exprInp.value = c.expr; setNameError(exprInp); return; }
+      c.expr = newExpr;
+      c.value = res.value;
+      renderConstValSpan(valSpan, c);
+      reEvalObjects();
+      renderVertexList();
+      renderSegmentList();
+      renderFaceList();
+      draw();
+    };
+
+    if (c.kind === 'number') {
+      const omegaBtn = document.createElement('button');
+      omegaBtn.className = 'v-toggle const-omega-btn' + (omegaMode === 'on' ? ' active' : omegaMode === 'on++' ? ' active-loop' : '');
+      omegaBtn.textContent = omegaMode === 'on++' ? 'Ω+' : 'Ω';
+      omegaBtn.style.visibility = 'hidden';
+      omegaBtn.addEventListener('mousedown', e => e.preventDefault());
+      omegaBtn.addEventListener('click', () => {
+        if      (omegaMode === 'off')  omegaMode = 'on';
+        else if (omegaMode === 'on')   omegaMode = 'on++';
+        else                           omegaMode = 'off';
+        updateSciKeyboard();
+      });
+      btnSlot.appendChild(omegaBtn);
+
+      exprInp.addEventListener('focus', () => {
+        activeExprInput = exprInp;
+        omegaBtn.style.visibility = '';
+        updateSciKeyboard();
+        requestAnimationFrame(positionSciKeyboard);
+      });
+      exprInp.addEventListener('blur', () => {
+        setTimeout(() => {
+          omegaBtn.style.visibility = 'hidden';
+          if (activeExprInput === exprInp) { activeExprInput = null; updateSciKeyboard(); }
+        }, 0);
+      });
+    } else if (c.kind === 'boolean') {
+      const logicBtn = document.createElement('button');
+      logicBtn.className = 'v-toggle const-logic-btn' + (logicMode === 'on' ? ' active' : '');
+      logicBtn.textContent = '𝔹';
+      logicBtn.style.visibility = 'hidden';
+      logicBtn.addEventListener('mousedown', e => e.preventDefault());
+      logicBtn.addEventListener('click', () => {
+        logicMode = logicMode === 'off' ? 'on' : 'off';
+        updateLogicKeyboard();
+      });
+      btnSlot.appendChild(logicBtn);
+
+      exprInp.addEventListener('focus', () => {
+        activeExprInput = exprInp;
+        logicBtn.style.visibility = '';
+        updateLogicKeyboard();
+        requestAnimationFrame(positionLogicKeyboard);
+      });
+      exprInp.addEventListener('blur', () => {
+        setTimeout(() => {
+          logicBtn.style.visibility = 'hidden';
+          if (activeExprInput === exprInp) { activeExprInput = null; updateLogicKeyboard(); }
+        }, 0);
+      });
+    } else {
+      // color
+      const colorBtn = document.createElement('button');
+      colorBtn.className = 'color-picker-btn';
+      colorBtn.title = 'Color';
+      colorBtn.style.background = c.value ?? '#4d4d4d';
+      btnSlot.appendChild(colorBtn);
+
+      const colorPopover = document.createElement('div');
+      colorPopover.className = 'color-popover';
+      colorPopover.style.display = 'none';
+      const presetLabel = document.createElement('div');
+      presetLabel.className = 'color-section-label';
+      presetLabel.textContent = 'Presets';
+      const presetList = document.createElement('div');
+      presetList.className = 'color-preset-list';
+      const constLabel = document.createElement('div');
+      constLabel.className = 'color-section-label';
+      constLabel.textContent = 'Constants';
+      const colorGrid = document.createElement('div');
+      colorGrid.className = 'color-const-list';
+      const customWrap = document.createElement('div');
+      customWrap.className = 'color-custom-wrap';
+      const customBtn = document.createElement('div');
+      customBtn.className = 'color-custom-btn';
+      customBtn.textContent = 'Custom…';
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = c.value ?? '#4d4d4d';
+      colorInput.className = 'color-native-overlay';
+      customWrap.append(customBtn, colorInput);
+      colorPopover.append(presetLabel, presetList, constLabel, colorGrid, customWrap);
+      entry.appendChild(colorPopover);
+
+      setupColorPicker(colorBtn, colorPopover, presetList, colorGrid, colorInput,
+        () => c.expr,
+        val => { exprInp.value = val; commitExprChange(val); colorBtn.style.background = c.value ?? '#4d4d4d'; },
+        hex => { exprInp.value = hex; commitExprChange(hex); colorBtn.style.background = c.value ?? '#4d4d4d'; },
+        () => { colorBtn.style.background = c.value ?? '#4d4d4d'; }
+      ).refresh();
+    }
+
+    exprInp.addEventListener('change', () => commitExprChange(exprInp.value.trim()));
 
     const del = document.createElement('button');
     del.className = 'v-delete';
@@ -2663,18 +2877,92 @@ function renderConstList() {
   renderAddRowDefaults();
 }
 
+// Reflects `addConstKind` (and whether c-expr currently has content) into
+// every visible piece of the add-row: the kind picker's own visibility and
+// active-button highlight, c-expr's placeholder, which single auxiliary
+// widget shows (math keyboard / color picker / logic keyboard), and
+// c-expr's `dataset.exprKind` (what updateSciKeyboard/updateLogicKeyboard
+// key off of). Called on every kind pick, every c-expr keystroke, and every
+// c-expr focus/blur — see callers below.
+function refreshConstAddRowAux() {
+  const exprInp = document.getElementById('c-expr');
+  const empty   = exprInp.value.trim() === '';
+  const focused = document.activeElement === exprInp;
+
+  document.getElementById('c-kind-picker').style.display = empty ? '' : 'none';
+  document.querySelectorAll('.c-kind-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.kind === (addConstKind === 'boolean' ? 'bool' : addConstKind));
+  });
+
+  exprInp.placeholder =
+    addConstKind === 'number'  ? 'insert number' :
+    addConstKind === 'color'   ? 'insert color'  :
+    addConstKind === 'boolean' ? 'insert bool'   :
+                                  'select aux type ---->';
+  exprInp.dataset.exprKind = addConstKind === 'boolean' ? 'boolean' : '';
+
+  const omegaBtn = document.getElementById('c-add-omega');
+  const colorBtn = document.getElementById('c-add-color-btn');
+  const logicBtn = document.getElementById('c-add-logic');
+  omegaBtn.style.display = addConstKind === 'number'  ? '' : 'none';
+  colorBtn.style.display = addConstKind === 'color'   ? '' : 'none';
+  logicBtn.style.display = addConstKind === 'boolean' ? '' : 'none';
+  omegaBtn.style.visibility = (addConstKind === 'number'  && focused) ? '' : 'hidden';
+  logicBtn.style.visibility = (addConstKind === 'boolean' && focused) ? '' : 'hidden';
+
+  updateSciKeyboard();
+  updateLogicKeyboard();
+}
+
+document.querySelectorAll('.c-kind-btn').forEach(btn => {
+  btn.addEventListener('mousedown', e => e.preventDefault()); // keep focus on c-expr
+  btn.addEventListener('click', () => {
+    addConstKind = btn.dataset.kind === 'bool' ? 'boolean' : btn.dataset.kind;
+    refreshConstAddRowAux();
+  });
+});
+
+cAddColorPicker = setupColorPicker(
+  document.getElementById('c-add-color-btn'),
+  document.getElementById('c-add-color-popover'),
+  document.getElementById('c-add-color-presets'),
+  document.getElementById('c-add-color-grid'),
+  document.getElementById('c-add-color-native'),
+  () => document.getElementById('c-expr').value,
+  val => { document.getElementById('c-expr').value = val; refreshConstAddRowAux(); },
+  hex => { document.getElementById('c-expr').value = hex; refreshConstAddRowAux(); },
+  () => {}
+);
+
+document.getElementById('c-expr').addEventListener('input', refreshConstAddRowAux);
+document.getElementById('c-expr').addEventListener('focus', () => {
+  if (addConstKind === 'number' || addConstKind === 'boolean') activeExprInput = document.getElementById('c-expr');
+  refreshConstAddRowAux();
+});
+document.getElementById('c-expr').addEventListener('blur', () => {
+  setTimeout(() => {
+    if (activeExprInput === document.getElementById('c-expr')) activeExprInput = null;
+    refreshConstAddRowAux();
+  }, 0);
+});
+
 document.getElementById('btn-add-const').addEventListener('click', () => {
   const nameInp = document.getElementById('c-name');
   const exprInp = document.getElementById('c-expr');
   const name = nameInp.value.trim();
   const expr = exprInp.value.trim();
   if (!name || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return;
-  if (name === 'true' || name === 'false') { setNameError(nameInp); return; }
+  if (name === 'true' || name === 'false' || CONST_KIND_KEYWORDS.includes(name)) { setNameError(nameInp); return; }
   if (isNameTaken(name)) { setNameError(nameInp); return; }
+  if (!addConstKind || !expr) { setNameError(exprInp); return; }
+  const res = resolveConstByKind(addConstKind, expr, buildEnvs());
+  if (!res.ok) { setNameError(exprInp); return; }
   snapshot();
-  constants.push({ id: nextConstantId++, name, expr, value: NaN });
+  constants.push({ id: nextConstantId++, name, expr, value: res.value, kind: addConstKind });
   nameInp.value = '';
   exprInp.value = '';
+  addConstKind = null;
+  refreshConstAddRowAux();
   reEvalObjects();
   renderConstList();
   draw();
@@ -2686,6 +2974,8 @@ document.getElementById('c-name').addEventListener('keydown', e => {
 document.getElementById('c-expr').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-add-const').click();
 });
+
+refreshConstAddRowAux();
 
 // ─── Add-row defaults (mirrors code-file `set` values) ─────────────────────────
 //
@@ -2902,6 +3192,11 @@ function renderAddRowDefaults() {
   document.getElementById('face-color-btn').style.background = fColorResolved;
   renderBoolToggle('face-add-visible', 'face-add-visible-sub', lastSetFace.visible ?? BUILTIN_SET_DEFAULTS.face.visible, boolEnv);
   faceColorPicker.refresh();
+
+  // The const add-row's own color-kind picker (only relevant while a color
+  // kind is actually selected there) needs the same live refresh so its
+  // "Constants" section stays current as other color constants come and go.
+  cAddColorPicker.refresh();
 }
 
 // ─── Vertex controls ──────────────────────────────────────────────────────────
@@ -4036,7 +4331,30 @@ function submitInterpreterLine() {
   // the staged object in place above — just not via this cheap path; that
   // mix is rare enough not to warrant its own branch.)
   if (newRecs.length === 1 && newRecs[0].kind === 'edit') {
-    const { editType, targetName, fields, coordEdits, endpointEdits } = newRecs[0].parsed;
+    const parsed = newRecs[0].parsed;
+    const { editType, targetName } = parsed;
+
+    // A const edit has no fields/coords/endpoints to Object.assign — just
+    // the one value, already validated against the constant's locked kind
+    // during the parse above (resolveConstByKind) — so it gets its own
+    // tiny commit rather than reusing the vertex/segment/face shape below.
+    if (editType === 'const') {
+      const target = constants.find(c => c.name === targetName);
+      snapshot();
+      target.expr  = parsed.newExpr;
+      target.value = parsed.newValue;
+      reEvalObjects();
+      renderConstList();
+      renderVertexList();
+      renderSegmentList();
+      renderFaceList();
+      draw();
+      input.value = '';
+      resizeInterpreterInput();
+      return;
+    }
+
+    const { fields, coordEdits, endpointEdits } = parsed;
     const liveArray = editType === 'vertex' ? vertices : editType === 'segment' ? segments : faces;
     const target = liveArray.find(o => o.name === targetName);
     snapshot();

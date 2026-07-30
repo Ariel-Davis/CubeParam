@@ -35,6 +35,7 @@ canvas {
 }
 
 #sci-keyboard,
+#logic-keyboard,
 #controls-header,
 #top-row,
 #interpreter-row,
@@ -42,7 +43,8 @@ canvas {
   pointer-events: auto;
 }
 
-#sci-keyboard {
+#sci-keyboard,
+#logic-keyboard {
   background: rgba(248, 248, 248, 0.97);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 8px;
@@ -53,7 +55,8 @@ canvas {
   margin-top: 42px;
 }
 
-body.dark-mode #sci-keyboard {
+body.dark-mode #sci-keyboard,
+body.dark-mode #logic-keyboard {
   background: rgba(25, 25, 25, 0.97);
   border-color: rgba(255, 255, 255, 0.15);
 }
