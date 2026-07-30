@@ -3104,22 +3104,27 @@ function setupColorPicker(rowBtn, popoverEl, presetListEl, constListEl, nativeIn
   return { refresh, close };
 }
 
-// Displays one governing boolean field's resolved state (opacity, plus the
-// ●/○ dot glyph for dot-style toggles like "visible" — "label" keeps its
-// fixed "A" glyph, only fading) and, when it's currently linked to a
-// constant rather than a literal, the constant's name as a small subscript.
-// Read-only — write-back happens only in toggleGoverningBool()'s own click
-// handler, never here, so calling this on every render (e.g. from the
-// renderConstList() hook, so a linked dot stays live as the constant is
-// edited) can never silently detach anything.
-function renderBoolToggle(btnId, subId, exprText, boolEnv, useDotGlyph = true) {
+// Displays one boolean field's resolved state (opacity, plus the ●/○ dot
+// glyph for dot-style toggles like "visible" — "label" keeps its fixed "A"
+// glyph, only fading) and, when it's currently linked to a constant rather
+// than a literal, the constant's name as a small subscript. Read-only —
+// write-back happens only in the caller's own click handler, never here, so
+// calling this on every render (e.g. from the renderConstList() hook, so a
+// linked dot stays live as the constant is edited) can never silently
+// detach anything. Element-based so both the governing add-row toggles
+// (via the id-based wrapper below) and per-instance list-row toggles
+// (vertex/segment/face, called directly with their own dynamically-created
+// elements) share one implementation.
+function applyBoolToggleDisplay(btn, sub, exprText, boolEnv, useDotGlyph = true) {
   const res = resolveBoolAttr(exprText, boolEnv);
   const val = res.ok ? res.value : true;
-  const btn = document.getElementById(btnId);
-  const sub = document.getElementById(subId);
   if (useDotGlyph) btn.textContent = val ? '●' : '○';
   btn.style.opacity = val ? '1' : '0.3';
   sub.textContent   = (exprText === 'true' || exprText === 'false') ? '' : exprText;
+}
+
+function renderBoolToggle(btnId, subId, exprText, boolEnv, useDotGlyph = true) {
+  applyBoolToggleDisplay(document.getElementById(btnId), document.getElementById(subId), exprText, boolEnv, useDotGlyph);
 }
 
 // Click handler for a governing boolean toggle: always sets a literal equal
@@ -3287,18 +3292,21 @@ function renderVertexList() {
       });
       nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
 
+      // A validated text input, not <input type="number"> — same widget as
+      // the add-row's v-radius (wireNumericAttrInput), so a radius governed
+      // by a constant shows that constant's name here too instead of
+      // flattening to its current numeric value the moment edit mode opens.
       const radiusInp = document.createElement('input');
-      radiusInp.type = 'number';
-      radiusInp.value = v.radius ?? 5;
+      radiusInp.type = 'text';
+      mobileTextInput(radiusInp);
+      radiusInp.inputMode = 'decimal';
       radiusInp.className = 'v-coord';
       radiusInp.style.width = '38px';
-      radiusInp.min = '1';
-      radiusInp.step = '0.5';
       radiusInp.title = 'Node radius';
-      radiusInp.addEventListener('blur', () => {
-        const n = parseFloat(radiusInp.value);
-        if (!isNaN(n) && n >= 1) { v.radius = n; v.radiusExpr = String(n); draw(); }
-      });
+      wireNumericAttrInput(radiusInp,
+        () => v.radiusExpr ?? String(v.radius ?? 5),
+        n => { v.radius = n; v.radiusExpr = String(n); draw(); }
+      );
       radiusInp.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
 
       const commitBtn = document.createElement('button');
@@ -3420,12 +3428,39 @@ function renderVertexList() {
       coords.className = 'v-coords';
       coords.textContent = v.coords.map(x => +x.toFixed(2)).join(', ');
 
+      // Radius: same validated-text widget as the add-row/edit-row (shows a
+      // governing constant's name, never lets typing/pasting produce one —
+      // beforeinput restricts to a plain signed-decimal grammar) rather than
+      // a bare number, so the list mirrors the definition line's own
+      // display instead of only ever showing a flattened value.
+      const radiusInp = document.createElement('input');
+      radiusInp.type = 'text';
+      mobileTextInput(radiusInp);
+      radiusInp.inputMode = 'decimal';
+      radiusInp.className = 'v-coord';
+      radiusInp.style.width = '32px';
+      radiusInp.title = 'Node radius';
+      radiusInp.disabled = inEdit;
+      radiusInp.addEventListener('click', e => e.stopPropagation());
+      radiusInp.addEventListener('focus', () => snapshot());
+      wireNumericAttrInput(radiusInp,
+        () => v.radiusExpr ?? String(v.radius ?? 5),
+        n => { v.radius = n; v.radiusExpr = String(n); draw(); }
+      );
+
+      const boolEnv = buildEnvs().boolEnv;
+
+      const labelWrap = document.createElement('span');
+      labelWrap.className = 'v-toggle-wrap';
       const labelToggle = document.createElement('button');
       labelToggle.className = 'v-toggle';
       labelToggle.textContent = 'A';
-      labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
-      labelToggle.style.opacity = v.showLabel ? '1' : '0.3';
       labelToggle.disabled = inEdit;
+      const labelSub = document.createElement('sub');
+      labelSub.className = 'v-toggle-const';
+      labelWrap.append(labelToggle, labelSub);
+      applyBoolToggleDisplay(labelToggle, labelSub, v.labelExpr ?? String(v.showLabel !== false), boolEnv, false);
+      labelToggle.title = v.showLabel ? 'Hide label' : 'Show label';
       labelToggle.addEventListener('click', e => {
         e.stopPropagation();
         snapshot();
@@ -3442,11 +3477,16 @@ function renderVertexList() {
       editBtn.disabled = inEdit;
       editBtn.addEventListener('click', e => { e.stopPropagation(); enterEditMode(v.id); });
 
+      const visibleWrap = document.createElement('span');
+      visibleWrap.className = 'v-toggle-wrap';
       const toggle = document.createElement('button');
       toggle.className = 'v-toggle';
-      toggle.textContent = v.visible ? '●' : '○';
-      toggle.title = v.visible ? 'Hide' : 'Show';
       toggle.disabled = inEdit;
+      const visibleSub = document.createElement('sub');
+      visibleSub.className = 'v-toggle-const';
+      visibleWrap.append(toggle, visibleSub);
+      applyBoolToggleDisplay(toggle, visibleSub, v.visibleExpr ?? String(v.visible !== false), boolEnv);
+      toggle.title = v.visible ? 'Hide' : 'Show';
       toggle.addEventListener('click', e => {
         e.stopPropagation();
         snapshot();
@@ -3474,7 +3514,7 @@ function renderVertexList() {
         draw();
       });
 
-      entry.append(swatch, name, coords, labelToggle, editBtn, toggle, del);
+      entry.append(swatch, name, coords, radiusInp, labelWrap, editBtn, visibleWrap, del);
     }
 
     list.appendChild(entry);
@@ -3745,18 +3785,20 @@ function renderSegmentList() {
       // B" fills both ends without the user tabbing between the boxes.
       v1Input._nextEndpointInput = v2Input;
 
+      // Same widget as vertex's radiusInp above (wireNumericAttrInput) —
+      // shows the governing constant's name when linked, instead of
+      // flattening to the current numeric value on entering edit mode.
       const widthInp = document.createElement('input');
-      widthInp.type = 'number';
-      widthInp.value = seg.lineWidth ?? 1.5;
+      widthInp.type = 'text';
+      mobileTextInput(widthInp);
+      widthInp.inputMode = 'decimal';
       widthInp.className = 'v-coord';
       widthInp.style.width = '38px';
-      widthInp.min = '0.5';
-      widthInp.step = '0.5';
       widthInp.title = 'Line width';
-      widthInp.addEventListener('blur', () => {
-        const n = parseFloat(widthInp.value);
-        if (!isNaN(n) && n >= 0.5) { seg.lineWidth = n; seg.widthExpr = String(n); draw(); }
-      });
+      wireNumericAttrInput(widthInp,
+        () => seg.widthExpr ?? String(seg.lineWidth ?? 1.5),
+        n => { seg.lineWidth = n; seg.widthExpr = String(n); draw(); }
+      );
       widthInp.addEventListener('keydown', e => { if (e.key === 'Enter') commitSegmentEdit(); });
 
       const commitBtn = document.createElement('button');
@@ -3787,6 +3829,23 @@ function renderSegmentList() {
       label.className = 's-name';
       label.textContent = `${seg.name}: ${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
 
+      // Same validated-text widget as the add-row/edit-row (see vertex's
+      // radiusInp above) — shows a governing constant's name rather than a
+      // flattened number, and typing/pasting can never produce one.
+      const widthInp = document.createElement('input');
+      widthInp.type = 'text';
+      mobileTextInput(widthInp);
+      widthInp.inputMode = 'decimal';
+      widthInp.className = 'v-coord';
+      widthInp.style.width = '32px';
+      widthInp.title = 'Line width';
+      widthInp.disabled = inEdit;
+      widthInp.addEventListener('focus', () => snapshot());
+      wireNumericAttrInput(widthInp,
+        () => seg.widthExpr ?? String(seg.lineWidth ?? 1.5),
+        n => { seg.lineWidth = n; seg.widthExpr = String(n); draw(); }
+      );
+
       const editBtn = document.createElement('button');
       editBtn.textContent = '✎';
       editBtn.className = 'v-toggle';
@@ -3794,11 +3853,17 @@ function renderSegmentList() {
       editBtn.disabled = inEdit;
       editBtn.addEventListener('click', () => enterSegmentEditMode(seg.id));
 
+      const boolEnv = buildEnvs().boolEnv;
+      const visibleWrap = document.createElement('span');
+      visibleWrap.className = 'v-toggle-wrap';
       const toggle = document.createElement('button');
       toggle.className = 'v-toggle';
-      toggle.textContent = seg.visible ? '●' : '○';
-      toggle.title = seg.visible ? 'Hide' : 'Show';
       toggle.disabled = inEdit;
+      const visibleSub = document.createElement('sub');
+      visibleSub.className = 'v-toggle-const';
+      visibleWrap.append(toggle, visibleSub);
+      applyBoolToggleDisplay(toggle, visibleSub, seg.visibleExpr ?? String(seg.visible !== false), boolEnv);
+      toggle.title = seg.visible ? 'Hide' : 'Show';
       toggle.addEventListener('click', () => {
         snapshot();
         seg.visible = !seg.visible;
@@ -3820,7 +3885,7 @@ function renderSegmentList() {
         draw();
       });
 
-      entry.append(swatch, label, editBtn, toggle, del);
+      entry.append(swatch, label, widthInp, editBtn, visibleWrap, del);
     }
 
     list.appendChild(entry);
@@ -3850,11 +3915,16 @@ function renderFaceList() {
     label.className = 's-name';
     label.textContent = f.name;
 
+    const visibleWrap = document.createElement('span');
+    visibleWrap.className = 'v-toggle-wrap';
     const toggle = document.createElement('button');
     toggle.className = 'v-toggle';
-    toggle.textContent = f.visible ? '●' : '○';
-    toggle.title = f.visible ? 'Hide' : 'Show';
     toggle.disabled = inEdit;
+    const visibleSub = document.createElement('sub');
+    visibleSub.className = 'v-toggle-const';
+    visibleWrap.append(toggle, visibleSub);
+    applyBoolToggleDisplay(toggle, visibleSub, f.visibleExpr ?? String(f.visible !== false), buildEnvs().boolEnv);
+    toggle.title = f.visible ? 'Hide' : 'Show';
     toggle.addEventListener('click', () => {
       snapshot();
       f.visible = !f.visible;
@@ -3875,7 +3945,7 @@ function renderFaceList() {
       draw();
     });
 
-    entry.append(swatch, label, toggle, del);
+    entry.append(swatch, label, visibleWrap, del);
     list.appendChild(entry);
   }
   list.scrollTop = savedScroll;
