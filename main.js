@@ -499,6 +499,35 @@ function resolveGoverningAttrs(type, explicitAttrs, governingText, envs) {
   return { ok: true, fields };
 }
 
+// Same resolution rules as resolveGoverningAttrs, but for editing an
+// *existing* object: only fields actually present in explicitAttrs are
+// touched at all — no governing/builtin fallback for absent ones, since an
+// omitted field on an edit line means "leave it alone," not "reset it to
+// the current default." Returns { ok:true, fields } with just the touched
+// *Expr/value pairs (spread via Object.assign onto the target, never a
+// full replacement), or { ok:false, errorMsg }.
+function resolveEditFields(type, explicitAttrs, envs) {
+  const fields = {};
+  for (const def of ATTR_DEFS[type]) {
+    if (!(def.token in explicitAttrs)) continue;
+    const exprText = explicitAttrs[def.token];
+    const res =
+      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv) :
+                               resolveBoolAttr(exprText, envs.boolEnv);
+    if (!res.ok) {
+      const errorMsg =
+        def.kind === 'color'  ? `unknown color '${exprText}'` :
+        def.kind === 'number' ? `invalid ${def.label} expression '${exprText}'` :
+                                 `invalid ${def.token} value '${exprText}'`;
+      return { ok: false, errorMsg };
+    }
+    fields[def.expr] = exprText;
+    fields[def.value] = res.value;
+  }
+  return { ok: true, fields };
+}
+
 // Builds all three constant environments in one order-dependent left-to-
 // right pass (a constant can only reference an earlier constant of the same
 // kind) — kind is inferred from the expression's shape: `#rrggbb` is always
@@ -601,14 +630,15 @@ function renameConstantEverywhere(oldName, newName) {
   }
 }
 
-function isNameTakenIn(name, vertexList, constList, faceList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null) {
+function isNameTakenIn(name, vertexList, constList, faceList = [], segList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null) {
   return vertexList.some(v => v.name === name && v.id !== excludeVertexId)
       || constList.some(c => c.name === name && c.id !== excludeConstId)
-      || faceList.some(f => f.name === name && f.id !== excludeFaceId);
+      || faceList.some(f => f.name === name && f.id !== excludeFaceId)
+      || segList.some(s => s.name === name && s.id !== excludeSegId);
 }
 
-function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null) {
-  return isNameTakenIn(name, vertices, constants, faces, excludeVertexId, excludeConstId, excludeFaceId);
+function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null) {
+  return isNameTakenIn(name, vertices, constants, faces, segments, excludeVertexId, excludeConstId, excludeFaceId, excludeSegId);
 }
 
 function setNameError(el) {
@@ -729,6 +759,7 @@ const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
 const CODE_OBJECT_RE = /^(const|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
 const CODE_SET_RE    = /^set\s+(vertex|segment|face)\s+(.+)$/;
+const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
 
@@ -855,6 +886,12 @@ function tokenizeAttrs(rest, allowedAttrs) {
     } else if (/^r=/.test(tok)) {
       if (!allowedAttrs.includes('r')) return { error: `'r=' not valid here` };
       attrs.r = tok.slice(2);
+    } else if (/^v0=/.test(tok)) {
+      if (!allowedAttrs.includes('v0')) return { error: `'v0=' not valid here` };
+      attrs.v0 = tok.slice(3);
+    } else if (/^v1=/.test(tok)) {
+      if (!allowedAttrs.includes('v1')) return { error: `'v1=' not valid here` };
+      attrs.v1 = tok.slice(3);
     } else if (/^w=/.test(tok)) {
       if (!allowedAttrs.includes('width')) return { error: `'w=' not valid here` };
       attrs.width = tok.slice(2);
@@ -884,9 +921,12 @@ function parseCodeText(text) {
   const colorEnv         = {};
   const boolEnv          = {};
   const vertexByName    = new Map(); // name -> staged vertex, built incrementally
-  let autoVertexN = 0;
-  let autoConstN  = 0;
-  let autoFaceN   = 0;
+  const segmentByName   = new Map(); // name -> staged segment, built incrementally (edit target lookup)
+  const faceByName      = new Map(); // name -> staged face, built incrementally (edit target lookup)
+  let autoVertexN  = 0;
+  let autoConstN   = 0;
+  let autoFaceN    = 0;
+  let autoSegmentN = 0;
 
   // Order-dependent "current set" state, like a paintbrush: a `set vertex
   // color=...` line updates this and every later vertex line that omits
@@ -926,6 +966,94 @@ function parseCodeText(text) {
     // is by Sort rather than being treated as an error or relocated.
     if (trimmed.startsWith('#')) {
       rec.kind = 'comment';
+      lines.push(rec);
+      continue;
+    }
+
+    // "edit TYPE NAME: field=value ..." — patches an object that already
+    // exists (found by name), rather than defining a new one. Only touches
+    // the fields actually given (resolveEditFields), applied immediately via
+    // Object.assign onto the *same object reference* already staged in
+    // stagedVertices/stagedSegments/stagedFaces — so the target's own line
+    // already reflects the edit by the time Sort/serializeState format it.
+    // targetSection stays null so Sort never relocates this line itself; it
+    // gets dropped entirely once absorbed (see sortCodeText), same treatment
+    // as `set`.
+    const editMatch = trimmed.match(CODE_EDIT_RE);
+    if (editMatch) {
+      const [, editType, nameRaw, editRest] = editMatch;
+      rec.kind = 'edit';
+      const targetName = nameRaw.trim();
+      if (targetName === '') {
+        rec.valid = false; rec.errorMsg = 'edit requires an object name'; lines.push(rec); continue;
+      }
+      const byName = editType === 'vertex' ? vertexByName : editType === 'segment' ? segmentByName : faceByName;
+      const target = byName.get(targetName);
+      if (!target) {
+        rec.valid = false; rec.errorMsg = `unknown ${editType} '${targetName}'`; lines.push(rec); continue;
+      }
+      const allowed = ATTR_DEFS[editType].map(d => d.token);
+      if (editType === 'vertex')  allowed.push('x', 'y', 'z');
+      if (editType === 'segment') allowed.push('v0', 'v1');
+      const tok = tokenizeAttrs(editRest.trim(), allowed);
+      if (tok.error || tok.positional.length > 0) {
+        rec.valid = false; rec.errorMsg = tok.error || `unexpected '${tok.positional[0]}'`; lines.push(rec); continue;
+      }
+      const fieldsRes = resolveEditFields(editType, tok.attrs, { numericEnv, colorEnv, boolEnv });
+      if (!fieldsRes.ok) { rec.valid = false; rec.errorMsg = fieldsRes.errorMsg; lines.push(rec); continue; }
+
+      // Coordinate edits: any subset of x/y/z, each independently optional —
+      // the opposite of a fresh vertex line's "all three or none" rule (see
+      // the namedUsed/allThree check above), since editing is inherently
+      // partial. Not part of ATTR_DEFS/resolveEditFields at all — coords
+      // live in their own coords[]/exprs[] arrays, indexed 0/1/2.
+      const coordEdits = {};
+      if (editType === 'vertex') {
+        let coordErr = null;
+        for (const axis of ['x', 'y', 'z']) {
+          if (!(axis in tok.attrs)) continue;
+          const exprText = tok.attrs[axis];
+          const val = evalExpr(exprText, numericEnv);
+          if (isNaN(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
+          coordEdits[axis] = { expr: exprText, value: val };
+        }
+        if (coordErr) { rec.valid = false; rec.errorMsg = coordErr; lines.push(rec); continue; }
+      }
+
+      // Endpoint edits: v0=/v1=, each independently optional, resolved by
+      // name (staged segments reference vertices by name — v1Name/v2Name —
+      // not id; ids don't exist until buildCommittedArraysFromStaged runs).
+      // The *resulting* pair must be distinct, checked against whichever
+      // endpoint wasn't given (falls back to the target's current one), so
+      // a line editing only v0 can't silently collapse it onto the
+      // already-existing v1, and vice versa.
+      const endpointEdits = {};
+      if (editType === 'segment') {
+        let endpointErr = null;
+        for (const key of ['v0', 'v1']) {
+          if (!(key in tok.attrs)) continue;
+          const vname = tok.attrs[key];
+          if (!vertexByName.has(vname)) { endpointErr = `unknown vertex '${vname}'`; break; }
+          endpointEdits[key] = vname;
+        }
+        if (!endpointErr) {
+          const finalV0 = endpointEdits.v0 ?? target.v1Name;
+          const finalV1 = endpointEdits.v1 ?? target.v2Name;
+          if (finalV0 === finalV1) endpointErr = 'segment endpoints must be distinct';
+        }
+        if (endpointErr) { rec.valid = false; rec.errorMsg = endpointErr; lines.push(rec); continue; }
+      }
+
+      Object.assign(target, fieldsRes.fields);
+      for (const axis of ['x', 'y', 'z']) {
+        if (!(axis in coordEdits)) continue;
+        const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+        target.coords[idx] = coordEdits[axis].value;
+        target.exprs[idx]  = coordEdits[axis].expr;
+      }
+      if ('v0' in endpointEdits) target.v1Name = endpointEdits.v0;
+      if ('v1' in endpointEdits) target.v2Name = endpointEdits.v1;
+      rec.parsed = { editType, targetName, fields: fieldsRes.fields, coordEdits, endpointEdits };
       lines.push(rec);
       continue;
     }
@@ -999,12 +1127,12 @@ function parseCodeText(text) {
       rec.targetSection = 'constants';
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces));
+        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid constant name '${finalName}'`; lines.push(rec); continue;
       } else if (finalName === 'true' || finalName === 'false') {
         rec.valid = false; rec.errorMsg = `'${finalName}' is reserved and cannot be used as a constant name`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
@@ -1060,10 +1188,10 @@ function parseCodeText(text) {
 
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `P${autoVertexN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces));
+        do { finalName = `P${autoVertexN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid vertex name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
       const coords = coordExprs.map(t => evalExpr(t, numericEnv));
@@ -1103,10 +1231,10 @@ function parseCodeText(text) {
 
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `F${autoFaceN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces));
+        do { finalName = `F${autoFaceN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid face name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
@@ -1119,13 +1247,14 @@ function parseCodeText(text) {
         ...attrRes.fields,
       };
       stagedFaces.push(obj);
+      faceByName.set(finalName, obj);
       rec.parsed = obj;
       lines.push(rec);
       continue;
     }
 
-    // segment — per settled decision, syntax is always "segment: v1 v2" (no
-    // name field on segments); a hand-typed name token is tolerated but discarded.
+    // segment — named, same as vertex/face, joining the same shared name
+    // namespace (see isNameTakenIn's segList param).
     rec.kind = 'segment';
     rec.targetSection = 'segments';
     const tok = tokenizeAttrs(rest, ['color', 'width', 'visible']);
@@ -1138,15 +1267,27 @@ function parseCodeText(text) {
     if (!v1 || !v2) {
       rec.valid = false; rec.errorMsg = `unknown vertex '${!v1 ? tok.positional[0] : tok.positional[1]}'`; lines.push(rec); continue;
     }
+
+    let finalName = name;
+    if (finalName === '') {
+      do { finalName = `S${autoSegmentN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+    } else if (!CODE_IDENT_RE.test(finalName)) {
+      rec.valid = false; rec.errorMsg = `invalid segment name '${finalName}'`; lines.push(rec); continue;
+    } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
+      rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
+    }
+
     const attrRes = resolveGoverningAttrs('segment', tok.attrs, currentSet.segment, { numericEnv, colorEnv, boolEnv });
     if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
     const obj = {
+      name: finalName,
       v1Name: v1.name,
       v2Name: v2.name,
       ...attrRes.fields,
     };
     stagedSegments.push(obj);
+    segmentByName.set(finalName, obj);
     rec.parsed = obj;
     lines.push(rec);
   }
@@ -1189,7 +1330,7 @@ function formatSegmentLine(v1, v2, seg) {
   const colorExpr   = seg.colorExpr   ?? seg.color ?? DEFAULT_COLOR;
   const widthExpr    = seg.widthExpr   ?? String(seg.lineWidth ?? 1.5);
   const visibleExpr = seg.visibleExpr ?? String(seg.visible !== false);
-  return `segment:  ${v1.name}  ${v2.name}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('width', widthExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
+  return `segment ${seg.name}:  ${v1.name}  ${v2.name}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('width', widthExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
 }
 
 // vertsForFace need only a `.name` each — callers may pass either full vertex
@@ -1309,6 +1450,11 @@ function sortCodeText(text) {
     // invalid one (bad field/value) is left untouched, same as any other
     // invalid line, so the user can see and fix it.
     if (rec.kind === 'set' && rec.valid) return;
+    // A valid `edit` line's effect is already baked into its target's own
+    // line (Object.assign in parseCodeText, at parse time) — it never had
+    // anything of its own to re-emit, unlike `set` there's no consolidated
+    // block to build either. It just vanishes once absorbed.
+    if (rec.kind === 'edit' && rec.valid) return;
     if (rec.valid && SECTION_ORDER.includes(rec.targetSection)) {
       perSection[rec.targetSection].push(rec);
       return;
@@ -2102,6 +2248,12 @@ function checkSelectionComplete() {
   // lastSetSegment/BUILTIN_SET_DEFAULTS.segment are always independently
   // valid — every write path validates before storing — so attrRes.ok is
   // guaranteed here.
+  // Collision-checked, not just `S${nextSegmentId}` — nextSegmentId is an id
+  // counter, not tied to which names are actually free, so a blind guess
+  // could collide with an explicitly-named segment sitting in the file.
+  let autoN = nextSegmentId;
+  let name  = `S${autoN}`;
+  while (isNameTaken(name)) name = `S${++autoN}`;
   // Clear the selection *before* snapshotting — otherwise the undo-captured
   // "before" state still has both vertices selected, and undoing restores
   // that stale selection, corrupting the next segment (its two leftover
@@ -2111,7 +2263,7 @@ function checkSelectionComplete() {
   selectedVertexIds.clear();
   snapshot();
   segments.push({
-    id: nextSegmentId++, vertexIds: [id1, id2], ...attrRes.fields,
+    id: nextSegmentId++, name, vertexIds: [id1, id2], ...attrRes.fields,
   });
   if (segmentMode === 'on') segmentMode = 'off';
   updateSegmentButton();
@@ -2662,18 +2814,20 @@ function setupColorPicker(rowBtn, popoverEl, presetListEl, constListEl, nativeIn
   return { refresh, close };
 }
 
-// Displays one governing boolean field's resolved state (dot fill/opacity)
-// and, when it's currently linked to a constant rather than a literal, the
-// constant's name as a small subscript. Read-only — write-back happens only
-// in toggleGoverningBool()'s own click handler, never here, so calling this
-// on every render (e.g. from the renderConstList() hook, so a linked dot
-// stays live as the constant is edited) can never silently detach anything.
-function renderBoolToggle(btnId, subId, exprText, boolEnv) {
+// Displays one governing boolean field's resolved state (opacity, plus the
+// ●/○ dot glyph for dot-style toggles like "visible" — "label" keeps its
+// fixed "A" glyph, only fading) and, when it's currently linked to a
+// constant rather than a literal, the constant's name as a small subscript.
+// Read-only — write-back happens only in toggleGoverningBool()'s own click
+// handler, never here, so calling this on every render (e.g. from the
+// renderConstList() hook, so a linked dot stays live as the constant is
+// edited) can never silently detach anything.
+function renderBoolToggle(btnId, subId, exprText, boolEnv, useDotGlyph = true) {
   const res = resolveBoolAttr(exprText, boolEnv);
   const val = res.ok ? res.value : true;
   const btn = document.getElementById(btnId);
   const sub = document.getElementById(subId);
-  btn.textContent   = val ? '●' : '○';
+  if (useDotGlyph) btn.textContent = val ? '●' : '○';
   btn.style.opacity = val ? '1' : '0.3';
   sub.textContent   = (exprText === 'true' || exprText === 'false') ? '' : exprText;
 }
@@ -2731,7 +2885,7 @@ function renderAddRowDefaults() {
   document.getElementById('v-color-btn').style.background = vColorResolved;
   refreshVRadius();
   renderBoolToggle('v-add-visible', 'v-add-visible-sub', lastSetVertex.visible ?? BUILTIN_SET_DEFAULTS.vertex.visible, boolEnv);
-  renderBoolToggle('v-add-label',   'v-add-label-sub',   lastSetVertex.label   ?? BUILTIN_SET_DEFAULTS.vertex.label,   boolEnv);
+  renderBoolToggle('v-add-label',   'v-add-label-sub',   lastSetVertex.label   ?? BUILTIN_SET_DEFAULTS.vertex.label,   boolEnv, false);
   vColorPicker.refresh();
 
   const sColorRes = resolveColorAttr(lastSetSegment.color ?? DEFAULT_COLOR, colorEnv);
@@ -3142,6 +3296,7 @@ function cancelSegmentEdit() {
     const orig = editingSegmentOriginal.segments.find(s => s.id === editingSegmentId);
     const seg  = segments.find(s => s.id === editingSegmentId);
     if (orig && seg) {
+      seg.name = orig.name;
       seg.color = orig.color; seg.colorExpr = orig.colorExpr;
       seg.lineWidth = orig.lineWidth ?? 1.5; seg.widthExpr = orig.widthExpr;
       seg.vertexIds = [...orig.vertexIds];
@@ -3238,6 +3393,22 @@ function renderSegmentList() {
         }
       ).refresh();
 
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      mobileTextInput(nameInput);
+      nameInput.value = seg.name;
+      nameInput.className = 'v-name-input';
+      nameInput.addEventListener('blur', () => {
+        const n = nameInput.value.trim();
+        if (n && n !== seg.name && isNameTaken(n, null, null, null, seg.id)) {
+          nameInput.value = seg.name;
+          setNameError(nameInput);
+        } else if (n) {
+          seg.name = n;
+        }
+      });
+      nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') commitSegmentEdit(); });
+
       // Endpoint pickers — let the user re-point either end of the segment
       // at a different vertex instead of it being fixed at creation time.
       // Plain text, live-validated: goes .expr-invalid (red) on an unknown
@@ -3305,7 +3476,7 @@ function renderSegmentList() {
       cancelBtn.title = 'Cancel edit';
       cancelBtn.addEventListener('click', cancelSegmentEdit);
 
-      mainRow.append(colorBtn, colorPopover, v1Input, dash, v2Input, widthInp, commitBtn, cancelBtn);
+      mainRow.append(colorBtn, colorPopover, nameInput, v1Input, dash, v2Input, widthInp, commitBtn, cancelBtn);
       entry.appendChild(mainRow);
 
     } else {
@@ -3319,7 +3490,7 @@ function renderSegmentList() {
 
       const label = document.createElement('span');
       label.className = 's-name';
-      label.textContent = `${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
+      label.textContent = `${seg.name}: ${v1?.name ?? '?'} – ${v2?.name ?? '?'}`;
 
       const editBtn = document.createElement('button');
       editBtn.textContent = '✎';
@@ -3594,6 +3765,7 @@ function buildCommittedArraysFromStaged(staged) {
   }));
   const newSegments = staged.stagedSegments.map((s, i) => ({
     id: i,
+    name: s.name,
     vertexIds: [nameToId.get(s.v1Name), nameToId.get(s.v2Name)],
     color: s.color,         colorExpr: s.colorExpr,
     lineWidth: s.lineWidth, widthExpr: s.widthExpr,
@@ -3854,6 +4026,53 @@ function submitInterpreterLine() {
 
   input.classList.remove('expr-invalid');
   input.removeAttribute('title');
+
+  // A lone `edit` line gets a cheap, targeted commit instead of the full
+  // reparse-and-rebuild below: it only ever mutates the one named object in
+  // place, so there's no reason to reassign every object's id on every
+  // edit the way create/set commits already do. (A multi-line paste mixing
+  // edit with other line kinds falls through to the full pipeline below,
+  // which still applies the edit correctly — parseCodeText already mutated
+  // the staged object in place above — just not via this cheap path; that
+  // mix is rare enough not to warrant its own branch.)
+  if (newRecs.length === 1 && newRecs[0].kind === 'edit') {
+    const { editType, targetName, fields, coordEdits, endpointEdits } = newRecs[0].parsed;
+    const liveArray = editType === 'vertex' ? vertices : editType === 'segment' ? segments : faces;
+    const target = liveArray.find(o => o.name === targetName);
+    snapshot();
+    Object.assign(target, fields);
+    // Live vertices carry the identical coords[]/exprs[] shape staged ones
+    // do (buildCommittedArraysFromStaged copies them straight across), so
+    // this applies exactly the same way parseCodeText already applied it
+    // to the staged object above — no name/id translation needed here,
+    // unlike segment endpoints below.
+    if (coordEdits) {
+      for (const axis of ['x', 'y', 'z']) {
+        if (!(axis in coordEdits)) continue;
+        const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+        target.coords[idx] = coordEdits[axis].value;
+        target.exprs[idx]  = coordEdits[axis].expr;
+      }
+    }
+    // Live segments reference vertices by id (vertexIds), not name — unlike
+    // the staged v1Name/v2Name parseCodeText already validated/applied
+    // above, so the given name needs resolving to a live vertex's id here.
+    // The name is guaranteed to resolve: it was already confirmed to exist
+    // during the validation parse above, and nothing can have removed it
+    // in between (single-threaded).
+    if (endpointEdits) {
+      if ('v0' in endpointEdits) target.vertexIds[0] = vertices.find(v => v.name === endpointEdits.v0).id;
+      if ('v1' in endpointEdits) target.vertexIds[1] = vertices.find(v => v.name === endpointEdits.v1).id;
+    }
+    reEvalObjects();
+    renderVertexList();
+    renderSegmentList();
+    renderFaceList();
+    draw();
+    input.value = '';
+    resizeInterpreterInput();
+    return;
+  }
 
   const { newVertices, newConstants, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
 
