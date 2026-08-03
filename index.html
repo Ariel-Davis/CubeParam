@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=41">
+  <link rel="stylesheet" href="style.css?v=44">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -38,6 +38,7 @@
     </div>
     <div id="controls">
       <div id="controls-header">
+        <button id="btn-about" title="Mathematical background">ⓘ</button>
         <button id="btn-dark">☾</button>
         <button id="btn-toggle-controls" class="active">☰</button>
       </div>
@@ -65,7 +66,7 @@
           <div class="toggle-group">
             <span class="label">Mode</span>
             <button id="btn-modeB" class="active">Compact</button>
-            <button id="btn-modeA">Poly</button>
+            <button id="btn-modeA">Polynomial</button>
             <button id="btn-show-pointer" class="active push-right">Show Pointer</button>
           </div>
           <div class="toggle-group">
@@ -89,7 +90,7 @@
             <input type="range"  id="slider-persp" min="0" max="1" step="0.001" value="0">
             <span class="label" id="persp-label">1/F =</span>
             <input type="number" id="input-persp"  value="0" step="0.001" min="0" max="1">
-            <button id="btn-clip" class="active push-right" title="Clip behind camera">📷</button>
+            <button id="btn-clip" class="active push-right" title="Clip behind camera">⏿</button>
           </div>
           <div class="toggle-group" id="scale-persp-row" style="display:none">
             <span class="label">Scale</span>
@@ -252,6 +253,21 @@
     </div>
   </div>
 
-  <script src="main.js?v=79"></script>
+  <!-- Mathematical-background overlay: a full-viewport backdrop + centered
+       panel embedding a PDF, opened by the ⓘ button in controls-header.
+       Closes the same way the color popovers do (click outside the panel),
+       plus an explicit ✗ and Escape for discoverability. -->
+  <div id="about-overlay" style="display:none">
+    <div id="about-panel">
+      <button id="btn-about-close" title="Close">✗</button>
+      <!-- #view=FitH is a standard PDF "open parameter" (fit width, scroll
+           vertically) — Chrome already defaults close to this, but Safari's
+           built-in viewer opens at a small fixed zoom regardless of the
+           iframe's size unless told otherwise. -->
+      <iframe id="about-frame" src="math-background.pdf#view=FitH" title="Mathematical background"></iframe>
+    </div>
+  </div>
+
+  <script src="main.js?v=80"></script>
 </body>
 </html>

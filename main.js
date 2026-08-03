@@ -4701,6 +4701,25 @@ document.getElementById('btn-dark').addEventListener('click', () => {
   draw();
 });
 
+// ─── Mathematical-background overlay ───────────────────────────────────────────
+// Closes the same way the color popovers do (a click that lands on the
+// backdrop itself, not a descendant, per the `e.target === overlay` check —
+// mirrors setupColorPicker's onOutsideClick), plus an explicit ✗ and Escape.
+function openAboutOverlay() {
+  document.getElementById('about-overlay').style.display = 'flex';
+}
+function closeAboutOverlay() {
+  document.getElementById('about-overlay').style.display = 'none';
+}
+document.getElementById('btn-about').addEventListener('click', openAboutOverlay);
+document.getElementById('btn-about-close').addEventListener('click', closeAboutOverlay);
+document.getElementById('about-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAboutOverlay();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('about-overlay').style.display !== 'none') closeAboutOverlay();
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('pointerdown', clearNameError, true);

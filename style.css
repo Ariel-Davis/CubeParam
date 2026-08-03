@@ -88,7 +88,8 @@ body.dark-mode #logic-keyboard {
 }
 
 #btn-toggle-controls,
-#btn-dark {
+#btn-dark,
+#btn-about {
   padding: 5px 10px;
   font-size: 15px;
   line-height: 1;
@@ -975,4 +976,45 @@ body.dark-mode .list-toggle:hover {
   font-size: 11px;
   color: rgba(0, 0, 0, 0.75);
   white-space: nowrap;
+}
+
+/* ─── Mathematical-background overlay ──────────────────────────────────────── */
+
+#about-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300; /* above #controls-wrapper's 100 and .face-pick-btn's 200 */
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#about-panel {
+  position: relative;
+  width: min(900px, 92vw);
+  height: min(1100px, 88vh);
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+body.dark-mode #about-panel {
+  background: #1c1c1c;
+}
+
+#about-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+#btn-about-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 4px 9px;
+  font-size: 13px;
 }
