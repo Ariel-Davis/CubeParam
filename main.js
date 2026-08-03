@@ -4707,6 +4707,13 @@ document.getElementById('btn-dark').addEventListener('click', () => {
 // mirrors setupColorPicker's onOutsideClick), plus an explicit ✗ and Escape.
 function openAboutOverlay() {
   document.getElementById('about-overlay').style.display = 'flex';
+  // Re-renders on every open (cheap — the parsed PDF itself is cached by
+  // pdf-viewer.js, only the per-page canvas draw repeats) so it always
+  // fits the panel's *current* width, even if the window was resized
+  // since the last time this was opened.
+  if (window.renderMathBackgroundPdf) {
+    window.renderMathBackgroundPdf(document.getElementById('about-frame'));
+  }
 }
 function closeAboutOverlay() {
   document.getElementById('about-overlay').style.display = 'none';

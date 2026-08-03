@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=44">
+  <link rel="stylesheet" href="style.css?v=47">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -260,14 +260,18 @@
   <div id="about-overlay" style="display:none">
     <div id="about-panel">
       <button id="btn-about-close" title="Close">✗</button>
-      <!-- #view=FitH is a standard PDF "open parameter" (fit width, scroll
-           vertically) — Chrome already defaults close to this, but Safari's
-           built-in viewer opens at a small fixed zoom regardless of the
-           iframe's size unless told otherwise. -->
-      <iframe id="about-frame" src="math-background.pdf#view=FitH" title="Mathematical background"></iframe>
+      <!-- Rendered by pdf-viewer.js (PDF.js), not a native <iframe> PDF
+           viewer — browsers' built-in viewers vary too much (Chrome mostly
+           fits width by default; Safari's does not, and ignores the
+           standard #view=FitH hint entirely). Rendering pages to canvas
+           ourselves gives the same correct fit-to-width sizing everywhere. -->
+      <div id="about-frame"></div>
     </div>
   </div>
 
-  <script src="main.js?v=80"></script>
+  <script src="vendor/pdfjs/pdf.min.js?v=1"></script>
+  <script src="math-background-pdf-data.js?v=1"></script>
+  <script src="pdf-viewer.js?v=2"></script>
+  <script src="main.js?v=81"></script>
 </body>
 </html>
