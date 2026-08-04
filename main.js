@@ -853,6 +853,126 @@ const CODE_SET_RE    = /^set\s+(vertex|segment|face)(?:\s*:\s*|\s+)(.+)$/;
 const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|const)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
+
+// A face's vertex list must never contain the same vertex twice — relied
+// upon by the whole face-editing design (name-based `replace` is only
+// well-defined if names are unique within the face) but never actually
+// enforced anywhere, including at creation, until now. Shared by face
+// creation here and by `replace`/`overwrite`'s result once those exist —
+// a pure name-list check, independent of how the list was produced.
+function hasDuplicateVertexNames(names) {
+  return new Set(names).size !== names.length;
+}
+
+// Parses a `replace OLD with NEW OLD with NEW ...` payload into an ordered
+// list of {old, new} pairs — shared by segment's `replace` (below) and
+// face's own `replace` once it exists. Purely syntactic: doesn't know or
+// care what OLD/NEW get validated against, which differs between
+// segment's fixed 2-endpoint arity and face's variable-length vertex list.
+function parseReplacePairs(rest) {
+  const tokens = rest.trim().split(/\s+/).filter(t => t.length > 0);
+  const pairs = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const oldName = tokens[i];
+    if (tokens[i + 1] !== 'with' || tokens[i + 2] === undefined) {
+      return { error: `expected '${oldName} with <name>'` };
+    }
+    pairs.push({ old: oldName, new: tokens[i + 2] });
+    i += 3;
+  }
+  if (pairs.length === 0) return { error: `expected at least one 'OLD with NEW' pair` };
+  return { pairs };
+}
+
+// Dispatches a face `edit` line's structural verb (replace/insert/remove/
+// overwrite) against the target's CURRENT vertexNames, producing the
+// resulting name list — or an error. `positional` is tokenizeAttrs'
+// leftover bare-token list with the verb as its first element (any
+// color=/visible= tokens and cosmetic semicolons were already stripped
+// before this runs). One verb per line, enforced for free: a second verb
+// keyword appearing later just fails to match the first verb's own
+// grammar (e.g. "replace P with Q remove R" chokes on `parseReplacePairs`
+// expecting "remove with <name>"), no separate check needed.
+function parseFaceVertexListEdit(positional, target, vertexByName) {
+  const [verb, ...rest] = positional;
+  const current = target.vertexNames;
+
+  if (verb === 'replace') {
+    const parsedPairs = parseReplacePairs(rest.join(' '));
+    if (parsedPairs.error) return { error: parsedPairs.error };
+    // Simultaneous substitution — build the whole {old: new} map first,
+    // apply once against the ORIGINAL list, never sequentially (same
+    // semantics as segment's replace, and for the same reason: applying
+    // pairs one at a time can pass through a momentarily-duplicate state
+    // depending on listing order, when the final result is perfectly
+    // valid). NEW deliberately does not need to already be a member —
+    // that's the primary use case (swapping in a vertex that was never
+    // part of the face, e.g. correcting a mis-picked one), not an edge case.
+    const subst = {};
+    for (const { old: oldName, new: newName } of parsedPairs.pairs) {
+      if (!current.includes(oldName)) return { error: `'${oldName}' is not currently a member of '${target.name}'` };
+      if (!vertexByName.has(newName)) return { error: `unknown vertex '${newName}'` };
+      subst[oldName] = newName;
+    }
+    const names = current.map(n => subst[n] ?? n);
+    if (hasDuplicateVertexNames(names)) return { error: 'a face cannot list the same vertex twice' };
+    return { names };
+  }
+
+  if (verb === 'remove') {
+    if (rest.length === 0) return { error: `expected at least one vertex name after 'remove'` };
+    // Dedupe *before* the membership check — this is what makes
+    // "remove P P" on a face containing P succeed as a no-op removal of P
+    // once (mathematically {P,P}={P}), while "remove P9 P" where P9 isn't
+    // a member still correctly fails as a whole — the second mention of a
+    // repeated name is never tested against an already-depleted
+    // intermediate state, because there is no intermediate state here,
+    // just one set checked once against the original list.
+    const toRemove = [...new Set(rest)];
+    const missing = toRemove.find(n => !current.includes(n));
+    if (missing) return { error: `'${missing}' is not currently a member of '${target.name}'` };
+    const names = current.filter(n => !toRemove.includes(n));
+    if (names.length < 3) return { error: 'a face needs at least 3 vertices' };
+    return { names };
+  }
+
+  if (verb === 'insert') {
+    if (rest.length !== 4 || rest[1] !== 'between') return { error: `expected 'insert NEW between A B'` };
+    const [newName, , a, b] = rest;
+    if (!vertexByName.has(newName)) return { error: `unknown vertex '${newName}'` };
+    if (a === b) return { error: `'between' requires two distinct vertices` };
+    // A and B must be currently adjacent — checked both orders, since
+    // "between A B" and "between B A" describe the same unordered edge.
+    // The wrap-around pair (last, first) counts as adjacent too (faces
+    // render as closed polygons) and always appends to the end — the one
+    // case with any real ambiguity to resolve, since an ordinary interior
+    // pair already has exactly one valid splice position.
+    const n = current.length;
+    let insertIdx = -1;
+    for (let idx = 0; idx < n; idx++) {
+      const next = (idx + 1) % n;
+      if ((current[idx] === a && current[next] === b) || (current[idx] === b && current[next] === a)) {
+        insertIdx = (next === 0) ? n : next;
+        break;
+      }
+    }
+    if (insertIdx === -1) return { error: `'${a}' and '${b}' are not currently adjacent in '${target.name}'` };
+    const names = [...current.slice(0, insertIdx), newName, ...current.slice(insertIdx)];
+    if (hasDuplicateVertexNames(names)) return { error: 'a face cannot list the same vertex twice' };
+    return { names };
+  }
+
+  if (verb === 'overwrite') {
+    if (rest.length < 3) return { error: `expected at least 3 vertex names, found ${rest.length}` };
+    const missingIdx = rest.findIndex(n => !vertexByName.has(n));
+    if (missingIdx !== -1) return { error: `unknown vertex '${rest[missingIdx]}'` };
+    if (hasDuplicateVertexNames(rest)) return { error: 'a face cannot list the same vertex twice' };
+    return { names: [...rest] };
+  }
+
+  return { error: `unrecognized face edit verb '${verb}'` };
+}
 // A const's kind (number/color/bool) is declared once at creation and
 // locked forever after — see the 'const' branch below and resolveConstKind.
 // 'bool' is the DSL-facing keyword; internally a boolean-kind constant's
@@ -1173,56 +1293,110 @@ function parseCodeText(text) {
         continue;
       }
 
-      const allowed = ATTR_DEFS[editType].map(d => d.token);
-      if (editType === 'vertex')  allowed.push('x', 'y', 'z');
-      if (editType === 'segment') allowed.push('v0', 'v1');
-      const tok = tokenizeAttrs(editRest.trim(), allowed);
-      if (tok.error || tok.positional.length > 0) {
-        rec.valid = false; rec.errorMsg = tok.error || `unexpected '${tok.positional[0]}'`; lines.push(rec); continue;
-      }
-      const fieldsRes = resolveEditFields(editType, tok.attrs, { numericEnv, colorEnv, boolEnv });
-      if (!fieldsRes.ok) { rec.valid = false; rec.errorMsg = fieldsRes.errorMsg; lines.push(rec); continue; }
+      // `edit segment S: replace P with Q` — addresses an endpoint by its
+      // current identity instead of its v0/v1 position (useful since a
+      // closed segment list doesn't show you which is which). Resolves to
+      // the exact same `endpointEdits` shape v0=/v1= already produces
+      // below, so every downstream consumer (this branch's own tail,
+      // the interpreter's cheap-commit path) needs no changes at all —
+      // only the parsing/validation differs by source.
+      let fieldsRes, coordEdits = {}, endpointEdits = {}, faceVertexNames = null;
+      const replaceMatch = editType === 'segment' ? editRest.trim().match(/^replace\s+(.+)$/) : null;
+      if (replaceMatch) {
+        const parsedPairs = parseReplacePairs(replaceMatch[1]);
+        if (parsedPairs.error) { rec.valid = false; rec.errorMsg = parsedPairs.error; lines.push(rec); continue; }
+        // Simultaneous substitution, not sequential — build the whole
+        // {old: new} map first, apply once against the segment's ORIGINAL
+        // pair, so listing order of multiple pairs never matters (same
+        // semantics face's own `replace` will use).
+        const subst = {};
+        let replaceErr = null;
+        for (const { old: oldName, new: newName } of parsedPairs.pairs) {
+          if (oldName !== target.v1Name && oldName !== target.v2Name) {
+            replaceErr = `'${oldName}' is not currently an endpoint of '${targetName}'`; break;
+          }
+          if (!vertexByName.has(newName)) { replaceErr = `unknown vertex '${newName}'`; break; }
+          subst[oldName] = newName;
+        }
+        if (!replaceErr) {
+          const finalV0 = subst[target.v1Name] ?? target.v1Name;
+          const finalV1 = subst[target.v2Name] ?? target.v2Name;
+          if (finalV0 === finalV1) replaceErr = 'segment endpoints must be distinct';
+          else endpointEdits = { v0: finalV0, v1: finalV1 };
+        }
+        if (replaceErr) { rec.valid = false; rec.errorMsg = replaceErr; lines.push(rec); continue; }
+        fieldsRes = { ok: true, fields: {} };
+      } else if (editType === 'face') {
+        // A structural verb (replace/insert/remove/overwrite) combines
+        // freely with plain attribute edits on the same line, so this
+        // can't be a simple "verb or attrs" branch the way segment's
+        // replace is — both can appear together. tokenizeAttrs already
+        // separates key=value tokens (color=/visible=) from bare ones
+        // regardless of where they sit in the line, so the bare leftovers
+        // (tok.positional) are exactly "the verb and its payload, if any."
+        // A semicolon is purely cosmetic here (visually separating the
+        // positional payload from trailing attributes) — never load-
+        // bearing, so it's stripped to a space before tokenizing, same as
+        // any other whitespace.
+        const tok = tokenizeAttrs(editRest.replace(/;/g, ' ').trim(), ['color', 'visible']);
+        if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
+        fieldsRes = resolveEditFields('face', tok.attrs, { numericEnv, colorEnv, boolEnv });
+        if (!fieldsRes.ok) { rec.valid = false; rec.errorMsg = fieldsRes.errorMsg; lines.push(rec); continue; }
+        if (tok.positional.length > 0) {
+          const verbResult = parseFaceVertexListEdit(tok.positional, target, vertexByName);
+          if (verbResult.error) { rec.valid = false; rec.errorMsg = verbResult.error; lines.push(rec); continue; }
+          faceVertexNames = verbResult.names;
+        }
+      } else {
+        const allowed = ATTR_DEFS[editType].map(d => d.token);
+        if (editType === 'vertex')  allowed.push('x', 'y', 'z');
+        if (editType === 'segment') allowed.push('v0', 'v1');
+        const tok = tokenizeAttrs(editRest.trim(), allowed);
+        if (tok.error || tok.positional.length > 0) {
+          rec.valid = false; rec.errorMsg = tok.error || `unexpected '${tok.positional[0]}'`; lines.push(rec); continue;
+        }
+        fieldsRes = resolveEditFields(editType, tok.attrs, { numericEnv, colorEnv, boolEnv });
+        if (!fieldsRes.ok) { rec.valid = false; rec.errorMsg = fieldsRes.errorMsg; lines.push(rec); continue; }
 
-      // Coordinate edits: any subset of x/y/z, each independently optional —
-      // the opposite of a fresh vertex line's "all three or none" rule (see
-      // the namedUsed/allThree check above), since editing is inherently
-      // partial. Not part of ATTR_DEFS/resolveEditFields at all — coords
-      // live in their own coords[]/exprs[] arrays, indexed 0/1/2.
-      const coordEdits = {};
-      if (editType === 'vertex') {
-        let coordErr = null;
-        for (const axis of ['x', 'y', 'z']) {
-          if (!(axis in tok.attrs)) continue;
-          const exprText = tok.attrs[axis];
-          const val = evalExpr(exprText, numericEnv);
-          if (!Number.isFinite(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
-          coordEdits[axis] = { expr: exprText, value: val };
+        // Coordinate edits: any subset of x/y/z, each independently optional —
+        // the opposite of a fresh vertex line's "all three or none" rule (see
+        // the namedUsed/allThree check above), since editing is inherently
+        // partial. Not part of ATTR_DEFS/resolveEditFields at all — coords
+        // live in their own coords[]/exprs[] arrays, indexed 0/1/2.
+        if (editType === 'vertex') {
+          let coordErr = null;
+          for (const axis of ['x', 'y', 'z']) {
+            if (!(axis in tok.attrs)) continue;
+            const exprText = tok.attrs[axis];
+            const val = evalExpr(exprText, numericEnv);
+            if (!Number.isFinite(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
+            coordEdits[axis] = { expr: exprText, value: val };
+          }
+          if (coordErr) { rec.valid = false; rec.errorMsg = coordErr; lines.push(rec); continue; }
         }
-        if (coordErr) { rec.valid = false; rec.errorMsg = coordErr; lines.push(rec); continue; }
-      }
 
-      // Endpoint edits: v0=/v1=, each independently optional, resolved by
-      // name (staged segments reference vertices by name — v1Name/v2Name —
-      // not id; ids don't exist until buildCommittedArraysFromStaged runs).
-      // The *resulting* pair must be distinct, checked against whichever
-      // endpoint wasn't given (falls back to the target's current one), so
-      // a line editing only v0 can't silently collapse it onto the
-      // already-existing v1, and vice versa.
-      const endpointEdits = {};
-      if (editType === 'segment') {
-        let endpointErr = null;
-        for (const key of ['v0', 'v1']) {
-          if (!(key in tok.attrs)) continue;
-          const vname = tok.attrs[key];
-          if (!vertexByName.has(vname)) { endpointErr = `unknown vertex '${vname}'`; break; }
-          endpointEdits[key] = vname;
+        // Endpoint edits: v0=/v1=, each independently optional, resolved by
+        // name (staged segments reference vertices by name — v1Name/v2Name —
+        // not id; ids don't exist until buildCommittedArraysFromStaged runs).
+        // The *resulting* pair must be distinct, checked against whichever
+        // endpoint wasn't given (falls back to the target's current one), so
+        // a line editing only v0 can't silently collapse it onto the
+        // already-existing v1, and vice versa.
+        if (editType === 'segment') {
+          let endpointErr = null;
+          for (const key of ['v0', 'v1']) {
+            if (!(key in tok.attrs)) continue;
+            const vname = tok.attrs[key];
+            if (!vertexByName.has(vname)) { endpointErr = `unknown vertex '${vname}'`; break; }
+            endpointEdits[key] = vname;
+          }
+          if (!endpointErr) {
+            const finalV0 = endpointEdits.v0 ?? target.v1Name;
+            const finalV1 = endpointEdits.v1 ?? target.v2Name;
+            if (finalV0 === finalV1) endpointErr = 'segment endpoints must be distinct';
+          }
+          if (endpointErr) { rec.valid = false; rec.errorMsg = endpointErr; lines.push(rec); continue; }
         }
-        if (!endpointErr) {
-          const finalV0 = endpointEdits.v0 ?? target.v1Name;
-          const finalV1 = endpointEdits.v1 ?? target.v2Name;
-          if (finalV0 === finalV1) endpointErr = 'segment endpoints must be distinct';
-        }
-        if (endpointErr) { rec.valid = false; rec.errorMsg = endpointErr; lines.push(rec); continue; }
       }
 
       Object.assign(target, fieldsRes.fields);
@@ -1234,7 +1408,8 @@ function parseCodeText(text) {
       }
       if ('v0' in endpointEdits) target.v1Name = endpointEdits.v0;
       if ('v1' in endpointEdits) target.v2Name = endpointEdits.v1;
-      rec.parsed = { editType, targetName, fields: fieldsRes.fields, coordEdits, endpointEdits };
+      if (faceVertexNames) target.vertexNames = faceVertexNames;
+      rec.parsed = { editType, targetName, fields: fieldsRes.fields, coordEdits, endpointEdits, faceVertexNames };
       lines.push(rec);
       continue;
     }
@@ -1458,6 +1633,9 @@ function parseCodeText(text) {
       const missingIdx = faceVerts.findIndex(v => !v);
       if (missingIdx !== -1) {
         rec.valid = false; rec.errorMsg = `unknown vertex '${tok.positional[missingIdx]}'`; lines.push(rec); continue;
+      }
+      if (hasDuplicateVertexNames(tok.positional)) {
+        rec.valid = false; rec.errorMsg = 'a face cannot list the same vertex twice'; lines.push(rec); continue;
       }
 
       let finalName = name;
@@ -4648,7 +4826,7 @@ function submitInterpreterLine() {
       return;
     }
 
-    const { fields, coordEdits, endpointEdits } = parsed;
+    const { fields, coordEdits, endpointEdits, faceVertexNames } = parsed;
     const liveArray = editType === 'vertex' ? vertices : editType === 'segment' ? segments : faces;
     const target = liveArray.find(o => o.name === targetName);
     snapshot();
@@ -4675,6 +4853,14 @@ function submitInterpreterLine() {
     if (endpointEdits) {
       if ('v0' in endpointEdits) target.vertexIds[0] = vertices.find(v => v.name === endpointEdits.v0).id;
       if ('v1' in endpointEdits) target.vertexIds[1] = vertices.find(v => v.name === endpointEdits.v1).id;
+    }
+    // Live faces reference vertices by id, not name — same translation
+    // segment endpoints needed above, just for a variable-length list
+    // instead of two fixed slots. Every name is guaranteed to resolve for
+    // the same reason: already confirmed to exist during the validation
+    // parse above, single-threaded so nothing can have changed since.
+    if (faceVertexNames) {
+      target.vertexIds = faceVertexNames.map(n => vertices.find(v => v.name === n).id);
     }
     reEvalObjects();
     renderVertexList();
