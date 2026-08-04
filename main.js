@@ -181,9 +181,9 @@ let previewOverride  = null;   // { vertices, segments } staged preview while ed
 // built-in defaults. Deliberately outside the undo/redo system (like
 // darkMode/userScale) — it's a UI convenience for what new code should
 // default to, not part of the object model itself.
-let lastSetVertex  = { color: undefined, r: undefined, visible: undefined, label: undefined };
-let lastSetSegment = { color: undefined, width: undefined, visible: undefined };
-let lastSetFace    = { color: undefined, visible: undefined };
+let lastSetVertex  = { color: undefined, r: undefined, visible: undefined, label: undefined, naming: undefined, counter: undefined };
+let lastSetSegment = { color: undefined, width: undefined, visible: undefined, naming: undefined, counter: undefined };
+let lastSetFace    = { color: undefined, visible: undefined, naming: undefined, counter: undefined };
 
 // Reparsing/validation is gated on "leaving a line after changing it" (not on
 // every keystroke) — these track the line the caret was in and its text as of
@@ -670,14 +670,37 @@ function isNameTaken(name, excludeVertexId = null, excludeConstId = null, exclud
 let nameCounters = { P: 0, S: 0, F: 0 };
 
 // Next free `${prefix}${n}` name, starting from that prefix's own counter
-// and skipping past any collision (e.g. a hand-typed name sitting in the
-// code file) — then advances the counter past whatever name is returned.
-function nextAutoName(prefix) {
-  let n = nameCounters[prefix];
+// (in whichever `counters` map — the live one above, or a code-file parse's
+// own local one, see parseCodeText) and skipping past any collision (e.g. a
+// hand-typed name sitting in the code file) — then advances the counter
+// past whatever name is returned. A prefix not seen before (a fresh custom
+// `naming=` template) starts from 0, same as the three built-in prefixes do.
+// Pure with respect to `counters` (the only thing it mutates) so the live
+// and parse-local call sites can never resolve "next free name" differently.
+function advanceAutoName(counters, prefix, isTaken) {
+  let n = counters[prefix] ?? 0;
   let name = `${prefix}${n}`;
-  while (isNameTaken(name)) { n++; name = `${prefix}${n}`; }
-  nameCounters[prefix] = n + 1;
+  while (isTaken(name)) { n++; name = `${prefix}${n}`; }
+  counters[prefix] = n + 1;
   return name;
+}
+
+function nextAutoName(prefix) {
+  return advanceAutoName(nameCounters, prefix, isNameTaken);
+}
+
+// Called after a code-file/interpreter commit (codeSave, submitInterpreterLine)
+// to let an explicit `counter=` in the file carry forward into the live
+// session — otherwise a `set vertex: counter=50` with no actual name
+// collision at P0..P49 would have no effect on the *next* controls-driven
+// "+" click, silently defeating the whole point of declaring one. Only
+// moves the live counter forward (max, never regresses it) — a save that
+// happened to touch this prefix less than the live session already has
+// must not roll a further-along live counter backward.
+function syncNameCounterFromParse(governing, defaultPrefix, staged) {
+  const prefix = governing.naming ?? defaultPrefix;
+  if (staged.nameCounters[prefix] === undefined) return;
+  nameCounters[prefix] = Math.max(nameCounters[prefix] ?? 0, staged.nameCounters[prefix]);
 }
 
 function setNameError(el) {
@@ -815,7 +838,10 @@ const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
 const CONST_KIND_KEYWORDS = ['number', 'color', 'bool'];
 
 // field -> canonical syntax token name (also used by tokenizeAttrs' error text)
-const FIELD_TOKEN_NAME = { color: 'color', r: 'r', width: 'w', visible: 'visible', label: 'label', x: 'x', y: 'y', z: 'z' };
+const FIELD_TOKEN_NAME = { color: 'color', r: 'r', width: 'w', visible: 'visible', label: 'label', x: 'x', y: 'y', z: 'z', naming: 'naming', counter: 'counter' };
+
+// Built-in auto-name prefix per type, absent any `naming=` override.
+const AUTO_NAME_PREFIX = { vertex: 'P', segment: 'S', face: 'F' };
 
 function formatFieldToken(field, value) {
   return `${FIELD_TOKEN_NAME[field]}=${value}`;
@@ -853,17 +879,40 @@ function emitSection(outLines, style, title, ...blocks) {
 // Which fields are settable per type, in the fixed order they're written in
 // a "set" cluster, and the ultimate built-in fallback for a field that was
 // never set anywhere in the file.
+// `naming=` rides along here too — it's a persistent governing default
+// exactly like color/r/visible/label ("template override = persistent,
+// sticky, tier-2 governing state"), so it belongs in the same always-
+// redisplayed cluster, and needs to be for a real reason beyond
+// consistency: serializeState()'s reconstructed text is the *only* thing a
+// later parse (a second interpreter submission, reopening the code file)
+// has to go on — if naming= weren't redeclared here, that later parse would
+// silently forget which prefix currently governs.
 const SET_FIELD_ORDER = {
-  vertex:  ['color', 'r', 'visible', 'label'],
-  segment: ['color', 'width', 'visible'],
-  face:    ['color', 'visible'],
+  vertex:  ['color', 'r', 'visible', 'label', 'naming'],
+  segment: ['color', 'width', 'visible', 'naming'],
+  face:    ['color', 'visible', 'naming'],
+};
+// `counter=` is also settable via a `set` line, but deliberately left out
+// of SET_FIELD_ORDER above — unlike naming (a stable template choice),
+// counter is a one-time imperative ("jump the counter to N right now"), not
+// a governing setting: its effect is applied immediately at parse time
+// (seeding parseNameCounters — see parseCodeText) and from then on lives
+// only in the resulting object names and the live nameCounters it advances
+// (see syncNameCounterFromParse), the same way an `edit` line's effect
+// lives on only in the target object it already mutated. Auto-redisplaying
+// it here would also churn the file on every single object creation, which
+// naming/color/etc. never do since they're stable across many creations.
+const SET_SETTABLE_FIELDS = {
+  vertex:  [...SET_FIELD_ORDER.vertex,  'counter'],
+  segment: [...SET_FIELD_ORDER.segment, 'counter'],
+  face:    [...SET_FIELD_ORDER.face,    'counter'],
 };
 // Text-typed (not number/boolean) for consistency — every field is raw expr
 // text everywhere else now, so these fall-back defaults are too.
 const BUILTIN_SET_DEFAULTS = {
-  vertex:  { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true' },
-  segment: { color: DEFAULT_COLOR, width: '1.5', visible: 'true' },
-  face:    { color: DEFAULT_COLOR, visible: 'true' },
+  vertex:  { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true', naming: AUTO_NAME_PREFIX.vertex },
+  segment: { color: DEFAULT_COLOR, width: '1.5', visible: 'true', naming: AUTO_NAME_PREFIX.segment },
+  face:    { color: DEFAULT_COLOR, visible: 'true', naming: AUTO_NAME_PREFIX.face },
 };
 
 // Per-type table of settable attributes: the set/object-line token (matches
@@ -952,6 +1001,12 @@ function tokenizeAttrs(rest, allowedAttrs) {
     } else if (/^label=/.test(tok)) {
       if (!allowedAttrs.includes('label')) return { error: `'label=' not valid here` };
       attrs.label = tok.slice(6);
+    } else if (/^naming=/.test(tok)) {
+      if (!allowedAttrs.includes('naming')) return { error: `'naming=' not valid here` };
+      attrs.naming = tok.slice(7);
+    } else if (/^counter=/.test(tok)) {
+      if (!allowedAttrs.includes('counter')) return { error: `'counter=' not valid here` };
+      attrs.counter = tok.slice(8);
     } else {
       positional.push(tok);
     }
@@ -975,10 +1030,22 @@ function parseCodeText(text) {
   const segmentByName   = new Map(); // name -> staged segment, built incrementally (edit target lookup)
   const faceByName      = new Map(); // name -> staged face, built incrementally (edit target lookup)
   const constByName     = new Map(); // name -> staged constant, built incrementally (edit target lookup)
-  let autoVertexN  = 0;
   let autoConstN   = 0;
-  let autoFaceN    = 0;
-  let autoSegmentN = 0;
+  // Per-prefix auto-name counters, local to this one parse (mutations here
+  // never touch the live nameCounters directly — see syncNameCounterFromParse,
+  // called only after a real commit) — but *seeded* from the live session's
+  // counters, not started fresh at 0. This is what carries a `naming=`/
+  // `counter=` override across separate interpreter submissions: each
+  // submission reparses serializeState()'s freshly-reconstructed text (which
+  // only ever redeclares the *current* governing naming=, not a full history
+  // of mid-file switches — see buildSetBlock), so without this seed a second
+  // submission would silently forget the first one's override. Collision-
+  // skip (advanceAutoName) still accounts for everything actually staged in
+  // this parse regardless of the seed, so a stale/wrong seed can only waste
+  // a few skip iterations, never cause an actual collision. Keyed by prefix,
+  // not type, matching `naming=`'s own per-prefix (not per-type) scope — two
+  // types sharing a custom prefix interleave through the same counter.
+  const parseNameCounters = { ...nameCounters };
 
   // Order-dependent "current set" state, like a paintbrush: a `set vertex
   // color=...` line updates this and every later vertex line that omits
@@ -986,10 +1053,15 @@ function parseCodeText(text) {
   // end). Resolved once here at parse time into a concrete value on the
   // staged/committed object — never stored as a lazily-resolved reference —
   // so relocating a line later (Sort) can never change what it resolved to.
+  // `naming`/`counter` ride along in the same per-type governing state as
+  // color/r/visible/label — naming picks which prefix a later blank-name
+  // line of that type auto-generates from; counter (applied immediately
+  // below, not deferred) seeds parseNameCounters for whichever prefix
+  // currently governs at the moment the `counter=` line itself is parsed.
   const currentSet = {
-    vertex:  { color: undefined, r: undefined, visible: undefined, label: undefined },
-    segment: { color: undefined, width: undefined, visible: undefined },
-    face:    { color: undefined, visible: undefined },
+    vertex:  { color: undefined, r: undefined, visible: undefined, label: undefined, naming: undefined, counter: undefined },
+    segment: { color: undefined, width: undefined, visible: undefined, naming: undefined, counter: undefined },
+    face:    { color: undefined, visible: undefined, naming: undefined, counter: undefined },
   };
 
   for (const raw of text.split('\n')) {
@@ -1151,7 +1223,7 @@ function parseCodeText(text) {
       // entirely positional (which object lines follow it), unlike const/
       // vertex/segment lines whose meaning doesn't depend on where within
       // their section they sit — so Sort must never relocate it.
-      const allowed = SET_FIELD_ORDER[setType];
+      const allowed = SET_SETTABLE_FIELDS[setType];
       const tok = tokenizeAttrs(fieldTok.trim(), allowed);
       const attrKeys = tok.error ? [] : Object.keys(tok.attrs);
       if (tok.error || tok.positional.length > 0 || attrKeys.length !== 1) {
@@ -1167,15 +1239,31 @@ function parseCodeText(text) {
       // that's what an inheriting vertex/segment line picks up as its own
       // *Expr, which is what makes it stay live-linked to a referenced
       // constant rather than getting baked to a snapshot value.
+      // naming=/counter= aren't object attributes at all (no *Expr/value
+      // pair feeds into ATTR_DEFS) — naming just needs to be a syntactically
+      // valid prefix (so prefix+digits stays a valid name); counter just
+      // needs to be a plain non-negative integer (a starting position, not
+      // a computed expression, so a constant reference wouldn't mean
+      // anything here).
       const resolveResult =
-        field === 'color' ? resolveColorAttr(rawText, colorEnv) :
+        field === 'color'   ? resolveColorAttr(rawText, colorEnv) :
         (field === 'r' || field === 'width') ? resolveNumAttr(rawText, numericEnv) :
+        field === 'naming'  ? { ok: CODE_IDENT_RE.test(rawText) } :
+        field === 'counter' ? { ok: /^\d+$/.test(rawText) } :
         resolveBoolAttr(rawText, boolEnv);
       if (!resolveResult.ok) {
         rec.valid = false;
         rec.errorMsg = `invalid ${field} value '${rawText}'`;
         lines.push(rec);
         continue;
+      }
+      if (field === 'counter') {
+        // Applied immediately, unlike every other set field (which only
+        // takes effect on a later object line) — a counter's whole job is
+        // seeding parseNameCounters for whichever prefix currently governs
+        // this type, right here, at the moment this line is parsed.
+        const prefix = currentSet[setType].naming ?? AUTO_NAME_PREFIX[setType];
+        parseNameCounters[prefix] = parseInt(rawText, 10);
       }
       currentSet[setType][field] = rawText;
       rec.parsed = { setType, field, value: rawText };
@@ -1301,7 +1389,8 @@ function parseCodeText(text) {
 
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `P${autoVertexN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+        finalName = advanceAutoName(parseNameCounters, currentSet.vertex.naming ?? AUTO_NAME_PREFIX.vertex,
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid vertex name '${finalName}'`; lines.push(rec); continue;
       } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
@@ -1344,7 +1433,8 @@ function parseCodeText(text) {
 
       let finalName = name;
       if (finalName === '') {
-        do { finalName = `F${autoFaceN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+        finalName = advanceAutoName(parseNameCounters, currentSet.face.naming ?? AUTO_NAME_PREFIX.face,
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid face name '${finalName}'`; lines.push(rec); continue;
       } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
@@ -1383,7 +1473,8 @@ function parseCodeText(text) {
 
     let finalName = name;
     if (finalName === '') {
-      do { finalName = `S${autoSegmentN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+      finalName = advanceAutoName(parseNameCounters, currentSet.segment.naming ?? AUTO_NAME_PREFIX.segment,
+        n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
     } else if (!CODE_IDENT_RE.test(finalName)) {
       rec.valid = false; rec.errorMsg = `invalid segment name '${finalName}'`; lines.push(rec); continue;
     } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
@@ -1405,7 +1496,7 @@ function parseCodeText(text) {
     lines.push(rec);
   }
 
-  return { lines, stagedConstants, stagedVertices, stagedSegments, stagedFaces, finalSet: currentSet };
+  return { lines, stagedConstants, stagedVertices, stagedSegments, stagedFaces, finalSet: currentSet, nameCounters: parseNameCounters };
 }
 
 function formatCoordExpr(v, i) {
@@ -1562,7 +1653,15 @@ function sortCodeText(text) {
     // canonical cluster per type (built below from `finalSet`) — drop the
     // scattered instance entirely rather than re-emitting it in place. An
     // invalid one (bad field/value) is left untouched, same as any other
-    // invalid line, so the user can see and fix it.
+    // invalid line, so the user can see and fix it. This covers `naming=`
+    // too now (SET_FIELD_ORDER includes it) — only the actual object names
+    // downstream carry the historical evidence of a mid-file naming switch,
+    // same as how a mid-file color switch already only shows up on the
+    // objects created under it, not as a preserved trail of `set` lines.
+    // `counter=` never reaches here at all (see the `field === 'counter'`
+    // branch above) — its effect already applied immediately at parse time,
+    // so it drops for the same reason `edit` does two branches down: nothing
+    // left to re-emit once absorbed.
     if (rec.kind === 'set' && rec.valid) return;
     // A valid `edit` line's effect is already baked into its target's own
     // line (Object.assign in parseCodeText, at parse time) — it never had
@@ -2372,7 +2471,7 @@ function checkSelectionComplete() {
   snapshot();
   // nextAutoName mutates nameCounters, so it must run after snapshot() —
   // see addVertexFromInputs for why.
-  const name = nextAutoName('S');
+  const name = nextAutoName(lastSetSegment.naming ?? AUTO_NAME_PREFIX.segment);
   segments.push({
     id: nextSegmentId++, name, vertexIds: [id1, id2], ...attrRes.fields,
   });
@@ -2418,7 +2517,7 @@ function checkFaceComplete() {
   snapshot();
   // nextAutoName mutates nameCounters, so it must run after snapshot() —
   // see addVertexFromInputs for why.
-  const name = nextAutoName('F');
+  const name = nextAutoName(lastSetFace.naming ?? AUTO_NAME_PREFIX.face);
   faces.push({
     id: nextFaceId++, name, vertexIds, ...attrRes.fields,
   });
@@ -3578,7 +3677,7 @@ function addVertexFromInputs() {
   // nextAutoName mutates nameCounters, so it must run after snapshot() —
   // otherwise undo would restore a state that already reflects this
   // creation's counter advance, defeating the point of restoring it at all.
-  const name = typed || nextAutoName('P');
+  const name = typed || nextAutoName(lastSetVertex.naming ?? AUTO_NAME_PREFIX.vertex);
   vertices.push({
     id: nextVertexId++, name, coords: vals, exprs, ...attrRes.fields,
   });
@@ -4263,6 +4362,11 @@ function codeSave() {
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
   lastSetFace    = { ...staged.finalSet.face };
+  // Let an explicit `counter=` (or a run of blank-name lines under a custom
+  // `naming=`) carry forward into future controls-driven creation too.
+  syncNameCounterFromParse(lastSetVertex,  AUTO_NAME_PREFIX.vertex,  staged);
+  syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
+  syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
 
   snapshot();
   vertices          = newVertices;
@@ -4506,6 +4610,9 @@ function submitInterpreterLine() {
   // renderAddRowDefaults() call) picks it up automatically, since the
   // add-rows now read lastSetVertex/lastSetSegment/lastSetFace directly
   // rather than a separately-synced shadow copy.
+  syncNameCounterFromParse(lastSetVertex,  AUTO_NAME_PREFIX.vertex,  staged);
+  syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
+  syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
 
   snapshot();
   vertices          = newVertices;
