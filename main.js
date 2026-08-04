@@ -473,7 +473,10 @@ function resolveColorAttr(exprText, colorEnv) {
 }
 function resolveNumAttr(exprText, numericEnv) {
   const v = evalExpr(exprText, numericEnv);
-  return isNaN(v) ? { ok: false } : { ok: true, value: v };
+  // isFinite, not just isNaN — evalExpr can overflow to Infinity (a literal
+  // like 1e400, or arithmetic like 1e200*1e200) without ever producing NaN,
+  // and every caller here downstream only meant "a real, usable number."
+  return Number.isFinite(v) ? { ok: true, value: v } : { ok: false };
 }
 function resolveBoolAttr(exprText, boolEnv) {
   if (exprText === 'true')  return { ok: true, value: true };
@@ -1192,7 +1195,7 @@ function parseCodeText(text) {
           if (!(axis in tok.attrs)) continue;
           const exprText = tok.attrs[axis];
           const val = evalExpr(exprText, numericEnv);
-          if (isNaN(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
+          if (!Number.isFinite(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
           coordEdits[axis] = { expr: exprText, value: val };
         }
         if (coordErr) { rec.valid = false; rec.errorMsg = coordErr; lines.push(rec); continue; }
@@ -1265,12 +1268,17 @@ function parseCodeText(text) {
       // valid prefix (so prefix+digits stays a valid name); counter just
       // needs to be a plain non-negative integer (a starting position, not
       // a computed expression, so a constant reference wouldn't mean
-      // anything here).
+      // anything here) — and additionally bounded to a safe integer: past
+      // Number.MAX_SAFE_INTEGER, `n++` in advanceAutoName/findNextAutoName
+      // silently stops incrementing at all (float precision), which turns
+      // that function's collision-skip loop into an infinite one the moment
+      // anything ever collides with the frozen name — confirmed by an actual
+      // hang during stress testing, not a theoretical concern.
       const resolveResult =
         field === 'color'   ? resolveColorAttr(rawText, colorEnv) :
         (field === 'r' || field === 'width') ? resolveNumAttr(rawText, numericEnv) :
         field === 'naming'  ? { ok: CODE_IDENT_RE.test(rawText) } :
-        field === 'counter' ? { ok: /^\d+$/.test(rawText) } :
+        field === 'counter' ? { ok: /^\d+$/.test(rawText) && Number.isSafeInteger(parseInt(rawText, 10)) } :
         resolveBoolAttr(rawText, boolEnv);
       if (!resolveResult.ok) {
         rec.valid = false;
@@ -1369,7 +1377,7 @@ function parseCodeText(text) {
         } else {
           kind = 'number';
           value = evalExpr(rest, numericEnv);
-          resOk = !isNaN(value);
+          resOk = Number.isFinite(value);
         }
       }
       if (!resOk) { rec.valid = false; rec.errorMsg = errMsg; lines.push(rec); continue; }
@@ -1418,7 +1426,7 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
       const coords = coordExprs.map(t => evalExpr(t, numericEnv));
-      if (coords.some(isNaN)) {
+      if (coords.some(c => !Number.isFinite(c))) {
         rec.valid = false; rec.errorMsg = 'invalid coordinate expression'; lines.push(rec); continue;
       }
 
@@ -2632,7 +2640,7 @@ function applyScale(value) {
 sliderScale.addEventListener('input', () => applyScale(parseFloat(sliderScale.value)));
 inputScale.addEventListener('change', () => {
   const v = parseFloat(inputScale.value);
-  if (!isNaN(v) && v > 0) applyScale(v);
+  if (Number.isFinite(v) && v > 0) applyScale(v);
 });
 
 // ─── Axes button ──────────────────────────────────────────────────────────────
@@ -3312,9 +3320,12 @@ function wireNumericAttrInput(input, getExprText, setLiteral) {
   });
   input.addEventListener('input', () => {
     const n   = parseFloat(input.value);
-    const bad = input.value.trim() !== '' && isNaN(n);
+    // isFinite, not just isNaN — the beforeinput grammar above blocks
+    // scientific notation, but a long-enough plain digit string still
+    // overflows a double to Infinity on its own (e.g. pasted).
+    const bad = input.value.trim() !== '' && !Number.isFinite(n);
     input.classList.toggle('expr-invalid', bad);
-    if (!isNaN(n)) setLiteral(n);
+    if (Number.isFinite(n)) setLiteral(n);
   });
   input.addEventListener('blur', refresh);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
@@ -3433,7 +3444,10 @@ function renderVertexList() {
       nameInput.className = 'v-name-input';
       nameInput.addEventListener('blur', () => {
         const n = nameInput.value.trim();
-        if (n && n !== v.name && isNameTaken(n, v.id)) {
+        // CODE_IDENT_RE too, not just collision — same reasoning as
+        // addVertexFromInputs above: a shape the code-file grammar would
+        // reject silently gets destroyed on the next Save otherwise.
+        if (n && n !== v.name && (!CODE_IDENT_RE.test(n) || isNameTaken(n, v.id))) {
           nameInput.value = v.name;
           _rejectedVertexId = v.id;
           setNameError(nameInput);
@@ -3521,10 +3535,14 @@ function renderVertexList() {
         exprInp.addEventListener('input', () => {
           v.exprs[i] = exprInp.value;
           const val  = evalExpr(exprInp.value, buildEnvs().numericEnv);
-          const bad  = isNaN(val) && exprInp.value.trim() !== '';
+          // isFinite, not just isNaN — a free-form expression box (unlike
+          // wireNumericAttrInput's restricted grammar) can reach Infinity
+          // via a literal like 1e400 or overflowing arithmetic, with no NaN
+          // ever produced along the way.
+          const bad  = !Number.isFinite(val) && exprInp.value.trim() !== '';
           exprInp.classList.toggle('expr-invalid', bad);
-          if (!isNaN(val)) { v.coords[i] = val; valSpan.textContent = +val.toFixed(4); }
-          else              { valSpan.textContent = '?'; }
+          if (Number.isFinite(val)) { v.coords[i] = val; valSpan.textContent = +val.toFixed(4); }
+          else                       { valSpan.textContent = '?'; }
           draw();
         });
         exprInp.addEventListener('keydown', e => { if (e.key === 'Enter') commitEdit(); });
@@ -3533,7 +3551,7 @@ function renderVertexList() {
         const valSpan = document.createElement('span');
         valSpan.className = 'coord-value';
         const curVal = evalExpr(exprVal, env);
-        valSpan.textContent = isNaN(curVal) ? '?' : +curVal.toFixed(4);
+        valSpan.textContent = Number.isFinite(curVal) ? +curVal.toFixed(4) : '?';
         row.appendChild(valSpan);
 
         entry.appendChild(row);
@@ -3656,12 +3674,20 @@ function renderVertexList() {
         e.stopPropagation();
         snapshot();
         segments = segments.filter(s => !s.vertexIds.includes(v.id));
+        // Faces need the exact same cascade segments already got — without
+        // this, a face referencing the deleted vertex becomes a "zombie":
+        // still sitting in the live array and the face list, invisible on
+        // canvas (drawFaces already guards against a missing vertex), and
+        // silently dropped the next time the code file is saved (serializeState
+        // guards too) — with no warning anywhere that it happened.
+        faces    = faces.filter(f => !f.vertexIds.includes(v.id));
         vertices = vertices.filter(u => u.id !== v.id);
         selectedVertexIds.delete(v.id);
         if (focusedVertexId === v.id) focusedVertexId = null;
         if (segments.every(s => s.id !== selectedSegmentId)) selectedSegmentId = null;
         renderVertexList();
         renderSegmentList();
+        renderFaceList();
         draw();
       });
 
@@ -3689,10 +3715,19 @@ function addVertexFromInputs() {
   const env       = buildEnvs().numericEnv;
   const exprs     = coordInps.map(inp => inp.value.trim() || '0');
   const vals      = exprs.map(expr => evalExpr(expr, env));
-  coordInps.forEach((inp, k) => inp.classList.toggle('expr-invalid', isNaN(vals[k])));
-  if (vals.some(isNaN)) return;
+  // isFinite, not just isNaN — a literal like 1e400 or overflowing
+  // arithmetic evaluates to Infinity, never NaN, and would otherwise be
+  // silently accepted as a coordinate (confirmed reachable during stress
+  // testing: `vertex P0: 1e400 2 3`).
+  coordInps.forEach((inp, k) => inp.classList.toggle('expr-invalid', !Number.isFinite(vals[k])));
+  if (vals.some(v => !Number.isFinite(v))) return;
   const typed = nameInput.value.trim();
-  if (typed && isNameTaken(typed)) { setNameError(nameInput); return; }
+  // CODE_IDENT_RE too, not just collision — a name the code-file grammar
+  // wouldn't accept (e.g. a bare "5") used to slip through here, rendering
+  // fine until the next Save silently dropped it (buildCommittedArraysFromStaged
+  // only keeps validly-reparsed objects) — confirmed as real data loss, not
+  // just a cosmetic gap, since nothing ever told the user why.
+  if (typed && (!CODE_IDENT_RE.test(typed) || isNameTaken(typed))) { setNameError(nameInput); return; }
   const attrRes = resolveGoverningAttrs('vertex', {}, lastSetVertex, buildEnvs());
   snapshot();
   // nextAutoName mutates nameCounters, so it must run after snapshot() —
@@ -3917,7 +3952,9 @@ function renderSegmentList() {
       nameInput.className = 'v-name-input';
       nameInput.addEventListener('blur', () => {
         const n = nameInput.value.trim();
-        if (n && n !== seg.name && isNameTaken(n, null, null, null, seg.id)) {
+        // CODE_IDENT_RE too, not just collision — same reasoning as the
+        // vertex rename/add-row fixes above.
+        if (n && n !== seg.name && (!CODE_IDENT_RE.test(n) || isNameTaken(n, null, null, null, seg.id))) {
           nameInput.value = seg.name;
           setNameError(nameInput);
         } else if (n) {
