@@ -208,6 +208,8 @@ function captureState() {
     faces:             faces.map(f => ({ ...f, vertexIds: [...f.vertexIds] })),
     selectedVertexIds: new Set(selectedVertexIds),
     constants:         constants.map(c => ({ ...c })),
+    nextVertexId, nextSegmentId, nextFaceId, nextConstantId,
+    nameCounters:      { ...nameCounters },
   };
 }
 
@@ -224,6 +226,11 @@ function restoreState(state) {
   faces                  = state.faces ?? [];
   selectedVertexIds      = state.selectedVertexIds;
   constants              = state.constants ?? [];
+  nextVertexId           = state.nextVertexId;
+  nextSegmentId          = state.nextSegmentId;
+  nextFaceId             = state.nextFaceId;
+  nextConstantId         = state.nextConstantId;
+  nameCounters           = { ...state.nameCounters };
   editingVertexId        = null;
   editingOriginal        = null;
   editingSegmentId       = null;
@@ -651,6 +658,26 @@ function isNameTakenIn(name, vertexList, constList, faceList = [], segList = [],
 
 function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null) {
   return isNameTakenIn(name, vertices, constants, faces, segments, excludeVertexId, excludeConstId, excludeFaceId, excludeSegId);
+}
+
+// Persistent per-prefix auto-name counters for controls-driven creation —
+// decoupled from the id counters (nextVertexId/nextSegmentId/nextFaceId),
+// which must always advance on every creation regardless of what name ends
+// up used. A name counter only ever moves when an auto-generated name is
+// actually consumed (including any collision skip below, folded into the
+// same lookup) or when undo/redo restores a prior value — never on an
+// explicit typed name, a rename, or a deletion.
+let nameCounters = { P: 0, S: 0, F: 0 };
+
+// Next free `${prefix}${n}` name, starting from that prefix's own counter
+// and skipping past any collision (e.g. a hand-typed name sitting in the
+// code file) — then advances the counter past whatever name is returned.
+function nextAutoName(prefix) {
+  let n = nameCounters[prefix];
+  let name = `${prefix}${n}`;
+  while (isNameTaken(name)) { n++; name = `${prefix}${n}`; }
+  nameCounters[prefix] = n + 1;
+  return name;
 }
 
 function setNameError(el) {
@@ -2330,12 +2357,6 @@ function checkSelectionComplete() {
   // lastSetSegment/BUILTIN_SET_DEFAULTS.segment are always independently
   // valid — every write path validates before storing — so attrRes.ok is
   // guaranteed here.
-  // Collision-checked, not just `S${nextSegmentId}` — nextSegmentId is an id
-  // counter, not tied to which names are actually free, so a blind guess
-  // could collide with an explicitly-named segment sitting in the file.
-  let autoN = nextSegmentId;
-  let name  = `S${autoN}`;
-  while (isNameTaken(name)) name = `S${++autoN}`;
   // Clear the selection *before* snapshotting — otherwise the undo-captured
   // "before" state still has both vertices selected, and undoing restores
   // that stale selection, corrupting the next segment (its two leftover
@@ -2344,6 +2365,9 @@ function checkSelectionComplete() {
   // forming a new one).
   selectedVertexIds.clear();
   snapshot();
+  // nextAutoName mutates nameCounters, so it must run after snapshot() —
+  // see addVertexFromInputs for why.
+  const name = nextAutoName('S');
   segments.push({
     id: nextSegmentId++, name, vertexIds: [id1, id2], ...attrRes.fields,
   });
@@ -2381,13 +2405,15 @@ function applyFacePick(id) {
 function checkFaceComplete() {
   const attrRes   = resolveGoverningAttrs('face', {}, lastSetFace, buildEnvs());
   const vertexIds = [...facePickOrder];
-  const name      = `F${nextFaceId}`;
   // Clear the pick *before* snapshotting — same reasoning as
   // checkSelectionComplete(): the undo-captured "before" state must not
   // still hold an in-progress pick, or undoing would resurrect it.
   facePickOrder = [];
   if (faceMode === 'on') faceMode = 'off'; // 'on++' stays primed for another face
   snapshot();
+  // nextAutoName mutates nameCounters, so it must run after snapshot() —
+  // see addVertexFromInputs for why.
+  const name = nextAutoName('F');
   faces.push({
     id: nextFaceId++, name, vertexIds, ...attrRes.fields,
   });
@@ -3540,10 +3566,14 @@ function addVertexFromInputs() {
   const vals      = exprs.map(expr => evalExpr(expr, env));
   coordInps.forEach((inp, k) => inp.classList.toggle('expr-invalid', isNaN(vals[k])));
   if (vals.some(isNaN)) return;
-  const name   = nameInput.value.trim() || `P${nextVertexId}`;
-  if (isNameTaken(name)) { setNameError(nameInput); return; }
+  const typed = nameInput.value.trim();
+  if (typed && isNameTaken(typed)) { setNameError(nameInput); return; }
   const attrRes = resolveGoverningAttrs('vertex', {}, lastSetVertex, buildEnvs());
   snapshot();
+  // nextAutoName mutates nameCounters, so it must run after snapshot() —
+  // otherwise undo would restore a state that already reflects this
+  // creation's counter advance, defeating the point of restoring it at all.
+  const name = typed || nextAutoName('P');
   vertices.push({
     id: nextVertexId++, name, coords: vals, exprs, ...attrRes.fields,
   });
