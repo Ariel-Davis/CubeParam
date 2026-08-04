@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=47">
+  <link rel="stylesheet" href="style.css?v=48">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -186,6 +186,7 @@
             <input type="text" id="seg-width" class="v-coord" value="1.5" inputmode="decimal" autocapitalize="none" autocorrect="off" spellcheck="false" title="Line width">
             <button id="seg-add-more" class="v-toggle" title="More options">⋯</button>
             <button id="btn-segment">draw</button>
+            <span id="seg-name-preview" class="name-preview"></span>
           </div>
           <div class="toggle-group" id="seg-add-extra" style="display:none">
             <span class="label"></span>
@@ -211,6 +212,7 @@
             </div>
             <button id="face-add-more" class="v-toggle" title="More options">⋯</button>
             <button id="btn-face">draw</button>
+            <span id="face-name-preview" class="name-preview"></span>
           </div>
           <div class="toggle-group" id="face-add-extra" style="display:none">
             <span class="label"></span>
@@ -272,6 +274,6 @@
   <script src="vendor/pdfjs/pdf.min.js?v=1"></script>
   <script src="math-background-pdf-data.js?v=1"></script>
   <script src="pdf-viewer.js?v=2"></script>
-  <script src="main.js?v=84"></script>
+  <script src="main.js?v=85"></script>
 </body>
 </html>

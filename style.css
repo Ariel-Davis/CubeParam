@@ -95,7 +95,8 @@ body.dark-mode #logic-keyboard {
   line-height: 1;
 }
 
-body.dark-mode .label {
+body.dark-mode .label,
+body.dark-mode .name-preview {
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -368,6 +369,15 @@ body.dark-mode #code-textarea {
   font-size: 11px;
   width: 44px;
   text-align: right;
+}
+
+/* Live preview of the name a segment/face would get if drawn right now —
+   shown only while "draw" is engaged, same grey-placeholder spirit as a
+   native <input placeholder>, since there's no name field to put one on. */
+.name-preview {
+  color: rgba(0, 0, 0, 0.45);
+  font-family: sans-serif;
+  font-size: 11px;
 }
 
 button {

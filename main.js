@@ -247,6 +247,11 @@ function restoreState(state) {
   facePickOrder          = [];
   clearPendingListPick();
   updateFaceButton();
+  // updateSegmentButton() (unlike updateFaceButton() above) was never
+  // called here before the name-preview span existed — segmentMode itself
+  // is untouched by restore, only the *displayed* preview could otherwise
+  // go stale relative to the just-restored nameCounters/lastSetSegment.
+  updateSegmentButton();
   reEvalObjects();
   renderConstList();
   renderVertexList();
@@ -672,17 +677,33 @@ let nameCounters = { P: 0, S: 0, F: 0 };
 // Next free `${prefix}${n}` name, starting from that prefix's own counter
 // (in whichever `counters` map — the live one above, or a code-file parse's
 // own local one, see parseCodeText) and skipping past any collision (e.g. a
-// hand-typed name sitting in the code file) — then advances the counter
-// past whatever name is returned. A prefix not seen before (a fresh custom
-// `naming=` template) starts from 0, same as the three built-in prefixes do.
-// Pure with respect to `counters` (the only thing it mutates) so the live
-// and parse-local call sites can never resolve "next free name" differently.
-function advanceAutoName(counters, prefix, isTaken) {
+// hand-typed name sitting in the code file). A prefix not seen before (a
+// fresh custom `naming=` template) starts from 0, same as the three
+// built-in prefixes do. Doesn't mutate `counters` itself — see
+// advanceAutoName/peekAutoName below, which both build on this.
+function findNextAutoName(counters, prefix, isTaken) {
   let n = counters[prefix] ?? 0;
   let name = `${prefix}${n}`;
   while (isTaken(name)) { n++; name = `${prefix}${n}`; }
+  return { name, n };
+}
+
+// Actually consumes the next free name — advances `counters` past it. Pure
+// with respect to `counters` (the only thing it mutates) so the live and
+// parse-local call sites can never resolve "next free name" differently.
+function advanceAutoName(counters, prefix, isTaken) {
+  const { name, n } = findNextAutoName(counters, prefix, isTaken);
   counters[prefix] = n + 1;
   return name;
+}
+
+// Read-only lookahead — same answer advanceAutoName would consume, but
+// never mutates `counters`. Used by the controls' live name-preview: the
+// prediction itself must not be what "consumes" a name, or merely focusing
+// the add-row (or leaving "draw" engaged) would burn through the counter
+// with nothing ever actually created.
+function peekAutoName(counters, prefix, isTaken) {
+  return findNextAutoName(counters, prefix, isTaken).name;
 }
 
 function nextAutoName(prefix) {
@@ -3684,6 +3705,7 @@ function addVertexFromInputs() {
   nameInput.value = '';
   coordInps.forEach(inp => { inp.value = '0'; inp.classList.remove('expr-invalid'); });
   renderVertexList();
+  updateVertexNamePreview();
   draw();
 }
 
@@ -3693,6 +3715,22 @@ document.getElementById('btn-add-vertex').addEventListener('click', addVertexFro
   document.getElementById(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') addVertexFromInputs();
   });
+});
+
+// Grey placeholder preview of the name a blank-name "+" would actually
+// produce right now — a pure peek (peekAutoName), never consumes a name by
+// itself. Triggered by focusing anywhere in the add-row (not continuously),
+// per the design: nothing else in this single-focus-at-a-time app can
+// invalidate a shown prediction while the row stays focused, so there's no
+// need to recompute it on every keystroke — only re-entering the row, or an
+// actual creation elsewhere (handled by the explicit call in
+// addVertexFromInputs above), can ever change the answer.
+function updateVertexNamePreview() {
+  document.getElementById('v-name').placeholder =
+    peekAutoName(nameCounters, lastSetVertex.naming ?? AUTO_NAME_PREFIX.vertex, isNameTaken);
+}
+['v-name', 'v-a1', 'v-a2', 'v-a3'].forEach(id => {
+  document.getElementById(id).addEventListener('focus', updateVertexNamePreview);
 });
 
 ['v-a1', 'v-a2', 'v-a3', 'v-radius', 'seg-width'].forEach(id => {
@@ -3788,6 +3826,14 @@ function updateSegmentButton() {
   btn.classList.toggle('active',      segmentMode === 'on');
   btn.classList.toggle('active-loop', segmentMode === 'on++');
   btn.textContent = segmentMode === 'on++' ? 'draw +' : 'draw';
+  // No persistent name field to attach a placeholder to (segments/faces are
+  // always auto-named at controls-creation time) — a grey preview span next
+  // to the button fills that role instead, shown only while draw is
+  // actually engaged (this function already runs at every point that
+  // matters: mode toggling, after a creation in 'on++' loop mode, and undo/
+  // redo — see the call sites). Pure peek, never consumes a name itself.
+  document.getElementById('seg-name-preview').textContent = segmentMode === 'off' ? '' :
+    peekAutoName(nameCounters, lastSetSegment.naming ?? AUTO_NAME_PREFIX.segment, isNameTaken);
 }
 
 function updateFaceButton() {
@@ -3795,6 +3841,8 @@ function updateFaceButton() {
   btn.classList.toggle('active',      faceMode === 'on');
   btn.classList.toggle('active-loop', faceMode === 'on++');
   btn.textContent = faceMode === 'on++' ? 'draw +' : 'draw';
+  document.getElementById('face-name-preview').textContent = faceMode === 'off' ? '' :
+    peekAutoName(nameCounters, lastSetFace.naming ?? AUTO_NAME_PREFIX.face, isNameTaken);
 }
 
 function renderSegmentList() {
