@@ -797,7 +797,12 @@ const SECTION_ORDER = OBJECT_TYPES.map(d => d.key);
 const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
 const CODE_OBJECT_RE = /^(const|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
-const CODE_SET_RE    = /^set\s+(vertex|segment|face)\s+(.+)$/;
+// Canonical form is colon-uniform (`set vertex: color=X`), matching every
+// other line kind — but the colon is optional on read: `set vertex
+// color=X` (the original, pre-decision shape) still parses, silently
+// normalized to the colon form on next Sort/Save, same backward-compat
+// treatment `const`'s shortcut forms already get.
+const CODE_SET_RE    = /^set\s+(vertex|segment|face)(?:\s*:\s*|\s+)(.+)$/;
 const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|const)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
@@ -895,7 +900,7 @@ const ATTR_DEFS = {
 function buildSetBlock(type, finalValues) {
   return SET_FIELD_ORDER[type].map(field => {
     const value = finalValues[field] ?? BUILTIN_SET_DEFAULTS[type][field];
-    return `set ${type} ${formatFieldToken(field, value)}`;
+    return `set ${type}: ${formatFieldToken(field, value)}`;
   });
 }
 
@@ -1453,7 +1458,7 @@ function formatFaceLine(vertsForFace, f) {
 }
 
 function formatSetLine(parsed) {
-  return `set ${parsed.setType} ${formatFieldToken(parsed.field, parsed.value)}`;
+  return `set ${parsed.setType}: ${formatFieldToken(parsed.field, parsed.value)}`;
 }
 
 // Shared by Sort's rebuild and Save's re-canonicalization: valid recognized
