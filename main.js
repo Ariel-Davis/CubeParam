@@ -188,8 +188,15 @@ let lastSetFace    = { color: undefined, visible: undefined, naming: undefined, 
 // Reparsing/validation is gated on "leaving a line after changing it" (not on
 // every keystroke) — these track the line the caret was in and its text as of
 // entering it, so a move to a different line can tell whether anything changed.
+// codeCurrentLineCount additionally tracks the *total* line count: pressing
+// Enter/Backspace across two blank lines leaves the specific "left" line's
+// own text unchanged (blank both before and after), which the content-only
+// comparison alone can't see — but the file gained or lost a line regardless,
+// which the gutter/auto-grow height need to know about just as much as an
+// actual content edit would. See codeCheckLineLeave.
 let codeCurrentLineIdx      = 0;
 let codeCurrentLineSnapshot = '';
+let codeCurrentLineCount    = 1;
 
 // ─── Undo / redo ──────────────────────────────────────────────────────────────
 //
@@ -4607,6 +4614,7 @@ function resetCodeLineTracking() {
   const lines = textarea.value.split('\n');
   codeCurrentLineIdx      = textarea.value.slice(0, textarea.selectionStart).split('\n').length - 1;
   codeCurrentLineSnapshot = lines[codeCurrentLineIdx] ?? '';
+  codeCurrentLineCount    = lines.length;
 }
 
 function codeSort() {
@@ -4973,16 +4981,23 @@ document.getElementById('btn-code-save-exit').addEventListener('click', codeSave
   const codeTextareaEl = document.getElementById('code-textarea');
 
   function codeCheckLineLeave(forceCheck) {
+    const lines  = codeTextareaEl.value.split('\n');
     const idxNow = codeTextareaEl.value.slice(0, codeTextareaEl.selectionStart).split('\n').length - 1;
     const movedLine = idxNow !== codeCurrentLineIdx;
     if (movedLine || forceCheck) {
-      const leftLineNow = codeTextareaEl.value.split('\n')[codeCurrentLineIdx] ?? '';
-      if (leftLineNow !== codeCurrentLineSnapshot) reparseAndPreview();
+      const leftLineNow  = lines[codeCurrentLineIdx] ?? '';
+      // Total line count too, not just the left line's own text — pressing
+      // Enter/Backspace across two blank lines leaves that comparison blind
+      // (blank equals blank) even though the file just gained or lost a
+      // line, which the gutter/auto-grow height need to know about.
+      const countChanged = lines.length !== codeCurrentLineCount;
+      if (leftLineNow !== codeCurrentLineSnapshot || countChanged) reparseAndPreview();
     }
     if (movedLine) {
       codeCurrentLineIdx      = idxNow;
-      codeCurrentLineSnapshot = codeTextareaEl.value.split('\n')[idxNow] ?? '';
+      codeCurrentLineSnapshot = lines[idxNow] ?? '';
     }
+    codeCurrentLineCount = lines.length;
   }
 
   codeTextareaEl.addEventListener('keyup', () => codeCheckLineLeave(false));

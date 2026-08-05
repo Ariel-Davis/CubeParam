@@ -361,8 +361,20 @@ body.dark-mode #code-textarea {
   cursor: pointer;
 }
 
-.code-error-row:hover {
-  text-decoration: underline;
+/* @media (hover: hover) guards every :hover rule in this file (see this
+   comment once, here — the others just note "guarded, see here") —
+   without it, a touch tap on iOS simulates :hover for compatibility with
+   hover-dependent sites, and with no mouse to move away afterward, it
+   just stays applied indefinitely. Confirmed as the actual cause of a
+   "buttons look stuck pressed" report on iPad, in every browser and
+   browsing mode — `-webkit-tap-highlight-color` and a blur()-on-click
+   listener were tried first and didn't touch it, since :hover is a
+   third, independent mechanism from both the native tap-highlight
+   overlay and DOM focus. */
+@media (hover: hover) {
+  .code-error-row:hover {
+    text-decoration: underline;
+  }
 }
 
 .toggle-group {
@@ -413,14 +425,17 @@ button:disabled {
   cursor: default;
 }
 
-button:disabled:hover {
-  background: #e8e8e8;
-  color: rgba(0, 0, 0, 0.70);
-}
+/* Guarded by @media (hover: hover) — see .code-error-row:hover's comment. */
+@media (hover: hover) {
+  button:disabled:hover {
+    background: #e8e8e8;
+    color: rgba(0, 0, 0, 0.70);
+  }
 
-button:hover {
-  background: #d4d4d4;
-  color: #000000;
+  button:hover {
+    background: #d4d4d4;
+    color: #000000;
+  }
 }
 
 button.active {
@@ -574,14 +589,17 @@ body.dark-mode .color-section-label {
   border: 1px solid transparent;
 }
 
-.color-preset-row:hover,
-.color-const-row:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
+/* Guarded by @media (hover: hover) — see .code-error-row:hover's comment. */
+@media (hover: hover) {
+  .color-preset-row:hover,
+  .color-const-row:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
 
-body.dark-mode .color-preset-row:hover,
-body.dark-mode .color-const-row:hover {
-  background: rgba(255, 255, 255, 0.08);
+  body.dark-mode .color-preset-row:hover,
+  body.dark-mode .color-const-row:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }
 
 .color-preset-row .v-swatch,
@@ -673,8 +691,11 @@ body.dark-mode .color-const-row.empty {
   cursor: pointer;
 }
 
-.list-toggle:hover {
-  color: rgba(0, 0, 0, 0.75);
+/* Guarded by @media (hover: hover) — see .code-error-row:hover's comment. */
+@media (hover: hover) {
+  .list-toggle:hover {
+    color: rgba(0, 0, 0, 0.75);
+  }
 }
 
 .list-toggle:disabled {
@@ -698,8 +719,11 @@ body.dark-mode .list-toggle {
   color: rgba(255, 255, 255, 0.45);
 }
 
-body.dark-mode .list-toggle:hover {
-  color: rgba(255, 255, 255, 0.75);
+/* Guarded by @media (hover: hover) — see .code-error-row:hover's comment. */
+@media (hover: hover) {
+  body.dark-mode .list-toggle:hover {
+    color: rgba(255, 255, 255, 0.75);
+  }
 }
 
 /* flex:1 (not a fixed max-height) so open lists divide whatever space
