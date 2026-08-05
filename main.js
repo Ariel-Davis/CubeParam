@@ -4571,11 +4571,18 @@ function refreshCodeGutterAndErrors() {
     }
   });
 
-  // Rebuilding via innerHTML = '' resets the gutter's own scrollTop to 0 —
-  // restore it to match the textarea's current scroll position immediately,
-  // rather than leaving the two desynced until the next native scroll event
-  // on the textarea happens to fire and correct it.
-  gutter.scrollTop = textarea.scrollTop;
+  // Auto-grow the textarea to exactly its content height (never scrolls
+  // internally — .code-editor-wrap is the sole scroll container, see its
+  // CSS comment) and match the gutter's height to it. Resetting to 'auto'
+  // first is required — reading scrollHeight without it would report a
+  // stale, too-large value carried over from the previous (taller) height
+  // whenever content shrinks (e.g. after deleting lines). This runs on
+  // every call site that changes the text (typing across a line boundary,
+  // paste, Sort, Save, Load, interpreter submit) since they all funnel
+  // through this function already — no separate hook needed anywhere else.
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+  gutter.style.height   = textarea.style.height;
 }
 
 // Synchronous reparse + staged preview refresh. Called whenever the caret
@@ -4688,15 +4695,13 @@ function openCodeSubmenu() {
 
   const textarea = document.getElementById('code-textarea');
   textarea.value = serializeState(vertices, constants, segments, faces);
+  // '#sub-code' is already display:'' by this point (set above), so
+  // reparseAndPreview()'s auto-grow (inside refreshCodeGutterAndErrors)
+  // measures a real, laid-out scrollHeight here — no separate height-sync
+  // needed the way the old ResizeObserver-based approach required.
   reparseAndPreview();
   resetCodeLineTracking();
   updateUndoButtons();
-
-  // Sync the gutter's height now rather than waiting on the ResizeObserver —
-  // while '#sub-code' was display:none the textarea measured 0-height, so a
-  // stale 0px may still be sitting on the gutter from that; correct it the
-  // instant the panel actually becomes visible and has a real layout.
-  document.getElementById('code-gutter').style.height = textarea.offsetHeight + 'px';
 }
 
 function closeCodeSubmenu() {
@@ -5018,29 +5023,15 @@ document.getElementById('btn-code-save-exit').addEventListener('click', codeSave
   });
 }
 
-// Bidirectional so a scroll gesture can start from either side and the two
-// stay locked together — e.g. the user should be able to scroll by touching
-// the row-numbers column itself, not just the code. Safe from feedback loops:
-// assigning a scrollTop that's already at that value doesn't fire another
-// 'scroll' event, so each gesture settles after one mirrored update.
-document.getElementById('code-textarea').addEventListener('scroll', () => {
-  document.getElementById('code-gutter').scrollTop = document.getElementById('code-textarea').scrollTop;
-});
-document.getElementById('code-gutter').addEventListener('scroll', () => {
-  document.getElementById('code-textarea').scrollTop = document.getElementById('code-gutter').scrollTop;
-});
-
-// The gutter's CSS height matches the textarea's default 260px so it clips
-// (and can therefore scroll) rather than just growing to fit every line —
-// but the textarea is user-resizable (resize:vertical), so keep the gutter's
-// height in sync with whatever height the textarea actually ends up at.
-// offsetHeight (border-box, like the CSS `height` we're setting) is used
-// rather than the ResizeObserver entry's contentRect, which excludes padding
-// and would otherwise leave the two consistently 12px out of sync.
-new ResizeObserver(() => {
-  const textarea = document.getElementById('code-textarea');
-  document.getElementById('code-gutter').style.height = textarea.offsetHeight + 'px';
-}).observe(document.getElementById('code-textarea'));
+// No scroll-sync listeners or ResizeObserver needed here anymore — the
+// gutter and textarea are unscrolled, natural-height content inside
+// .code-editor-wrap, the one real scroll container (see its CSS comment).
+// Scrolling by touching the row-numbers column still works for free: with
+// no scroll capability of its own, the gesture simply bubbles to the
+// wrapper, same as touching any other non-scrollable content inside it
+// would. Height matching between gutter and textarea is handled entirely
+// by refreshCodeGutterAndErrors's auto-grow step, which already runs on
+// every content change.
 
 // ─── Undo / redo controls ─────────────────────────────────────────────────────
 
@@ -5144,6 +5135,21 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('pointerdown', clearNameError, true);
 document.addEventListener('keydown',     clearNameError, true);
+
+// A clicked button keeps native keyboard focus afterward by default, which
+// on every browser tested (iPad/laptop x Safari/Chrome) renders as a
+// visibly darker grey — indistinguishable from an actual toggled-on state,
+// or muddying a toggled-off one. A click is a momentary interaction, not a
+// state of its own, so every button should drop focus the instant its own
+// handler has run. One delegated listener covers every button in the app
+// (submenu toggles, "…" buttons, draw, Ω, label/visible, etc.) without
+// needing a blur() call added to each individual handler — and doesn't
+// touch non-button elements (a text input blurring itself on click would
+// break typing).
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (btn) btn.blur();
+});
 
 // Any click anywhere except the pending button itself clears an in-progress
 // list face-pick — capture phase, same idiom as onOutsideClick/clearNameError

@@ -252,7 +252,27 @@ body.dark-mode #interpreter-row {
   min-height: 0;
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 5px;
-  overflow: hidden;
+  /* The SOLE vertical scroll container as of 2026-08-05 (previously the
+     gutter and textarea each scrolled independently, kept in lockstep via
+     JS scrollTop mirroring — see git history / NOTES4.md for the full
+     saga). Real-device testing across three rounds of tuning
+     overscroll-behavior/-webkit-overflow-scrolling on the two-scroller
+     setup kept surfacing new problems (momentum still broken on iPad,
+     then actual page-reloading pull-to-refresh once containment was
+     loosened) — so instead of continuing to fight each browser's physics
+     on two synced elements, the two elements were unified into one: the
+     gutter and textarea are now unscrolled, natural-height content (see
+     their own rules below) inside this one native overflow:auto region.
+     Nothing to desync, by construction, instead of by best-effort
+     mirroring — and a plain scrollable div is a far more standard,
+     reliably-supported target for momentum/overscroll physics than a
+     `<textarea>`'s own internal scrolling, which has a documented history
+     of iOS-specific quirks distinct from generic div scrolling. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  resize: vertical;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 body.dark-mode .code-editor-wrap {
@@ -277,19 +297,14 @@ body.dark-mode .code-editor-wrap {
   font-size: 11px;
   line-height: 16px;
   text-align: right;
-  /* Genuinely scrollable (not hidden) so a scroll gesture can start from the
-     gutter itself, for cohesion with the textarea beside it — kept in sync
-     bidirectionally via JS, and its own scrollbar is hidden since the
-     textarea already shows one. `contain`, not `none` (see #code-textarea's
-     overscroll-behavior below for why). */
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  /* Natural content height, not independently scrollable — .code-editor-wrap
+     is the one scroll container now (see its own comment for why). Its own
+     rendered height is set explicitly in JS (refreshCodeGutterAndErrors) to
+     exactly match the textarea's auto-grown height, so the two can never
+     drift apart the way two independently-synced scrollers could. `hidden`
+     purely as a defensive clip, not an interactive scroll region. */
+  overflow: hidden;
   user-select: none;
-}
-
-#code-gutter::-webkit-scrollbar {
-  display: none;
 }
 
 body.dark-mode #code-gutter {
@@ -314,23 +329,16 @@ body.dark-mode #code-gutter {
   font-size: 11px;
   line-height: 16px;
   white-space: pre;
-  overflow: auto;
-  resize: vertical;
-  /* `contain`, not `none` — `none` was the original choice (to stop the
-     gutter, whose scrollTop only ever follows this textarea's via JS, from
-     visibly desyncing during the rare native elastic bounce past the very
-     top/bottom edge, which JS mirroring can't perfectly replicate). But
-     `none` turned out to carry a real cost: on trackpad/touch, it silently
-     kills momentum/inertial scrolling for the *entire* gesture, not just
-     the boundary bounce — so lifting a finger mid-scroll (nowhere near
-     either end) stopped the scroll dead instead of letting it glide,
-     the much more common case. `contain` still blocks scroll chaining to
-     the surrounding controls panel (the original concern besides the
-     desync) while leaving native bounce/momentum physics alone, trading
-     a brief, rare cosmetic desync (only visible if you deliberately
-     overscroll past the very top/bottom) for correct momentum on every
-     ordinary scroll. */
-  overscroll-behavior: contain;
+  /* Auto-grown to its content's full height in JS (refreshCodeGutterAndErrors)
+     — never scrolls vertically on its own, so overflow-y is just a
+     defensive clip (see .code-editor-wrap's comment for the full history
+     of why this moved off the textarea/gutter pair and onto one shared
+     wrapper). Horizontal scroll stays local to the textarea, deliberately
+     not unified with the wrapper — the gutter never needs it, and a long
+     code line scrolling sideways shouldn't carry the line-number column
+     off-screen with it. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 body.dark-mode #code-textarea {
@@ -390,6 +398,14 @@ button {
   font-family: sans-serif;
   font-size: 12px;
   transition: background 0.15s, color 0.15s;
+  /* A separate mechanism from :focus (which the global blur()-on-click
+     listener in main.js already handles) — this is WebKit/Chromium's
+     built-in translucent grey overlay shown on tap, unrelated to DOM
+     focus, so blur() has no effect on it. Confirmed present on iPad in
+     both Safari and Chrome (persisted even in Private Browsing, ruling
+     out any caching explanation) with the exact "still looks pressed"
+     symptom reported — never explicitly disabled before this. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
