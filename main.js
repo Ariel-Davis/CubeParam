@@ -1929,6 +1929,21 @@ function darkInk(alpha) {
   return darkMode ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
 }
 
+// Dims an object's own color for its "ghost" marker — the ghost stands in
+// for a hidden-but-currently-picked/selected object, so it needs to be
+// this object's actual color, just faded, not a generic grey. Shared
+// across object types (vertex today; segment/face/curve reuse this
+// unchanged once each grows its own ghost-marker treatment) rather than
+// duplicated per type — themeColor() is applied first so dark mode's own
+// color inversion still applies underneath the fade.
+function fadedColor(hex, alpha) {
+  const c = themeColor(hex);
+  const r = parseInt(c.slice(1, 3), 16);
+  const g = parseInt(c.slice(3, 5), 16);
+  const b = parseInt(c.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 
 function drawDiskBoundary(scale) {
@@ -2366,7 +2381,15 @@ function drawFacePickPreview(verts, vecs, heights, scale, normS) {
 
 function drawVertices(verts, vecs, heights, scale, normS) {
   for (const v of verts) {
-    if (!v.visible) continue;
+    // A picked/selected vertex still needs an on-canvas anchor even when
+    // hidden (see NOTES6, "highlighting a hidden object") — projectPoint
+    // et al. don't depend on visibility, so compute the highlight state
+    // before deciding whether to bail out entirely. Same conditions as the
+    // if/else-if chain below, loosened to "would any branch fire."
+    const isHighlighted = (pendingListPick && pendingListPick.vertexId === v.id) ||
+                           facePickOrder.includes(v.id) ||
+                           selectedVertexIds.has(v.id) || v.id === focusedVertexId;
+    if (!v.visible && !isHighlighted) continue;
     const { pt, depth } = projectPoint(v.coords, vecs, heights);
     if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) continue;
     const { pt: ppt, ok, factor } = applyPerspective(pt, depth, normS);
@@ -2454,21 +2477,34 @@ function drawVertices(verts, vecs, heights, scale, normS) {
       ctx.restore();
     }
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(scr.x, scr.y, r, 0, 2 * Math.PI);
-    ctx.fillStyle = themeColor(v.color);
-    ctx.fill();
-    ctx.strokeStyle = darkInk(0.25);
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-
-    if (v.showLabel) {
+    if (v.visible) {
       ctx.save();
-      ctx.font = '11px sans-serif';
+      ctx.beginPath();
+      ctx.arc(scr.x, scr.y, r, 0, 2 * Math.PI);
       ctx.fillStyle = themeColor(v.color);
-      ctx.fillText(v.name, scr.x + r + 4, scr.y - 7);
+      ctx.fill();
+      ctx.strokeStyle = darkInk(0.25);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      if (v.showLabel) {
+        ctx.save();
+        ctx.font = '11px sans-serif';
+        ctx.fillStyle = themeColor(v.color);
+        ctx.fillText(v.name, scr.x + r + 4, scr.y - 7);
+        ctx.restore();
+      }
+    } else {
+      // Ghost marker — only reachable when isHighlighted is true (see the
+      // bail-out above). No stroke and no label, unlike the real marker:
+      // both are part of what reads as "ghost, not actually here" rather
+      // than just a dimmer version of the same thing.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(scr.x, scr.y, r, 0, 2 * Math.PI);
+      ctx.fillStyle = fadedColor(v.color, 0.4);
+      ctx.fill();
       ctx.restore();
     }
   }
