@@ -158,7 +158,7 @@ let focusedVertexId   = null;      // vertex id highlighted in the list (canvas 
 let selectedSegmentId = null;      // segment id highlighted in the list (canvas click)
 let faceMode          = 'off';     // 'off' | 'on' — no 'on++' yet, see getFacePickAction() area
 let facePickOrder     = [];        // ordered vertex ids picked so far for a new face (order matters, unlike selectedVertexIds)
-let pendingListPick   = null;      // { vertexId, rowEl, btnEl } | null — a face vertex clicked from the list, awaiting its floating confirm button
+let pendingListPick   = null;      // { vertexId, btnEl, getAction } | null — a face or segment vertex clicked from the list, awaiting its floating confirm button
 let editingVertexId        = null;  // id of vertex currently in edit mode, or null
 let editingOriginal        = null;  // captureState() snapshot taken on vertex edit entry
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
@@ -2381,7 +2381,9 @@ function drawVertices(verts, vecs, heights, scale, normS) {
       // red = error) — fully overrides whatever static highlight this
       // vertex would otherwise show (e.g. the first-pick green), since
       // "pending confirmation" supersedes it until resolved either way.
-      const isError = getFacePickAction(v.id).kind === 'reject';
+      // pendingListPick.getAction is whichever of getFacePickAction/
+      // getSegmentPickAction created this pending pick (see handleListPick).
+      const isError = pendingListPick.getAction(v.id).kind === 'reject';
       ctx.save();
       ctx.beginPath();
       ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
@@ -2694,6 +2696,28 @@ function checkSelectionComplete() {
   renderSegmentList();
 }
 
+// Pure rule for what clicking `vertexId` would do to the in-progress segment
+// pick — mirrors getFacePickAction below, but a segment's fixed 2-vertex
+// cardinality means there's no 'close' case: a second distinct pick always
+// completes the segment automatically (checkSelectionComplete), so only
+// 'append' (a fresh vertex) or 'reject' (re-picking the one already-picked
+// vertex) ever occur.
+function getSegmentPickAction(vertexId) {
+  return selectedVertexIds.has(vertexId) ? { kind: 'reject' } : { kind: 'append' };
+}
+
+// List-confirm path only (see handleListPick below) — the direct canvas
+// path (selectVertexById) keeps its own existing toggle-add/remove behavior
+// unchanged, since that wasn't the reported gap.
+function applySegmentPick(id) {
+  const action = getSegmentPickAction(id);
+  if (action.kind === 'reject') return;
+  selectedVertexIds.add(id);
+  checkSelectionComplete();
+  renderVertexList();
+  draw();
+}
+
 // Pure rule for what clicking `vertexId` would do to the in-progress face
 // pick — shared by the direct canvas path (applyFacePick, below) and the
 // list's pending-button label/enabled-state (renderVertexList), so the two
@@ -2741,20 +2765,25 @@ function checkFaceComplete() {
   draw();
 }
 
-// List-driven face picking gets a confirm step canvas doesn't need — the
-// list doesn't show you *where* a vertex is until you look, so a click
-// there previews (highlight on canvas + list, floating button) rather than
-// acting immediately. Cleared by the global pointerdown listener below on
-// any other click, or explicitly when its own button is used.
+// List-driven picking gets a confirm step canvas doesn't need — the list
+// doesn't show you *where* a vertex is until you look, so a click there
+// previews (highlight on canvas + list, floating button) rather than acting
+// immediately. Shared by face picking (which can also "close" — revisit the
+// first vertex once >=3 are picked) and segment picking (which never can,
+// see getSegmentPickAction) — `getAction` is stashed on pendingListPick
+// itself so the canvas/list render code can ask "use or error?" without
+// having to rediscover which of the two flows is currently live. Cleared by
+// the global pointerdown listener below on any other click, or explicitly
+// when its own button is used.
 function clearPendingListPick() {
   if (!pendingListPick) return;
   pendingListPick.btnEl.remove();
   pendingListPick = null;
 }
 
-function handleFaceListPick(vertexId, rowEl) {
+function handleListPick(vertexId, rowEl, getAction, applyPick) {
   clearPendingListPick();
-  const action = getFacePickAction(vertexId);
+  const action = getAction(vertexId);
   const btn = document.createElement('button');
   btn.className = 'face-pick-btn';
   btn.textContent = action.kind === 'close' ? 'close?' : action.kind === 'reject' ? 'error' : 'use';
@@ -2762,7 +2791,7 @@ function handleFaceListPick(vertexId, rowEl) {
   btn.addEventListener('click', e => {
     e.stopPropagation();
     clearPendingListPick();
-    applyFacePick(vertexId);
+    applyPick(vertexId);
     renderVertexList();
   });
   document.body.appendChild(btn);
@@ -2772,8 +2801,22 @@ function handleFaceListPick(vertexId, rowEl) {
   const btnRect = btn.getBoundingClientRect();
   btn.style.left = (rowRect.left - btnRect.width - 6) + 'px';
   btn.style.top  = (rowRect.top + rowRect.height / 2 - btnRect.height / 2) + 'px';
-  pendingListPick = { vertexId, btnEl: btn };
+  pendingListPick = { vertexId, btnEl: btn, getAction };
   renderVertexList();
+  // Pre-existing gap, caught while verifying this refactor: drawVertices'
+  // pendingListPick glow (blue/red fill matching this button) needs an
+  // actual draw() to appear — renderVertexList() alone never repainted the
+  // canvas, so a list-driven pending pick's canvas-side highlight never
+  // actually showed (for face either, before this fix).
+  draw();
+}
+
+function handleFaceListPick(vertexId, rowEl) {
+  handleListPick(vertexId, rowEl, getFacePickAction, applyFacePick);
+}
+
+function handleSegmentListPick(vertexId, rowEl) {
+  handleListPick(vertexId, rowEl, getSegmentPickAction, applySegmentPick);
 }
 
 // ─── Toggle buttons ───────────────────────────────────────────────────────────
@@ -3755,7 +3798,7 @@ function renderVertexList() {
       // unless it's currently the pending candidate, in which case blue/red
       // (matching the floating button) takes over entirely.
       if (pendingListPick && pendingListPick.vertexId === v.id) {
-        const action = getFacePickAction(v.id);
+        const action = pendingListPick.getAction(v.id);
         entry.classList.add(action.kind === 'reject' ? 'list-pending-error' : 'list-pending-use');
       } else if (facePickOrder[0] === v.id) {
         // No faceMode gate — the first pick's green highlight also survives
@@ -3765,8 +3808,15 @@ function renderVertexList() {
       if (v.id === focusedVertexId) focusedEntry = entry;
 
       entry.addEventListener('click', () => {
-        if (faceMode !== 'off') handleFaceListPick(v.id, entry);
-        else                    selectVertexById(v.id);
+        // An active endpoint-fill box (or any other edit in progress) takes
+        // priority over starting a new pick — same guard selectVertexById
+        // already applies internally for the plain (non-picking) click path,
+        // and handleFaceListPick/handleSegmentListPick don't check it
+        // themselves.
+        if (activeEndpointInput || isEditingBlocked()) { selectVertexById(v.id); return; }
+        if      (faceMode !== 'off')    handleFaceListPick(v.id, entry);
+        else if (segmentMode !== 'off') handleSegmentListPick(v.id, entry);
+        else                             selectVertexById(v.id);
       });
 
       const swatch = document.createElement('span');
@@ -5167,10 +5217,10 @@ document.addEventListener('click', e => {
 });
 
 // Any click anywhere except the pending button itself clears an in-progress
-// list face-pick — capture phase, same idiom as onOutsideClick/clearNameError
-// above, and the e.target guard is what lets the button's own click still
-// land (pointerdown fires first and would otherwise remove it from the DOM
-// before its click handler ever runs).
+// list-driven pick (face or segment) — capture phase, same idiom as
+// onOutsideClick/clearNameError above, and the e.target guard is what lets
+// the button's own click still land (pointerdown fires first and would
+// otherwise remove it from the DOM before its click handler ever runs).
 document.addEventListener('pointerdown', e => {
   if (pendingListPick && e.target !== pendingListPick.btnEl) clearPendingListPick();
 }, true);
