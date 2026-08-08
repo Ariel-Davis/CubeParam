@@ -156,6 +156,7 @@ let selectedVertexIds = new Set();
 let segmentMode       = 'off';     // 'off' | 'on' | 'on++'
 let focusedVertexId   = null;      // vertex id highlighted in the list (canvas click)
 let selectedSegmentId = null;      // segment id highlighted in the list (canvas click)
+let selectedFaceId    = null;      // face id highlighted in the list (list click only — no canvas face-hit-testing exists)
 let faceMode          = 'off';     // 'off' | 'on' — no 'on++' yet, see getFacePickAction() area
 let facePickOrder     = [];        // ordered vertex ids picked so far for a new face (order matters, unlike selectedVertexIds)
 let pendingListPick   = null;      // { vertexId, btnEl, getAction } | null — a face or segment vertex clicked from the list, awaiting its floating confirm button
@@ -244,6 +245,7 @@ function restoreState(state) {
   editingSegmentOriginal = null;
   focusedVertexId        = null;
   selectedSegmentId      = null;
+  selectedFaceId         = null;
   activeExprInput        = null;
   activeEndpointInput    = null;
   // Undo/redo isn't blocked by faceMode the way it's blocked by an actual
@@ -2247,7 +2249,10 @@ function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
   const F = perspectiveOn ? perspPtoF(perspectiveP) : Infinity;
   const items = [];
   for (const f of facesArr) {
-    if (!f.visible) continue;
+    // A selected-but-hidden face still needs an on-canvas anchor — same
+    // pattern as drawVertices/drawSegments (see NOTES6, "highlighting a
+    // hidden object"). Face's only highlight state is selectedFaceId.
+    if (!f.visible && f.id !== selectedFaceId) continue;
     const vs = f.vertexIds.map(id => vertsArr.find(v => v.id === id));
     if (vs.some(v => !v)) continue;
     const pts2D = [];      // [x, y, depth] pre-perspective, for avgDepth
@@ -2284,14 +2289,36 @@ function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
     ctx.moveTo(sp[0].x, sp[0].y);
     for (let k = 1; k < sp.length; k++) ctx.lineTo(sp[k].x, sp[k].y);
     ctx.closePath();
-    ctx.fillStyle = themeColor(f.color);
+    // Selection halo: a wide translucent stroke along the boundary, drawn
+    // before the fill so the fill's opaque interior covers its inward half
+    // — same technique and color as drawSegments' own halo, applied to a
+    // face's boundary (which is, after all, just a loop of segments).
+    // Chosen over a true outward polygon offset specifically to avoid
+    // needing to solve Minkowski-offsetting for an arbitrary — possibly
+    // concave, possibly self-intersecting-once-projected — polygon.
+    if (f.id === selectedFaceId) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(30,100,220,0.28)';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Ghost fill when hidden (only reachable here because f.id ===
+    // selectedFaceId, per the gate above) — same faded-real-color
+    // treatment as vertex's ghost marker and segment's ghost line.
+    ctx.fillStyle = f.visible ? themeColor(f.color) : fadedColor(f.color, 0.4);
     ctx.fill();
   }
 }
 
 function drawSegments(segs, verts, vecs, heights, scale, normS) {
   for (const seg of segs) {
-    if (!seg.visible) continue;
+    // A selected-but-hidden segment still needs an on-canvas anchor — same
+    // reasoning as drawVertices' isHighlighted gate above (see NOTES6,
+    // "highlighting a hidden object"). Segment's only highlight state is
+    // selectedSegmentId (no in-progress-pick equivalent the way vertex has).
+    const isHighlighted = seg.id === selectedSegmentId;
+    if (!seg.visible && !isHighlighted) continue;
     const v1 = verts.find(v => v.id === seg.vertexIds[0]);
     const v2 = verts.find(v => v.id === seg.vertexIds[1]);
     if (!v1 || !v2) continue;
@@ -2304,6 +2331,11 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
     const p1 = toScreen(a1.pt, scale);
     const p2 = toScreen(a2.pt, scale);
     const w = seg.lineWidth ?? 1.5;
+    // Ghost stand-in when hidden (only reachable here because isHighlighted
+    // is true) — same faded-real-color treatment as vertex's ghost marker,
+    // not a generic grey. The selection halo below is drawn at full
+    // strength either way, same as vertex's glow never dimmed either.
+    const strokeColor = seg.visible ? themeColor(seg.color) : fadedColor(seg.color, 0.4);
     ctx.save();
     if (perspScaleSegs) {
       const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -2312,7 +2344,7 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
       const px = -dy / len, py = dx / len;   // unit perpendicular
       const hw1 = Math.min(w * a1.factor / 2, 10);
       const hw2 = Math.min(w * a2.factor / 2, 10);
-      if (seg.id === selectedSegmentId) {
+      if (isHighlighted) {
         const e = 3;
         ctx.beginPath();
         ctx.moveTo(p1.x + px*(hw1+e), p1.y + py*(hw1+e));
@@ -2329,13 +2361,13 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
       ctx.lineTo(p2.x - px*hw2, p2.y - py*hw2);
       ctx.lineTo(p1.x - px*hw1, p1.y - py*hw1);
       ctx.closePath();
-      ctx.fillStyle = themeColor(seg.color);
+      ctx.fillStyle = strokeColor;
       ctx.fill();
     } else {
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
-      if (seg.id === selectedSegmentId) {
+      if (isHighlighted) {
         ctx.strokeStyle = 'rgba(30,100,220,0.28)';
         ctx.lineWidth = w + 6;
         ctx.stroke();
@@ -2343,8 +2375,8 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
       }
-      ctx.strokeStyle = themeColor(seg.color);
-      ctx.lineWidth = seg.id === selectedSegmentId ? w + 1 : w;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = isHighlighted ? w + 1 : w;
       ctx.stroke();
     }
     ctx.restore();
@@ -2635,8 +2667,10 @@ function selectVertexById(id) {
   }
   focusedVertexId   = id;
   selectedSegmentId = null;
+  selectedFaceId    = null;
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   draw();
 }
 
@@ -2684,10 +2718,12 @@ function handleCanvasClick(px, py, pointerType) {
     if (distToSegmentPx(px, py, p1.x, p1.y, p2.x, p2.y) <= hitR) {
       if (segmentMode !== 'off') return;  // give user another shot at a vertex
       selectedSegmentId = seg.id === selectedSegmentId ? null : seg.id;
+      selectedFaceId    = null;
       focusedVertexId   = null;
       selectedVertexIds.clear();
       renderVertexList();
       renderSegmentList();
+      renderFaceList();
       draw();
       return;
     }
@@ -2699,10 +2735,12 @@ function handleCanvasClick(px, py, pointerType) {
   // abandon signal for facePickOrder to react to.
   focusedVertexId   = null;
   selectedSegmentId = null;
+  selectedFaceId    = null;
   if (segmentMode === 'off') selectedVertexIds.clear();
   if (faceMode === 'off') { facePickOrder = []; clearPendingListPick(); }
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   draw();
 }
 
@@ -2931,6 +2969,7 @@ function enterEditMode(id) {
   editingOriginal   = captureState();
   selectedVertexIds.clear();
   selectedSegmentId = null;
+  selectedFaceId    = null;
   focusedVertexId   = id;
   if (omegaMode === 'on') omegaMode = 'off';
   updateUndoButtons();
@@ -3956,6 +3995,7 @@ function renderVertexList() {
         selectedVertexIds.delete(v.id);
         if (focusedVertexId === v.id) focusedVertexId = null;
         if (segments.every(s => s.id !== selectedSegmentId)) selectedSegmentId = null;
+        if (faces.every(f => f.id !== selectedFaceId)) selectedFaceId = null;
         renderVertexList();
         renderSegmentList();
         renderFaceList();
@@ -4153,8 +4193,10 @@ function updateFaceButton() {
 
 function renderSegmentList() {
   const list   = document.getElementById('segment-list');
+  const savedScroll = list.scrollTop;
   list.innerHTML = '';
   const inEdit = editingVertexId !== null || editingSegmentId !== null;
+  let selectedEntry = null;
 
   for (const seg of segments) {
     const v1 = vertices.find(v => v.id === seg.vertexIds[0]);
@@ -4310,6 +4352,26 @@ function renderSegmentList() {
       // ── Display row ───────────────────────────────────────────────────────
       if (seg.id === selectedSegmentId) entry.classList.add('list-selected');
 
+      // Baseline list-click-to-canvas-highlight, the segment equivalent of
+      // what vertex list rows already get via selectVertexById's off-mode
+      // branch — previously missing entirely (only this row's own
+      // sub-widgets had click handlers). Mirrors handleCanvasClick's own
+      // segment-hit-test branch exactly: same segmentMode guard (a click
+      // during active segment-drawing is reserved for vertex picks, not
+      // reinterpreted as selecting an existing segment), same toggle-off,
+      // same clearing of vertex focus/selection.
+      entry.addEventListener('click', () => {
+        if (isEditingBlocked() || segmentMode !== 'off') return;
+        selectedSegmentId = seg.id === selectedSegmentId ? null : seg.id;
+        selectedFaceId    = null;
+        focusedVertexId   = null;
+        selectedVertexIds.clear();
+        renderVertexList();
+        renderSegmentList();
+        renderFaceList();
+        draw();
+      });
+
       const swatch = document.createElement('span');
       swatch.className = 's-swatch';
       swatch.style.background = seg.color;
@@ -4330,6 +4392,7 @@ function renderSegmentList() {
       widthInp.style.width = '32px';
       widthInp.title = 'Line width';
       widthInp.disabled = inEdit;
+      widthInp.addEventListener('click', e => e.stopPropagation());
       widthInp.addEventListener('focus', () => snapshot());
       wireNumericAttrInput(widthInp,
         () => seg.widthExpr ?? String(seg.lineWidth ?? 1.5),
@@ -4341,7 +4404,7 @@ function renderSegmentList() {
       editBtn.className = 'v-toggle';
       editBtn.title = 'Edit';
       editBtn.disabled = inEdit;
-      editBtn.addEventListener('click', () => enterSegmentEditMode(seg.id));
+      editBtn.addEventListener('click', e => { e.stopPropagation(); enterSegmentEditMode(seg.id); });
 
       const boolEnv = buildEnvs().boolEnv;
       const visibleWrap = document.createElement('span');
@@ -4354,7 +4417,8 @@ function renderSegmentList() {
       visibleWrap.append(toggle, visibleSub);
       applyBoolToggleDisplay(toggle, visibleSub, seg.visibleExpr ?? String(seg.visible !== false), boolEnv);
       toggle.title = seg.visible ? 'Hide' : 'Show';
-      toggle.addEventListener('click', () => {
+      toggle.addEventListener('click', e => {
+        e.stopPropagation();
         snapshot();
         seg.visible = !seg.visible;
         seg.visibleExpr = String(seg.visible);
@@ -4367,7 +4431,8 @@ function renderSegmentList() {
       del.textContent = '×';
       del.title = 'Delete';
       del.disabled = inEdit;
-      del.addEventListener('click', () => {
+      del.addEventListener('click', e => {
+        e.stopPropagation();
         snapshot();
         segments = segments.filter(s => s.id !== seg.id);
         if (selectedSegmentId === seg.id) selectedSegmentId = null;
@@ -4379,23 +4444,50 @@ function renderSegmentList() {
     }
 
     list.appendChild(entry);
-    if (seg.id === selectedSegmentId) entry.scrollIntoView({ block: 'nearest' });
+    if (seg.id === selectedSegmentId) selectedEntry = entry;
   }
+  // Deferred until the full list is built (see NOTES6, "scroll-into-view
+  // timing bug") — calling scrollIntoView mid-loop computes "nearest"
+  // against a container that doesn't have its later rows appended yet,
+  // producing a wrong (truncated-height) scroll amount instead of the
+  // correct minimal one.
+  if (selectedEntry) selectedEntry.scrollIntoView({ block: 'nearest' });
+  else list.scrollTop = savedScroll;
   updateListToggle('segment');
 }
 
-// Read-only for Phase 1 (per plan) — visibility toggle + delete only, no
-// edit mode, no color popover, no canvas selection. Faces are defined in the
-// code file only; this list is for quick control, not creation.
+// No edit mode yet, no color popover — the text/interpreter `edit face`
+// command exists (replace/insert/remove/overwrite), but no buttons/fields
+// for it in the control panel yet (see SotU backlog). Visibility toggle,
+// delete, and (as of this session) list-click-to-canvas-highlight, same
+// baseline vertex/segment rows already have.
 function renderFaceList() {
   const list   = document.getElementById('face-list');
   const savedScroll = list.scrollTop;
   list.innerHTML = '';
   const inEdit = editingVertexId !== null || editingSegmentId !== null;
+  let selectedEntry = null;
 
   for (const f of faces) {
     const entry = document.createElement('div');
     entry.className = 'segment-entry';
+    if (f.id === selectedFaceId) entry.classList.add('list-selected');
+
+    // Baseline list-click-to-canvas-highlight — same pattern segment's row
+    // just got: sets selectedFaceId (drawn as a boundary halo in
+    // drawFaces), clears the other object types' selection, and stays out
+    // of the way of an in-progress face draw-mode pick.
+    entry.addEventListener('click', () => {
+      if (isEditingBlocked() || faceMode !== 'off') return;
+      selectedFaceId    = f.id === selectedFaceId ? null : f.id;
+      selectedSegmentId = null;
+      focusedVertexId   = null;
+      selectedVertexIds.clear();
+      renderVertexList();
+      renderSegmentList();
+      renderFaceList();
+      draw();
+    });
 
     const swatch = document.createElement('span');
     swatch.className = 's-swatch';
@@ -4415,7 +4507,8 @@ function renderFaceList() {
     visibleWrap.append(toggle, visibleSub);
     applyBoolToggleDisplay(toggle, visibleSub, f.visibleExpr ?? String(f.visible !== false), buildEnvs().boolEnv);
     toggle.title = f.visible ? 'Hide' : 'Show';
-    toggle.addEventListener('click', () => {
+    toggle.addEventListener('click', e => {
+      e.stopPropagation();
       snapshot();
       f.visible = !f.visible;
       f.visibleExpr = String(f.visible);
@@ -4428,17 +4521,28 @@ function renderFaceList() {
     del.textContent = '×';
     del.title = 'Delete';
     del.disabled = inEdit;
-    del.addEventListener('click', () => {
+    del.addEventListener('click', e => {
+      e.stopPropagation();
       snapshot();
       faces = faces.filter(x => x.id !== f.id);
+      if (selectedFaceId === f.id) selectedFaceId = null;
       renderFaceList();
       draw();
     });
 
     entry.append(swatch, label, visibleWrap, del);
     list.appendChild(entry);
+    if (f.id === selectedFaceId) selectedEntry = entry;
   }
-  list.scrollTop = savedScroll;
+  // Deferred until the full list is built — see the identical comment in
+  // renderSegmentList (NOTES6, "scroll-into-view timing bug"). Face had a
+  // second, compounding issue: the old code always ran `list.scrollTop =
+  // savedScroll` unconditionally right after the loop, which silently
+  // undid whatever the (also mistimed) mid-loop scrollIntoView had just
+  // done — the reason face's selection scroll appeared to do nothing at
+  // all, not just the wrong amount.
+  if (selectedEntry) selectedEntry.scrollIntoView({ block: 'nearest' });
+  else list.scrollTop = savedScroll;
   updateListToggle('face');
 }
 
@@ -4473,7 +4577,7 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   if      (segmentMode === 'off')  segmentMode = 'on';
   else if (segmentMode === 'on')   segmentMode = 'on++';
   else                             segmentMode = 'off';
-  if (segmentMode !== 'off') selectedSegmentId = null;
+  if (segmentMode !== 'off') { selectedSegmentId = null; selectedFaceId = null; }
   // Mutually exclusive with face mode, but only pauses it — facePickOrder
   // is preserved (same as segmentMode itself never clearing
   // selectedVertexIds), resumable later by clicking "draw" on the face row.
@@ -4483,6 +4587,7 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   updateFaceButton();
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   draw();
 });
 
@@ -4503,6 +4608,7 @@ document.getElementById('btn-face').addEventListener('click', () => {
     // segment mode either way.
     segmentMode       = 'off';
     selectedSegmentId = null;
+    selectedFaceId    = null;
     updateSegmentButton();
     // Off-mode single-vertex priming carries over as the first pick, same
     // as segment mode already carries selectedVertexIds forward — but only
@@ -4516,6 +4622,7 @@ document.getElementById('btn-face').addEventListener('click', () => {
   updateFaceButton();
   renderVertexList();
   renderSegmentList();
+  renderFaceList();
   draw();
 });
 
@@ -4744,6 +4851,7 @@ function codeSave() {
   selectedVertexIds = new Set();
   focusedVertexId   = null;
   selectedSegmentId = null;
+  selectedFaceId    = null;
 
   reEvalObjects();
   renderConstList();
@@ -4996,6 +5104,7 @@ function submitInterpreterLine() {
   selectedVertexIds = new Set();
   focusedVertexId   = null;
   selectedSegmentId = null;
+  selectedFaceId    = null;
 
   reEvalObjects();
   renderConstList();
