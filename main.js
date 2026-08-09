@@ -160,6 +160,18 @@ let selectedFaceId    = null;      // face id highlighted in the list (list clic
 let faceMode          = 'off';     // 'off' | 'on' — no 'on++' yet, see getFacePickAction() area
 let facePickOrder     = [];        // ordered vertex ids picked so far for a new face (order matters, unlike selectedVertexIds)
 let pendingListPick   = null;      // { vertexId, btnEl, getAction, applyPick } | null — a face or segment vertex clicked from the list, awaiting its floating confirm button. btnEl is null while the vertex list section is collapsed (see updatePendingButtonPosition) — the pick itself survives, only the button's DOM presence is toggled.
+// "Undo the most recently confirmed vertex" (see NOTES6/NOTES7) — a second,
+// independent pair of arm states layered on top of facePickOrder/
+// selectedVertexIds, not a replacement for them. armedVertexId covers both
+// face's "latest" vertex and segment's sole pending vertex (which trivially
+// IS "the latest," since segment never has more than one before
+// completion) — one tap arms it (yellow→red in the UI), a second, separate
+// tap actually removes it. faceCloseArmed is v0's own independent state
+// machine for "close the loop" (blue) — structurally can never target the
+// same vertex armedVertexId does (v0 is never "the latest" once
+// facePickOrder.length >= 3), so no coupling between the two is needed.
+let armedVertexId  = null;
+let faceCloseArmed = false;
 let editingVertexId        = null;  // id of vertex currently in edit mode, or null
 let editingOriginal        = null;  // captureState() snapshot taken on vertex edit entry
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
@@ -255,6 +267,7 @@ function restoreState(state) {
   faceMode               = 'off';
   facePickOrder          = [];
   clearPendingListPick();
+  clearArmedStates();
   updateFaceButton();
   // updateSegmentButton() (unlike updateFaceButton() above) was never
   // called here before the name-preview span existed — segmentMode itself
@@ -1946,6 +1959,15 @@ function fadedColor(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// Pick-highlight RGB triplets shared across drawVertices' ring rendering —
+// green (face pick), blue (segment pick / v0 close-armed), yellow (the
+// latest confirmed vertex, unarmed), red (the latest confirmed vertex,
+// armed for removal). Rings are recolored via this map rather than layering
+// an extra ring on top, per the user's correction (NOTES7) — same shape,
+// different hue, so the arm state reads as "this vertex," not "an
+// additional halo."
+const PICK_HUE = { green: '30, 150, 90', blue: '30, 100, 220', yellow: '230, 180, 20', red: '200, 50, 50' };
+
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 
 function drawDiskBoundary(scale) {
@@ -2412,6 +2434,11 @@ function drawFacePickPreview(verts, vecs, heights, scale, normS) {
 }
 
 function drawVertices(verts, vecs, heights, scale, normS) {
+  // Computed once per draw, not per vertex — both are always already a
+  // member of facePickOrder/selectedVertexIds, so the isHighlighted
+  // computation below needs no changes to account for them.
+  const latestPickId = currentLatestPickId();
+  const closePickId  = currentClosePickId();
   for (const v of verts) {
     // A picked/selected vertex still needs an on-canvas anchor even when
     // hidden (see NOTES6, "highlighting a hidden object") — projectPoint
@@ -2431,6 +2458,21 @@ function drawVertices(verts, vecs, heights, scale, normS) {
     const baseR = v.radius ?? 5;
     const r     = perspScaleNodes ? Math.min(baseR * factor, 30) : baseR;
 
+    // Undo-latest-vertex arm state (NOTES6/7) recolors the existing rings
+    // below rather than adding a new one on top — same shape, different
+    // hue, so arming reads as "this vertex changed state," not "an extra
+    // halo appeared" (corrected from an earlier layered-ring draft, see
+    // NOTES7). No v0 exception: v0 gets the ordinary yellow/red recolor,
+    // not the close-armed blue, whenever it's also the latest
+    // (facePickOrder.length === 1) — isLatest is checked first below,
+    // exactly mirroring getFacePickAction's own precedence. Segment's
+    // canvas gesture itself is unchanged (see selectVertexById) but
+    // armedVertexId can still be set for its sole vertex via the list, so
+    // the recolor applies here regardless of which entry point armed it.
+    const isLatest  = v.id === latestPickId;
+    const latestHue = isLatest ? (armedVertexId === v.id ? 'red' : 'yellow') : null;
+    const closeHue  = (v.id === closePickId && faceCloseArmed) ? 'blue' : null;
+
     if (pendingListPick && pendingListPick.vertexId === v.id) {
       // Glow matches the floating button's own color (blue = use/close,
       // red = error) — fully overrides whatever static highlight this
@@ -2446,13 +2488,15 @@ function drawVertices(verts, vecs, heights, scale, normS) {
       ctx.fill();
       ctx.restore();
     } else if (facePickOrder.includes(v.id) && faceMode !== 'off') {
-      // Rim: green ring(s) to signal an in-progress face pick, distinct from
-      // segment's blue. Double ring on the first-picked vertex — re-clicking
-      // it is what closes the loop.
+      // Rim: ring(s) to signal an in-progress face pick — green by default,
+      // recolored yellow/red when this is the latest vertex, blue when
+      // this is v0 armed for closing. Double ring on the first-picked
+      // vertex — re-clicking it is what closes the loop.
+      const hue = PICK_HUE[latestHue ?? closeHue ?? 'green'];
       ctx.save();
       ctx.beginPath();
       ctx.arc(scr.x, scr.y, r + 4, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(30, 150, 90, 0.90)';
+      ctx.strokeStyle = `rgba(${hue}, 0.90)`;
       ctx.lineWidth = 2;
       ctx.stroke();
       if (v.id === facePickOrder[0]) {
@@ -2462,13 +2506,13 @@ function drawVertices(verts, vecs, heights, scale, normS) {
           // without over-cluttering the first vertex's marker.
           ctx.beginPath();
           ctx.arc(scr.x, scr.y, r + 6.5, 0, 2 * Math.PI);
-          ctx.strokeStyle = 'rgba(30, 150, 90, 0.55)';
+          ctx.strokeStyle = `rgba(${hue}, 0.55)`;
           ctx.lineWidth = 5;
           ctx.stroke();
         }
         ctx.beginPath();
         ctx.arc(scr.x, scr.y, r + 9, 0, 2 * Math.PI);
-        ctx.strokeStyle = 'rgba(30, 150, 90, 0.50)';
+        ctx.strokeStyle = `rgba(${hue}, 0.50)`;
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
@@ -2477,6 +2521,9 @@ function drawVertices(verts, vecs, heights, scale, normS) {
       // faceMode is 'off' here but the pick survived (paused, resumable via
       // "draw") — same soft-glow-instead-of-rim treatment segment mode
       // already gets when paused, just in green to stay a face vertex.
+      // Always green: currentLatestPickId/currentClosePickId both gate on
+      // the mode actually being active, so latestHue/closeHue are already
+      // null throughout a pause — nothing to recolor here.
       ctx.save();
       ctx.beginPath();
       ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
@@ -2484,17 +2531,21 @@ function drawVertices(verts, vecs, heights, scale, normS) {
       ctx.fill();
       ctx.restore();
     } else if (selectedVertexIds.has(v.id) && segmentMode !== 'off') {
-      // Rim: crisp ring(s) to signal segment-creation selection
+      // Rim: crisp ring(s) to signal segment-creation selection — blue by
+      // default, recolored yellow/red when armed (segment's sole pending
+      // vertex is always "the latest" the moment segmentMode is active, so
+      // this fires unconditionally once armed via the list).
+      const hue = PICK_HUE[latestHue ?? 'blue'];
       ctx.save();
       ctx.beginPath();
       ctx.arc(scr.x, scr.y, r + 4, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(30, 100, 220, 0.90)';
+      ctx.strokeStyle = `rgba(${hue}, 0.90)`;
       ctx.lineWidth = 2;
       ctx.stroke();
       if (segmentMode === 'on++') {
         ctx.beginPath();
         ctx.arc(scr.x, scr.y, r + 9, 0, 2 * Math.PI);
-        ctx.strokeStyle = 'rgba(30, 100, 220, 0.50)';
+        ctx.strokeStyle = `rgba(${hue}, 0.50)`;
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
@@ -2659,6 +2710,11 @@ function selectVertexById(id) {
   if (segmentMode !== 'off') {
     if (selectedVertexIds.has(id)) selectedVertexIds.delete(id);
     else selectedVertexIds.add(id);
+    // Canvas always resolves this directly, single tap, regardless of any
+    // arm state the list may have set on this same vertex — deliberate "no
+    // behavior change" for segment's own canvas gesture (see NOTES6/7); the
+    // two-step arm/remove is specifically a list-side affordance here.
+    armedVertexId = null;
     checkSelectionComplete();
   } else {
     // Off mode: single-vertex priming — replace any prior selection
@@ -2739,10 +2795,44 @@ function handleCanvasClick(px, py, pointerType) {
   selectedFaceId    = null;
   if (segmentMode === 'off') selectedVertexIds.clear();
   if (faceMode === 'off') { facePickOrder = []; clearPendingListPick(); }
+  // Empty space is always an "outside click" for the undo-latest-vertex arm
+  // states, mode-active or not — unlike facePickOrder/selectedVertexIds
+  // themselves, which only get wiped while paused (see above).
+  clearArmedStates();
   renderVertexList();
   renderSegmentList();
   renderFaceList();
   draw();
+}
+
+// The vertex "undo the most recently confirmed vertex" currently targets,
+// or null if no picking is in progress. Face: the last-pushed member of
+// facePickOrder. Segment: its sole pending vertex (segment never holds more
+// than one before checkSelectionComplete fires, so "most recent" and "the
+// only one" already coincide — see NOTES6). Gated on the mode actually
+// being active (not just paused), matching every other interactive-picking
+// entry point in this file.
+function currentLatestPickId() {
+  if (faceMode !== 'off' && facePickOrder.length > 0) return facePickOrder[facePickOrder.length - 1];
+  if (segmentMode !== 'off' && selectedVertexIds.size === 1) return [...selectedVertexIds][0];
+  return null;
+}
+
+// The vertex "close the loop" currently targets, or null — always v0, and
+// only once facePickOrder.length >= 3 (below that, re-picking v0 is a plain
+// reject, not something to arm — see getFacePickAction). Face-only; segment
+// has no closing gesture at all.
+function currentClosePickId() {
+  return (faceMode !== 'off' && facePickOrder.length >= 3) ? facePickOrder[0] : null;
+}
+
+// Clears both arm states — called everywhere a pick sequence is abandoned,
+// completed, or replaced wholesale (mirrors every clearPendingListPick()
+// call site), so an arm never survives past the context that made it
+// meaningful. Safe to call unconditionally; a no-op when nothing's armed.
+function clearArmedStates() {
+  armedVertexId  = null;
+  faceCloseArmed = false;
 }
 
 function checkSelectionComplete() {
@@ -2759,6 +2849,7 @@ function checkSelectionComplete() {
   // vertex is clicked, recreating the just-undone segment instead of
   // forming a new one).
   selectedVertexIds.clear();
+  clearArmedStates();
   snapshot();
   // nextAutoName mutates nameCounters, so it must run after snapshot() —
   // see addVertexFromInputs for why.
@@ -2774,11 +2865,17 @@ function checkSelectionComplete() {
 // Pure rule for what clicking `vertexId` would do to the in-progress segment
 // pick — mirrors getFacePickAction below, but a segment's fixed 2-vertex
 // cardinality means there's no 'close' case: a second distinct pick always
-// completes the segment automatically (checkSelectionComplete), so only
-// 'append' (a fresh vertex) or 'reject' (re-picking the one already-picked
-// vertex) ever occur.
+// completes the segment automatically (checkSelectionComplete). Re-picking
+// the one already-picked vertex is now 'arm'/'remove' (the undo-latest
+// two-step — segment's sole pending vertex trivially IS "the latest," see
+// currentLatestPickId), not the plain 'reject' this used to be — but only
+// via this, the list-confirm path (see handleListPick below); the direct
+// canvas path (selectVertexById) keeps its own existing single-tap
+// toggle-add/remove behavior completely unchanged (see NOTES6/7, "no
+// behavior change" for segment's canvas gesture).
 function getSegmentPickAction(vertexId) {
-  return selectedVertexIds.has(vertexId) ? { kind: 'reject' } : { kind: 'append' };
+  if (!selectedVertexIds.has(vertexId)) return { kind: 'append' };
+  return armedVertexId === vertexId ? { kind: 'remove' } : { kind: 'arm' };
 }
 
 // List-confirm path only (see handleListPick below) — the direct canvas
@@ -2786,7 +2883,16 @@ function getSegmentPickAction(vertexId) {
 // unchanged, since that wasn't the reported gap.
 function applySegmentPick(id) {
   const action = getSegmentPickAction(id);
-  if (action.kind === 'reject') return;
+  // Arming (unlike a plain append) requires further list interaction — the
+  // user has to find and press the new "remove" button — so unlike append,
+  // it needs to scroll the row into view even when the arming click itself
+  // came from canvas (see NOTES7: "confirming intermediate vertices on
+  // canvas is automatic, arming isn't"). Harmless/no-op when it was already
+  // a list click, since the row's already visible then.
+  if (action.kind === 'arm')    { armedVertexId = id; _pendingScrollToVertexId = id; renderVertexList(); draw(); return; }
+  if (action.kind === 'remove') { selectedVertexIds.delete(id); armedVertexId = null; renderVertexList(); draw(); return; }
+  // action.kind === 'append'
+  armedVertexId = null;
   selectedVertexIds.add(id);
   checkSelectionComplete();
   renderVertexList();
@@ -2797,23 +2903,56 @@ function applySegmentPick(id) {
 // pick — shared by the direct canvas path (applyFacePick, below) and the
 // list's pending-button label/enabled-state (renderVertexList), so the two
 // can never disagree about what a given click means.
-//   'append' — first pick, or a fresh vertex: add it to the end.
-//   'close'  — re-picking the first vertex with >=3 already picked: complete the face.
-//   'reject' — re-picking the first vertex too early, or any other already-picked vertex.
+//   'append'    — a fresh vertex: add it to the end.
+//   'arm'       — the latest (last-pushed) vertex, not yet armed: arm it (yellow→red).
+//   'remove'    — the latest vertex, already armed: undo it, handing "latest" to the runner-up.
+//   'armClose'  — v0, with >=3 already picked, not yet armed: arm the close gesture (blue).
+//   'close'     — v0, with >=3 already picked, already armed: complete the face.
+//   'reject'    — v0 too early (< 3 picked), or any other already-picked, non-latest vertex.
+// The latest-vertex check runs first and unconditionally — v0 gets no
+// exception when it's also the latest (facePickOrder.length === 1): same
+// color path, same two-step, as any other vertex (see NOTES6, "Question 1").
 function getFacePickAction(vertexId) {
+  if (facePickOrder.length > 0 && vertexId === facePickOrder[facePickOrder.length - 1]) {
+    return armedVertexId === vertexId ? { kind: 'remove' } : { kind: 'arm' };
+  }
   if (facePickOrder.length > 0 && vertexId === facePickOrder[0]) {
-    return facePickOrder.length >= 3 ? { kind: 'close' } : { kind: 'reject' };
+    if (facePickOrder.length >= 3) return faceCloseArmed ? { kind: 'close' } : { kind: 'armClose' };
+    return { kind: 'reject' };
   }
   if (facePickOrder.includes(vertexId)) return { kind: 'reject' };
   return { kind: 'append' };
 }
 
 // Canvas path: applies getFacePickAction's rule directly, no confirmation
-// step — a canvas click already shows you exactly what you're clicking.
+// step beyond the arm states themselves baked into getFacePickAction — a
+// canvas click already shows you exactly what you're clicking, so no extra
+// preview layer is needed on top (see NOTES6, "confirmation/cueing exists
+// only to compensate for missing disambiguating context"). Also the direct
+// commit path for the list's own "latest"/"close" companion buttons and
+// row clicks on an already-armable vertex (see renderVertexList) — those
+// don't get a preview step either, since the arm/red or arm/blue state
+// itself already *is* the confirmation.
 function applyFacePick(id) {
   const action = getFacePickAction(id);
-  if (action.kind === 'reject') return;
-  if (action.kind === 'close') { checkFaceComplete(); return; }
+  if (action.kind === 'reject') {
+    // A click elsewhere counts as abandoning whatever's currently armed —
+    // mirrors pendingListPick's own clear-on-outside-click precedent. Only
+    // worth a re-render if something was actually armed to begin with.
+    if (armedVertexId !== null || faceCloseArmed) { clearArmedStates(); renderVertexList(); draw(); }
+    return;
+  }
+  // Arming needs the list scrolled to the row even when triggered from
+  // canvas — unlike a plain append (fully automatic, no further input
+  // needed), arming requires the user to then find and press a button (see
+  // NOTES7). Both branches set the same one-shot scroll target
+  // renderVertexList already consumes.
+  if (action.kind === 'arm')      { armedVertexId = id; faceCloseArmed = false; _pendingScrollToVertexId = id; renderVertexList(); draw(); return; }
+  if (action.kind === 'armClose') { faceCloseArmed = true; armedVertexId = null; _pendingScrollToVertexId = id; renderVertexList(); draw(); return; }
+  if (action.kind === 'remove')   { facePickOrder.pop(); armedVertexId = null; renderVertexList(); draw(); return; }
+  if (action.kind === 'close')    { checkFaceComplete(); return; }
+  // action.kind === 'append'
+  clearArmedStates();
   facePickOrder.push(id);
   renderVertexList();
   draw();
@@ -2826,6 +2965,7 @@ function checkFaceComplete() {
   // checkSelectionComplete(): the undo-captured "before" state must not
   // still hold an in-progress pick, or undoing would resurrect it.
   facePickOrder = [];
+  clearArmedStates();
   if (faceMode === 'on') faceMode = 'off'; // 'on++' stays primed for another face
   snapshot();
   // nextAutoName mutates nameCounters, so it must run after snapshot() —
@@ -2937,9 +3077,19 @@ function updatePendingButtonPosition() {
     pendingListPick.btnEl = btn;
   }
 
-  // Measured only after (re)appending, since offsetWidth needs the button
-  // actually laid out.
-  const btn      = pendingListPick.btnEl;
+  positionRowButton(pendingListPick.btnEl, row, list);
+}
+
+// Shared clamped-position math for every floating per-row button this app
+// uses (the pending-pick "use"/"close?"/"error" button above, and the
+// undo-latest-vertex "latest"/"remove?"/"close?" buttons below) — measured
+// only after the button is actually laid out in the DOM (offsetWidth needs
+// real layout). Follows the row (centered) while it's fully within the
+// vertex list's own visible band; sticks to whichever edge the row scrolls
+// past otherwise, so the button never leaves the screen and the stuck edge
+// itself tells you which way to scroll. See NOTES6, "clamped pending-pick
+// button".
+function positionRowButton(btn, row, list) {
   const rowRect  = row.getBoundingClientRect();
   const listRect = list.getBoundingClientRect();
   const btnRect  = btn.getBoundingClientRect();
@@ -2950,6 +3100,78 @@ function updatePendingButtonPosition() {
             :                 rowRect.top + rowRect.height / 2 - btnRect.height / 2;
   btn.style.left = (rowRect.left - btnRect.width - 6) + 'px';
   btn.style.top  = top + 'px';
+}
+
+// The two companion buttons for "undo the most recently confirmed vertex"
+// (NOTES6/7) — unlike pendingListPick's button, these aren't click-
+// triggered previews: they're a continuous status display, automatically
+// shown/hidden/repositioned every render (and every scroll/collapse-toggle,
+// same trigger points as updatePendingButtonPosition) purely as a function
+// of current state. Unlike the row's own .list-latest/.list-face-first
+// highlight classes, though, the button only exists once the vertex is
+// actually armed — an unarmed latest/closeable vertex gets *only* the row
+// highlight, no button (see NOTES7's correction: only an active row gets a
+// button, so a scrolled-to-the-edge list never has two competing sticky
+// buttons at once). Clicking the button always performs the confirm action
+// (remove/close) — arming itself only ever happens via a row click (see
+// renderVertexList), never via this button, since the button doesn't exist
+// until after that arm has already happened.
+let latestBtnEl = null;
+let closeBtnEl  = null;
+
+function updateLatestButtonPosition() {
+  const id   = currentLatestPickId();
+  const list = document.getElementById('vertex-list');
+  const row  = (id !== null && armedVertexId === id) ? list.querySelector(`[data-vertex-id="${id}"]`) : null;
+  if (!row || !listSectionOpen.vertex) {
+    if (latestBtnEl) { latestBtnEl.remove(); latestBtnEl = null; }
+    return;
+  }
+  if (!latestBtnEl) {
+    latestBtnEl = document.createElement('button');
+    latestBtnEl.className = 'face-pick-btn latest-pick-btn';
+    latestBtnEl.textContent = 'remove';
+    latestBtnEl.addEventListener('click', e => {
+      e.stopPropagation();
+      const currentId = currentLatestPickId();
+      if (currentId === null) return;
+      if (faceMode !== 'off') applyFacePick(currentId); else applySegmentPick(currentId);
+    });
+    document.body.appendChild(latestBtnEl);
+  }
+  positionRowButton(latestBtnEl, row, list);
+}
+
+function updateCloseButtonPosition() {
+  const id   = currentClosePickId();
+  const list = document.getElementById('vertex-list');
+  const row  = (id !== null && faceCloseArmed) ? list.querySelector(`[data-vertex-id="${id}"]`) : null;
+  if (!row || !listSectionOpen.vertex) {
+    if (closeBtnEl) { closeBtnEl.remove(); closeBtnEl = null; }
+    return;
+  }
+  if (!closeBtnEl) {
+    closeBtnEl = document.createElement('button');
+    closeBtnEl.className = 'face-pick-btn close-pick-btn';
+    closeBtnEl.textContent = 'close';
+    closeBtnEl.addEventListener('click', e => {
+      e.stopPropagation();
+      const currentId = currentClosePickId();
+      if (currentId === null) return;
+      applyFacePick(currentId);
+    });
+    document.body.appendChild(closeBtnEl);
+  }
+  positionRowButton(closeBtnEl, row, list);
+}
+
+// Single entry point for refreshing every per-row floating button this
+// feature owns — called everywhere updatePendingButtonPosition already was
+// (end of renderVertexList, the scroll listener, the list-toggle handler),
+// so all three buttons stay in sync with the same triggers.
+function updateArmButtons() {
+  updateLatestButtonPosition();
+  updateCloseButtonPosition();
 }
 
 // ─── Toggle buttons ───────────────────────────────────────────────────────────
@@ -3932,15 +4154,23 @@ function renderVertexList() {
       // canvas already showing every pick, repeating that in the list adds
       // little. The first pick is the one exception (it's the vertex that
       // closes the loop), highlighted green to match its canvas rim —
-      // unless it's currently the pending candidate, in which case blue/red
-      // (matching the floating button) takes over entirely.
+      // unless it's currently the pending candidate (blue/red, matching the
+      // floating button), the latest pick (yellow/red, the undo-latest-
+      // vertex feature — takes priority over the plain green even for v0,
+      // when v0 is also the latest: no exception, see getFacePickAction),
+      // or v0 itself once armed for closing (blue, layered on top of its
+      // own green — see NOTES6/7).
+      const latestPickId = currentLatestPickId();
       if (pendingListPick && pendingListPick.vertexId === v.id) {
         const action = pendingListPick.getAction(v.id);
         entry.classList.add(action.kind === 'reject' ? 'list-pending-error' : 'list-pending-use');
+      } else if (v.id === latestPickId) {
+        entry.classList.add(armedVertexId === v.id ? 'list-latest-armed' : 'list-latest');
       } else if (facePickOrder[0] === v.id) {
         // No faceMode gate — the first pick's green highlight also survives
         // a pause, matching the canvas's paused-glow treatment.
         entry.classList.add('list-face-first');
+        if (faceCloseArmed) entry.classList.add('list-close-armed');
       }
       entry.addEventListener('click', () => {
         // An active endpoint-fill box (or any other edit in progress) takes
@@ -3949,9 +4179,28 @@ function renderVertexList() {
         // and handleFaceListPick/handleSegmentListPick don't check it
         // themselves.
         if (activeEndpointInput || isEditingBlocked()) { selectVertexById(v.id); return; }
-        if      (faceMode !== 'off')    handleFaceListPick(v.id);
-        else if (segmentMode !== 'off') handleSegmentListPick(v.id);
-        else                             selectVertexById(v.id);
+        if (faceMode !== 'off') {
+          // 'append'/'reject' still go through the list's own preview-then-
+          // confirm step (the list doesn't show you where a vertex is, so a
+          // fresh pick needs that disambiguation). 'arm'/'armClose' target
+          // an *unarmed* latest/closeable vertex — a row click arms it,
+          // same as any other row-click-to-select elsewhere in this list.
+          // 'remove'/'close' means this vertex is *already* armed — a row
+          // click does nothing there; only the companion button (which
+          // exists precisely because it's armed) can confirm, per NOTES7's
+          // correction ("only an active row gets a button," and pressing
+          // that button is required — re-clicking the row a second time no
+          // longer confirms anything).
+          const action = getFacePickAction(v.id);
+          if (action.kind === 'append' || action.kind === 'reject') handleFaceListPick(v.id);
+          else if (action.kind === 'arm' || action.kind === 'armClose') applyFacePick(v.id);
+        } else if (segmentMode !== 'off') {
+          const action = getSegmentPickAction(v.id);
+          if (action.kind === 'append') handleSegmentListPick(v.id);
+          else if (action.kind === 'arm') applySegmentPick(v.id);
+        } else {
+          selectVertexById(v.id);
+        }
       });
 
       const swatch = document.createElement('span');
@@ -4084,6 +4333,7 @@ function renderVertexList() {
   // Rows were just rebuilt from scratch — any pending pick's button needs
   // to resync against its (possibly moved, possibly newly-stale) row.
   updatePendingButtonPosition();
+  updateArmButtons();
 }
 
 function addVertexFromInputs() {
@@ -4642,6 +4892,7 @@ document.querySelectorAll('.list-toggle').forEach(btn => {
     // updatePendingButtonPosition) — harmless, cheap no-op otherwise, not
     // worth gating on which key this is.
     updatePendingButtonPosition();
+    updateArmButtons();
   });
 });
 
@@ -4656,6 +4907,7 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   // selectedVertexIds), resumable later by clicking "draw" on the face row.
   faceMode = 'off';
   clearPendingListPick();
+  clearArmedStates();
   if (wasOff && segmentMode !== 'off' && selectedVertexIds.size === 0 && facePickOrder.length === 1) {
     // Symmetric counterpart to btn-face's own adoption below — without
     // this, a single vertex sitting in facePickOrder (whether itself
@@ -4690,6 +4942,7 @@ document.getElementById('btn-face').addEventListener('click', () => {
   // since a floating confirm button describing a now-stale action would be
   // confusing.
   clearPendingListPick();
+  clearArmedStates();
   if (wasOff && faceMode !== 'off') {
     // Starting fresh or resuming a paused pick — mutually exclusive with
     // segment mode either way.
@@ -4940,6 +5193,7 @@ function codeSave() {
   focusedVertexId   = null;
   selectedSegmentId = null;
   selectedFaceId    = null;
+  clearArmedStates();
 
   reEvalObjects();
   renderConstList();
@@ -5193,6 +5447,7 @@ function submitInterpreterLine() {
   focusedVertexId   = null;
   selectedSegmentId = null;
   selectedFaceId    = null;
+  clearArmedStates();
 
   reEvalObjects();
   renderConstList();
@@ -5466,14 +5721,40 @@ document.addEventListener('pointerdown', e => {
   clearPendingListPick();
 }, true);
 
+// Same clear-on-outside-click precedent as pendingListPick above, for the
+// undo-latest-vertex arm states — except canvas is exempted entirely: its
+// own click handling (applyFacePick, or the segment toggle's own inline
+// logic in selectVertexById) already resolves arm state correctly on its
+// own, invoked from pointerup, and would otherwise have its arm cleared out
+// from under it by this pointerdown-phase listener before that handler
+// ever runs (the same race the pendingListPick.btnEl exemption above
+// solves for its own button). Also exempts the armed vertex's own row (or
+// v0's row, while its close-arm is active) and both companion buttons, for
+// the identical reason — those are exactly the taps meant to *resolve* the
+// arm, not cancel it.
+document.addEventListener('pointerdown', e => {
+  if (armedVertexId === null && !faceCloseArmed) return;
+  if (e.target === canvas) return;
+  if (e.target === latestBtnEl || e.target === closeBtnEl) return;
+  const row   = e.target.closest && e.target.closest('.vertex-entry');
+  const rowId = row ? Number(row.dataset.vertexId) : null;
+  if (rowId === armedVertexId) return;
+  if (faceCloseArmed && facePickOrder.length > 0 && rowId === facePickOrder[0]) return;
+  clearArmedStates();
+  renderVertexList();
+  draw();
+}, true);
+
 // Keeps the pending-pick button clamped to its row as any scrollable
 // ancestor moves it — `scroll` events don't bubble, but do reach capture-
 // phase listeners on ancestors, so this one listener catches #vertex-list's
 // own scrolling and #controls-body's (if that's ever what's scrolling)
 // without needing to know which one. No-ops immediately when nothing is
 // pending. See updatePendingButtonPosition's own comment for the full
-// clamping behavior.
+// clamping behavior. updateArmButtons follows the same clamping logic for
+// the undo-latest-vertex buttons, for the same reason.
 document.addEventListener('scroll', updatePendingButtonPosition, true);
+document.addEventListener('scroll', updateArmButtons, true);
 
 updateUndoButtons();
 renderConstList();
