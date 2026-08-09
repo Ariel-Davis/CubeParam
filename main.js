@@ -140,7 +140,7 @@ let logicMode      = 'off';  // 'off' | 'on' — logic keyboard (bool-kind const
 let addConstKind   = null;   // 'number' | 'color' | 'boolean' | null — add-row's currently picked kind
 let activeExprInput    = null;   // the coord input currently focused in edit mode
 let activeEndpointInput = null;  // segment endpoint input currently focused; a canvas/list vertex pick fills it instead of selecting
-let _pendingScrollToEdit = false; // trigger scroll-to-edit-entry on next renderVertexList
+let _pendingScrollToVertexId = null; // vertex id | null — one-shot: the next renderVertexList scrolls this row fully into view, then clears it. Deliberately separate from focusedVertexId, which persists (drives highlighting every render) — conflating the two was the bug where an old selection kept re-stealing the scroll on every later, unrelated render (see NOTES6, "one-shot scroll-to-row").
 let _rejectedVertexId = null;    // vertex whose last rename was rejected; shows red in list
 let _errorNameEl      = null;    // name input/span currently highlighted red
 
@@ -159,7 +159,7 @@ let selectedSegmentId = null;      // segment id highlighted in the list (canvas
 let selectedFaceId    = null;      // face id highlighted in the list (list click only — no canvas face-hit-testing exists)
 let faceMode          = 'off';     // 'off' | 'on' — no 'on++' yet, see getFacePickAction() area
 let facePickOrder     = [];        // ordered vertex ids picked so far for a new face (order matters, unlike selectedVertexIds)
-let pendingListPick   = null;      // { vertexId, btnEl, getAction } | null — a face or segment vertex clicked from the list, awaiting its floating confirm button
+let pendingListPick   = null;      // { vertexId, btnEl, getAction, applyPick } | null — a face or segment vertex clicked from the list, awaiting its floating confirm button. btnEl is null while the vertex list section is collapsed (see updatePendingButtonPosition) — the pick itself survives, only the button's DOM presence is toggled.
 let editingVertexId        = null;  // id of vertex currently in edit mode, or null
 let editingOriginal        = null;  // captureState() snapshot taken on vertex edit entry
 let editingSegmentId       = null;  // id of segment currently in edit mode, or null
@@ -2666,6 +2666,7 @@ function selectVertexById(id) {
     else { selectedVertexIds.clear(); selectedVertexIds.add(id); }
   }
   focusedVertexId   = id;
+  _pendingScrollToVertexId = id;
   selectedSegmentId = null;
   selectedFaceId    = null;
   renderVertexList();
@@ -2844,53 +2845,111 @@ function checkFaceComplete() {
 // previews (highlight on canvas + list, floating button) rather than acting
 // immediately. Shared by face picking (which can also "close" — revisit the
 // first vertex once >=3 are picked) and segment picking (which never can,
-// see getSegmentPickAction) — `getAction` is stashed on pendingListPick
-// itself so the canvas/list render code can ask "use or error?" without
-// having to rediscover which of the two flows is currently live. Cleared by
-// the global pointerdown listener below on any other click, or explicitly
-// when its own button is used.
+// see getSegmentPickAction) — `getAction`/`applyPick` are stashed on
+// pendingListPick itself so updatePendingButtonPosition can (re)create the
+// button at any time without needing them passed back in. Cleared by the
+// global pointerdown listener below on any other click, or explicitly when
+// its own button is used.
 function clearPendingListPick() {
   if (!pendingListPick) return;
-  pendingListPick.btnEl.remove();
+  // btnEl can already be null — the vertex list section may be collapsed
+  // (see updatePendingButtonPosition), which removes the button but keeps
+  // pendingListPick itself alive.
+  if (pendingListPick.btnEl) pendingListPick.btnEl.remove();
   pendingListPick = null;
 }
 
-function handleListPick(vertexId, rowEl, getAction, applyPick) {
+function handleListPick(vertexId, getAction, applyPick) {
   clearPendingListPick();
-  const action = getAction(vertexId);
-  const btn = document.createElement('button');
-  btn.className = 'face-pick-btn';
-  btn.textContent = action.kind === 'close' ? 'close?' : action.kind === 'reject' ? 'error' : 'use';
-  btn.disabled = action.kind === 'reject';
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    clearPendingListPick();
-    applyPick(vertexId);
-    renderVertexList();
-  });
-  document.body.appendChild(btn);
-  // Positioned to the left of the row, vertically centered on it — measured
-  // only after appending, since offsetWidth needs the button actually laid out.
-  const rowRect = rowEl.getBoundingClientRect();
-  const btnRect = btn.getBoundingClientRect();
-  btn.style.left = (rowRect.left - btnRect.width - 6) + 'px';
-  btn.style.top  = (rowRect.top + rowRect.height / 2 - btnRect.height / 2) + 'px';
-  pendingListPick = { vertexId, btnEl: btn, getAction };
+  pendingListPick = { vertexId, btnEl: null, getAction, applyPick };
+  // Scroll the picked row fully into view, once — previously missing
+  // entirely for a list-driven pick (see NOTES6, "one-shot scroll-to-row").
+  _pendingScrollToVertexId = vertexId;
+  // renderVertexList() calls updatePendingButtonPosition() itself at its own
+  // end, so the button gets created/positioned as a side effect of this.
   renderVertexList();
-  // Pre-existing gap, caught while verifying this refactor: drawVertices'
+  // Pre-existing gap, caught while verifying an earlier refactor: drawVertices'
   // pendingListPick glow (blue/red fill matching this button) needs an
   // actual draw() to appear — renderVertexList() alone never repainted the
   // canvas, so a list-driven pending pick's canvas-side highlight never
-  // actually showed (for face either, before this fix).
+  // actually showed (for face either, before that fix).
   draw();
 }
 
-function handleFaceListPick(vertexId, rowEl) {
-  handleListPick(vertexId, rowEl, getFacePickAction, applyFacePick);
+function handleFaceListPick(vertexId) {
+  handleListPick(vertexId, getFacePickAction, applyFacePick);
 }
 
-function handleSegmentListPick(vertexId, rowEl) {
-  handleListPick(vertexId, rowEl, getSegmentPickAction, applySegmentPick);
+function handleSegmentListPick(vertexId) {
+  handleListPick(vertexId, getSegmentPickAction, applySegmentPick);
+}
+
+// Repositions (or creates/hides) the floating "use"/"error"/"close" button
+// for the current pendingListPick, based on where its row currently sits
+// relative to the vertex list's own visible band. Three cases:
+//   - The row's vertex no longer exists (deleted mid-pick): abandon the
+//     pick entirely — nothing left to point at.
+//   - The vertex list section is collapsed: hide the button (nothing
+//     sensible to position it against), but leave pendingListPick's
+//     vertexId/getAction/applyPick alone — the canvas glow and the list's
+//     own pending-highlight class both key off pendingListPick directly,
+//     not the button's existence, so they keep showing while collapsed.
+//     Reopening the section calls this again and the button reappears,
+//     still describing the same pick.
+//   - Otherwise: the row is looked up fresh by data-vertex-id (never a
+//     cached reference — renderVertexList rebuilds every row from scratch
+//     on any change) and the button is clamped into the list's own visible
+//     band — follows the row, centered, while it's fully in view; sticks
+//     to whichever edge the row goes past once it's clipped or fully
+//     scrolled out, so the button never leaves the screen and the stuck
+//     edge itself tells you which way to scroll. See NOTES6, "clamped
+//     pending-pick button".
+// Called after creating a pick, on every scroll of any scrollable ancestor
+// (capture-phase listener below), on the vertex list section's own
+// open/close toggle, and at the end of every renderVertexList — cheap and
+// a no-op whenever nothing is pending, so it's safe to call liberally
+// rather than track exactly which changes could have moved the row.
+function updatePendingButtonPosition() {
+  if (!pendingListPick) return;
+  const list = document.getElementById('vertex-list');
+  const row  = list.querySelector(`[data-vertex-id="${pendingListPick.vertexId}"]`);
+  if (!row) { clearPendingListPick(); return; }
+
+  if (!listSectionOpen.vertex) {
+    if (pendingListPick.btnEl) { pendingListPick.btnEl.remove(); pendingListPick.btnEl = null; }
+    return;
+  }
+
+  if (!pendingListPick.btnEl) {
+    const action = pendingListPick.getAction(pendingListPick.vertexId);
+    const btn = document.createElement('button');
+    btn.className = 'face-pick-btn';
+    btn.textContent = action.kind === 'close' ? 'close?' : action.kind === 'reject' ? 'error' : 'use';
+    btn.disabled = action.kind === 'reject';
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const { vertexId, applyPick } = pendingListPick;
+      clearPendingListPick();
+      applyPick(vertexId);
+      renderVertexList();
+    });
+    document.body.appendChild(btn);
+    pendingListPick.btnEl = btn;
+  }
+
+  // Measured only after (re)appending, since offsetWidth needs the button
+  // actually laid out.
+  const btn      = pendingListPick.btnEl;
+  const rowRect  = row.getBoundingClientRect();
+  const listRect = list.getBoundingClientRect();
+  const btnRect  = btn.getBoundingClientRect();
+  const clippedTop    = rowRect.top    < listRect.top;
+  const clippedBottom = rowRect.bottom > listRect.bottom;
+  const top = clippedTop    ? listRect.top
+            : clippedBottom ? listRect.bottom - btnRect.height
+            :                 rowRect.top + rowRect.height / 2 - btnRect.height / 2;
+  btn.style.left = (rowRect.left - btnRect.width - 6) + 'px';
+  btn.style.top  = top + 'px';
 }
 
 // ─── Toggle buttons ───────────────────────────────────────────────────────────
@@ -2962,7 +3021,7 @@ document.getElementById('btn-show-pointer').addEventListener('click', () => {
 // ─── Vertex edit mode ─────────────────────────────────────────────────────────
 
 function enterEditMode(id) {
-  _pendingScrollToEdit = true;
+  _pendingScrollToVertexId = id;
   const v = vertices.find(u => u.id === id);
   if (v && !v.exprs) v.exprs = ['', '', ''];
   editingVertexId   = id;
@@ -2986,6 +3045,7 @@ function commitEdit() {
   if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
   redoStack       = [];
   focusedVertexId = editingVertexId;
+  _pendingScrollToVertexId = editingVertexId;
   editingVertexId = null;
   editingOriginal = null;
   if (omegaMode === 'on') omegaMode = 'off';
@@ -3017,6 +3077,7 @@ function cancelEdit() {
     }
   }
   focusedVertexId = editingVertexId;
+  _pendingScrollToVertexId = editingVertexId;
   editingVertexId = null;
   editingOriginal = null;
   if (omegaMode === 'on') omegaMode = 'off';
@@ -3676,17 +3737,18 @@ function renderVertexList() {
   const savedScroll = list.scrollTop;
   list.innerHTML   = '';
   const inEdit     = editingVertexId !== null || editingSegmentId !== null;
-  let   editEntry    = null;
-  let   focusedEntry = null;
 
   for (const v of vertices) {
     const entry = document.createElement('div');
     entry.className = 'vertex-entry';
+    // Stable lookup key for updatePendingButtonPosition — it re-queries the
+    // row fresh every time rather than caching a node, since this function
+    // rebuilds every row from scratch on any change.
+    entry.dataset.vertexId = v.id;
 
     if (v.id === editingVertexId) {
       // ── Edit block (column layout) ─────────────────────────────────────────
       entry.className = 'vertex-entry vertex-editing';
-      editEntry = entry;
       if (!v.exprs) v.exprs = ['', '', ''];
 
       // Row 1: color / name / radius / ✓ ✗
@@ -3880,8 +3942,6 @@ function renderVertexList() {
         // a pause, matching the canvas's paused-glow treatment.
         entry.classList.add('list-face-first');
       }
-      if (v.id === focusedVertexId) focusedEntry = entry;
-
       entry.addEventListener('click', () => {
         // An active endpoint-fill box (or any other edit in progress) takes
         // priority over starting a new pick — same guard selectVertexById
@@ -3889,8 +3949,8 @@ function renderVertexList() {
         // and handleFaceListPick/handleSegmentListPick don't check it
         // themselves.
         if (activeEndpointInput || isEditingBlocked()) { selectVertexById(v.id); return; }
-        if      (faceMode !== 'off')    handleFaceListPick(v.id, entry);
-        else if (segmentMode !== 'off') handleSegmentListPick(v.id, entry);
+        if      (faceMode !== 'off')    handleFaceListPick(v.id);
+        else if (segmentMode !== 'off') handleSegmentListPick(v.id);
         else                             selectVertexById(v.id);
       });
 
@@ -4008,15 +4068,22 @@ function renderVertexList() {
     list.appendChild(entry);
   }
 
-  if (_pendingScrollToEdit && editEntry) {
-    _pendingScrollToEdit = false;
-    editEntry.scrollIntoView({ block: 'nearest' });
-  } else if (focusedEntry) {
-    focusedEntry.scrollIntoView({ block: 'nearest' });
-  } else {
-    list.scrollTop = savedScroll;
+  // One-shot: scroll a specific row into view only on the render that
+  // immediately follows the action that requested it (a fresh selection, a
+  // list-driven pick, entering/leaving edit mode) — never on a later,
+  // unrelated render, which is what let a stale target keep re-stealing the
+  // scroll indefinitely (see NOTES6, "one-shot scroll-to-row").
+  let scrollTarget = null;
+  if (_pendingScrollToVertexId !== null) {
+    scrollTarget = list.querySelector(`[data-vertex-id="${_pendingScrollToVertexId}"]`);
+    _pendingScrollToVertexId = null;
   }
+  if (scrollTarget) scrollTarget.scrollIntoView({ block: 'nearest' });
+  else list.scrollTop = savedScroll;
   updateListToggle('vertex');
+  // Rows were just rebuilt from scratch — any pending pick's button needs
+  // to resync against its (possibly moved, possibly newly-stale) row.
+  updatePendingButtonPosition();
 }
 
 function addVertexFromInputs() {
@@ -4570,10 +4637,16 @@ document.querySelectorAll('.list-toggle').forEach(btn => {
     const key = btn.dataset.list;
     listSectionOpen[key] = !listSectionOpen[key];
     updateListToggle(key);
+    // Only actually matters for key === 'vertex' (collapsing/reopening that
+    // section is what hides/reshows the button — see
+    // updatePendingButtonPosition) — harmless, cheap no-op otherwise, not
+    // worth gating on which key this is.
+    updatePendingButtonPosition();
   });
 });
 
 document.getElementById('btn-segment').addEventListener('click', () => {
+  const wasOff = segmentMode === 'off';
   if      (segmentMode === 'off')  segmentMode = 'on';
   else if (segmentMode === 'on')   segmentMode = 'on++';
   else                             segmentMode = 'off';
@@ -4583,6 +4656,20 @@ document.getElementById('btn-segment').addEventListener('click', () => {
   // selectedVertexIds), resumable later by clicking "draw" on the face row.
   faceMode = 'off';
   clearPendingListPick();
+  if (wasOff && segmentMode !== 'off' && selectedVertexIds.size === 0 && facePickOrder.length === 1) {
+    // Symmetric counterpart to btn-face's own adoption below — without
+    // this, a single vertex sitting in facePickOrder (whether itself
+    // carried over from off-mode priming, or from one genuine face click)
+    // was stranded the moment segment mode activated: segmentMode never
+    // touched facePickOrder, so selectedVertexIds stayed empty and the
+    // vertex's green ring became purely cosmetic — primed for nothing.
+    // Gating on selectedVertexIds being empty (not on facePickOrder's
+    // history) mirrors exactly how btn-face's own adoption is gated on
+    // *its* target set being empty, so this activates in precisely the
+    // same class of situation, just mirrored.
+    selectedVertexIds = new Set(facePickOrder);
+    facePickOrder = [];
+  }
   updateSegmentButton();
   updateFaceButton();
   renderVertexList();
@@ -4612,7 +4699,8 @@ document.getElementById('btn-face').addEventListener('click', () => {
     updateSegmentButton();
     // Off-mode single-vertex priming carries over as the first pick, same
     // as segment mode already carries selectedVertexIds forward — but only
-    // when there's no paused pick already waiting to be resumed.
+    // when there's no paused pick already waiting to be resumed. btn-segment
+    // has the exact mirror of this block, for the reverse direction.
     if (facePickOrder.length === 0 && selectedVertexIds.size === 1) {
       facePickOrder = [...selectedVertexIds];
     }
@@ -5366,9 +5454,26 @@ document.addEventListener('click', e => {
 // onOutsideClick/clearNameError above, and the e.target guard is what lets
 // the button's own click still land (pointerdown fires first and would
 // otherwise remove it from the DOM before its click handler ever runs).
+// Same reasoning exempts the vertex list's own collapse/expand toggle —
+// without it, this listener would destroy the pick outright (pointerdown
+// fires before the toggle's click handler) every time the section got
+// collapsed, instead of letting updatePendingButtonPosition just hide the
+// button while leaving the pick itself alive.
 document.addEventListener('pointerdown', e => {
-  if (pendingListPick && e.target !== pendingListPick.btnEl) clearPendingListPick();
+  if (!pendingListPick) return;
+  if (e.target === pendingListPick.btnEl) return;
+  if (e.target.closest('.list-toggle[data-list="vertex"]')) return;
+  clearPendingListPick();
 }, true);
+
+// Keeps the pending-pick button clamped to its row as any scrollable
+// ancestor moves it — `scroll` events don't bubble, but do reach capture-
+// phase listeners on ancestors, so this one listener catches #vertex-list's
+// own scrolling and #controls-body's (if that's ever what's scrolling)
+// without needing to know which one. No-ops immediately when nothing is
+// pending. See updatePendingButtonPosition's own comment for the full
+// clamping behavior.
+document.addEventListener('scroll', updatePendingButtonPosition, true);
 
 updateUndoButtons();
 renderConstList();
