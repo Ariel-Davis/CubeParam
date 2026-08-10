@@ -2473,18 +2473,26 @@ function drawVertices(verts, vecs, heights, scale, normS) {
     const latestHue = isLatest ? (armedVertexId === v.id ? 'red' : 'yellow') : null;
     const closeHue  = (v.id === closePickId && faceCloseArmed) ? 'blue' : null;
 
-    if (pendingListPick && pendingListPick.vertexId === v.id) {
-      // Glow matches the floating button's own color (blue = use/close,
-      // red = error) — fully overrides whatever static highlight this
-      // vertex would otherwise show (e.g. the first-pick green), since
-      // "pending confirmation" supersedes it until resolved either way.
+    // A reject specifically is handled *inside* the facePickOrder branch
+    // below, not here — a reject only ever targets a vertex already in
+    // facePickOrder (v0 too early, or a middle pick), so it always has an
+    // existing role-halo worth keeping visible underneath the red (see
+    // NOTES7 — corrected from an earlier version where the red glow fully
+    // replaced the halo). 'append' (a genuinely new, not-yet-picked
+    // candidate) has no such halo to preserve, so it keeps the original
+    // full-disc treatment here.
+    const pendingIsError = pendingListPick && pendingListPick.vertexId === v.id &&
+                            pendingListPick.getAction(v.id).kind === 'reject';
+    if (pendingListPick && pendingListPick.vertexId === v.id && !pendingIsError) {
+      // Glow matches the floating button's own color (blue = use) — fully
+      // overrides whatever static highlight this vertex would otherwise
+      // show, since "pending confirmation" supersedes it until resolved.
       // pendingListPick.getAction is whichever of getFacePickAction/
       // getSegmentPickAction created this pending pick (see handleListPick).
-      const isError = pendingListPick.getAction(v.id).kind === 'reject';
       ctx.save();
       ctx.beginPath();
       ctx.arc(scr.x, scr.y, r + 6, 0, 2 * Math.PI);
-      ctx.fillStyle = isError ? 'rgba(200, 50, 50, 0.30)' : 'rgba(30, 100, 220, 0.30)';
+      ctx.fillStyle = 'rgba(30, 100, 220, 0.30)';
       ctx.fill();
       ctx.restore();
     } else if (facePickOrder.includes(v.id) && faceMode !== 'off') {
@@ -2515,6 +2523,19 @@ function drawVertices(verts, vecs, heights, scale, normS) {
         ctx.strokeStyle = `rgba(${hue}, 0.50)`;
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      }
+      if (pendingIsError) {
+        // The reject glow itself: confined to the gap between the vertex's
+        // own marker and its nearest hard ring (r+4), rather than a big
+        // disc that would blot out the rings just drawn above — "retain
+        // the hard halo, fill the gap beneath it" (the user's own framing,
+        // NOTES7). Deliberately doesn't reach past the first ring even for
+        // v0's double-ring — only "the gap from the vertex" fills, not the
+        // whole structure.
+        ctx.beginPath();
+        ctx.arc(scr.x, scr.y, r + 4, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(200, 50, 50, 0.30)';
+        ctx.fill();
       }
       ctx.restore();
     } else if (facePickOrder.includes(v.id)) {
