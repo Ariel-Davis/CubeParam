@@ -2643,11 +2643,10 @@ function updateFromPointer(e) {
 }
 
 // Whether a pointerdown this close to the control point is about to become
-// a drag (view rotation) rather than a click — factored out of the
-// canvas pointerdown handler below purely so its hit-test logic has a name
-// (no other caller currently; the pendingListPick-clearing listener used
-// to call this too, before canvas was exempted from it entirely — see
-// NOTES7).
+// a drag (view rotation) rather than a click — used both by canvas's own
+// pointerdown handler (to decide drag-vs-click) and by the
+// pendingListPick-clearing listener below (rotating the view is never a
+// decision about a pending pick, so it shouldn't clear one — NOTES7).
 function isControlPointDragStart(e) {
   if (e.target !== canvas) return false;
   const rect      = canvas.getBoundingClientRect();
@@ -2656,6 +2655,33 @@ function isControlPointDragStart(e) {
   const ctrlPt    = toScreen(controlPt, getBaseScale());
   const hitRadius = e.pointerType === 'touch' ? 40 : 20;
   return showPointer && Math.hypot(px - ctrlPt.x, py - ctrlPt.y) <= hitRadius;
+}
+
+// Whether a pointerdown is landing on vertexId's own on-screen position —
+// the narrow condition under which the pendingListPick-clearing listener
+// below should treat a canvas pointerdown as "about to confirm this exact
+// pending pick" rather than "clicked elsewhere, abandon it" (NOTES7).
+// Deliberately vertex-specific, not a blanket "any canvas click is fine"
+// exemption: reuses the identical projection math handleCanvasClick's own
+// hit test uses, so the two can never disagree about what's under the
+// pointer. Visibility is irrelevant here on purpose — the whole point is
+// letting a *hidden* pending vertex's ghost marker be clicked too.
+function isPointerOnVertex(e, vertexId) {
+  if (e.target !== canvas) return false;
+  const v = vertices.find(u => u.id === vertexId);
+  if (!v) return false;
+  const rect                 = canvas.getBoundingClientRect();
+  const px                   = e.clientX - rect.left;
+  const py                   = e.clientY - rect.top;
+  const display               = getDisplayScale();
+  const { vecs, heights, s }  = getProjectionState();
+  const { pt, depth } = projectPoint(v.coords, vecs, heights);
+  if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) return false;
+  const { pt: ppt, ok } = applyPerspective(pt, depth, s);
+  if (!ok) return false;
+  const scr  = toScreen(ppt, display);
+  const hitR = e.pointerType === 'touch' ? 28 : 14;
+  return Math.hypot(px - scr.x, py - scr.y) <= hitR;
 }
 
 canvas.addEventListener('pointerdown', e => {
@@ -2711,17 +2737,21 @@ function selectVertexById(id) {
     return;
   }
   if (isEditingBlocked()) return;
+  // The mode-dispatch branches below are only ever reached via a canvas
+  // vertex hit (handleCanvasClick) — list-driven clicks either return
+  // above or fall through to the plain off-mode selection below. If this
+  // canvas click is confirming the exact vertex pendingListPick was
+  // previewing, the global pointerdown listener deliberately left it
+  // uncleared (isPointerOnVertex — see that listener's comment, NOTES7),
+  // so it needs resolving here, once, right where canvas actually enters
+  // the picking logic — a no-op in every other case, since the listener
+  // has already cleared anything that doesn't match.
+  if (faceMode !== 'off' || segmentMode !== 'off') clearPendingListPick();
   if (faceMode !== 'off') {
     applyFacePick(id);
     return;
   }
   if (segmentMode !== 'off') {
-    // Canvas is now authoritative for whatever just happened, so any stale
-    // list preview (a hidden vertex being confirmed straight from canvas,
-    // or an unrelated one left over from before) resolves here rather than
-    // via the global outside-click listener, which exempts canvas
-    // entirely — see the listener's own comment for why (NOTES7).
-    clearPendingListPick();
     if (selectedVertexIds.has(id)) selectedVertexIds.delete(id);
     else selectedVertexIds.add(id);
     // Canvas always resolves this directly, single tap, regardless of any
@@ -2830,13 +2860,15 @@ function handleCanvasClick(px, py, pointerType) {
   if (segmentMode === 'off') selectedVertexIds.clear();
   if (faceMode === 'off') facePickOrder = [];
   // Empty space is always an "outside click" for the undo-latest-vertex arm
-  // states and any list preview, mode-active or not — unlike
-  // facePickOrder/selectedVertexIds themselves, which only get wiped while
-  // paused (see above). pendingListPick specifically: canvas is exempted
-  // from the global outside-click listener that would otherwise handle
-  // this (see that listener's comment, NOTES7), so an empty-space click
-  // needs to clear it explicitly here instead.
-  clearPendingListPick();
+  // states, mode-active or not — unlike facePickOrder/selectedVertexIds
+  // themselves, which only get wiped while paused (see above). Unlike
+  // pendingListPick (see the global pointerdown listener, which already
+  // clears that on any canvas click that isn't landing on the pending
+  // vertex itself), armedVertexId/faceCloseArmed have no such listener
+  // coverage for canvas — that listener exempts canvas entirely, since
+  // every canvas-reachable path (applyFacePick, selectVertexById's segment
+  // branch) already sets them explicitly in every branch — so empty space
+  // needs this explicit clear too, to be one of those branches.
   clearArmedStates();
   renderVertexList();
   renderSegmentList();
@@ -2973,16 +3005,6 @@ function getFacePickAction(vertexId) {
 // don't get a preview step either, since the arm/red or arm/blue state
 // itself already *is* the confirmation.
 function applyFacePick(id) {
-  // Whatever's about to happen here is now authoritative, so any stale list
-  // preview resolves — either for the vertex this call is itself about
-  // (a hidden vertex confirmed straight from canvas, no separate list
-  // button click involved), or an unrelated one left over from before. The
-  // global outside-click listener exempts canvas entirely for exactly this
-  // reason (NOTES7) — canvas-driven paths like this one now own clearing
-  // pendingListPick themselves, rather than racing a pointerdown-phase
-  // listener that would otherwise clear it *before* this function even
-  // runs (pointerdown always precedes the pointerup that calls this).
-  clearPendingListPick();
   const action = getFacePickAction(id);
   if (action.kind === 'reject') {
     // A click elsewhere counts as abandoning whatever's currently armed —
@@ -5796,26 +5818,30 @@ document.addEventListener('click', e => {
 // collapsed, instead of letting updatePendingButtonPosition just hide the
 // button while leaving the pick itself alive.
 //
-// Canvas is exempted entirely, for the same class of reason, generalized
-// (NOTES7): canvas can now itself be the confirming click for a pending
-// pick (hidden vertices became canvas-clickable this session), and
-// pointerdown always precedes the pointerup-driven handleCanvasClick that
-// would resolve it — so this capture-phase listener would otherwise race
-// ahead and clear the pick before handleCanvasClick ever got to act on it,
-// exactly the same race the button-itself and list-toggle exemptions above
-// solve for their own cases. (An earlier, narrower attempt exempted only
-// the control-point-drag hit-test specifically, to fix a bug where
-// dragging the view silently discarded a pending pick — that bug is a
-// special case of this same race, now covered by the general exemption.)
-// canvas's own click-resolution paths (applyFacePick, selectVertexById's
-// segment branch, the empty-space branch) now own clearing/replacing
-// pendingListPick themselves instead, mirroring how they already do for
-// armedVertexId below.
+// Two more canvas-specific exemptions, both narrow — NOT "ignore canvas
+// entirely" (NOTES7; an earlier draft of this fix did exactly that, and
+// was walked back after realizing it was broader than the actual problem
+// warranted):
+//   - isControlPointDragStart: rotating the view is never a decision about
+//     a pending pick (fixes a real bug — dragging the pointer used to
+//     silently discard one).
+//   - isPointerOnVertex(e, pendingListPick.vertexId): a pointerdown that's
+//     about to land on the *exact* vertex currently pending — this is the
+//     same race the button-itself exemption above solves, just for
+//     canvas's own confirm gesture (hidden vertices became canvas-
+//     clickable this session, including the pending one itself — pointerdown
+//     always precedes the pointerup that would otherwise confirm it, so
+//     without this the listener would clear the pick a frame before
+//     handleCanvasClick got to act on it).
+// Every *other* canvas pointerdown — a different vertex, empty space, a
+// segment — still clears the pick exactly as before; only these two exact
+// situations are carved out.
 document.addEventListener('pointerdown', e => {
   if (!pendingListPick) return;
   if (e.target === pendingListPick.btnEl) return;
   if (e.target.closest('.list-toggle[data-list="vertex"]')) return;
-  if (e.target === canvas) return;
+  if (isControlPointDragStart(e)) return;
+  if (isPointerOnVertex(e, pendingListPick.vertexId)) return;
   clearPendingListPick();
 }, true);
 
