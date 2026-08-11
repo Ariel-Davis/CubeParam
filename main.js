@@ -2974,6 +2974,13 @@ function getSegmentPickAction(vertexId) {
 // path (selectVertexById) keeps its own existing toggle-add/remove behavior
 // unchanged, since that wasn't the reported gap.
 function applySegmentPick(id) {
+  // Whatever's about to happen is now authoritative, so any stale list
+  // preview for a *different* vertex resolves here — needed because the
+  // pointerdown listeners that would otherwise clear pendingListPick/
+  // armedVertexId now defer entirely to a vertex row's own click handler
+  // (see those listeners' comments, NOTES7) rather than clearing pre-
+  // emptively, so this function is where that deferred resolution lands.
+  clearPendingListPick();
   const action = getSegmentPickAction(id);
   // Arming (unlike a plain append) requires further list interaction — the
   // user has to find and press the new "remove" button — so unlike append,
@@ -3040,9 +3047,18 @@ function applyFacePick(id) {
     // two — and its existing _pendingScrollToVertexId assignment is what
     // scrolls the row into view for a canvas-triggered error, matching
     // the request that the information be shown once, on the spot.
+    // handleListPick has its own re-targeting-the-same-vertex no-op check
+    // (see its comment) — deliberately not pre-empted by a clear here, so
+    // that check still applies to a repeated canvas click too.
     handleListPick(id, getFacePickAction, applyFacePick);
     return;
   }
+  // Every other outcome resolves any stale, unrelated list preview here —
+  // needed now that the pendingListPick-clearing listener defers entirely
+  // to a vertex row's own click handler instead of clearing pre-emptively
+  // on pointerdown (see that listener's comment, NOTES7); this is where
+  // that deferred resolution actually lands once the click resolves.
+  clearPendingListPick();
   // Arming needs the list scrolled to the row even when triggered from
   // canvas — unlike a plain append (fully automatic, no further input
   // needed), arming requires the user to then find and press a button (see
@@ -3101,6 +3117,26 @@ function clearPendingListPick() {
 }
 
 function handleListPick(vertexId, getAction, applyPick) {
+  // Re-targeting the exact same vertex with the exact same outcome (e.g.
+  // re-clicking a row that's already showing "use"/"error") is a genuine
+  // no-op — nothing about the resulting state actually changes. Previously
+  // this unconditionally tore the button down and rebuilt it regardless,
+  // which the user traced to a real, reproducible flicker (both the
+  // button itself and, downstream, a native grey highlight flash on the
+  // row) — "close"/"remove" never had this problem because re-clicking an
+  // already-armed row was already a true no-op (see renderVertexList's row
+  // dispatch). getAction is compared by reference (getFacePickAction vs.
+  // getSegmentPickAction) rather than re-invoked, since it's a pure
+  // function of current state — same vertexId + same getAction always
+  // means the same computed kind, so there's nothing left to check.
+  if (pendingListPick && pendingListPick.vertexId === vertexId && pendingListPick.getAction === getAction) {
+    return;
+  }
+  // A genuinely new pick supersedes any stale arm state left over from a
+  // different vertex — needed now that the arm-clearing listener defers
+  // entirely to a vertex row's own click handler (see that listener's
+  // comment, NOTES7) instead of clearing pre-emptively on pointerdown.
+  clearArmedStates();
   clearPendingListPick();
   pendingListPick = { vertexId, btnEl: null, getAction, applyPick };
   // Scroll the picked row fully into view, once — previously missing
@@ -3158,13 +3194,27 @@ function handleSegmentListPick(vertexId) {
 // open/close toggle, and at the end of every renderVertexList — cheap and
 // a no-op whenever nothing is pending, so it's safe to call liberally
 // rather than track exactly which changes could have moved the row.
+// True once the vertex list is hidden by *any* collapsed ancestor —
+// its own .list-toggle, the Display submenu, or the whole control panel
+// (all three ultimately use display:none, per their own toggle handlers,
+// so offsetParent reliably goes null under any of them). Checking this
+// directly, rather than only listSectionOpen.vertex, closes a real bug:
+// the Display-submenu and whole-panel toggles never called any of these
+// update functions at all, so a floating button collapsed along with
+// neither of those two would just keep floating on screen, stale, with
+// nothing left underneath it (see NOTES7 — user-caught, iPad/laptop
+// Chrome and Safari both).
+function isVertexListHidden(list) {
+  return list.offsetParent === null;
+}
+
 function updatePendingButtonPosition() {
   if (!pendingListPick) return;
   const list = document.getElementById('vertex-list');
   const row  = list.querySelector(`[data-vertex-id="${pendingListPick.vertexId}"]`);
   if (!row) { clearPendingListPick(); return; }
 
-  if (!listSectionOpen.vertex) {
+  if (!listSectionOpen.vertex || isVertexListHidden(list)) {
     if (pendingListPick.btnEl) { pendingListPick.btnEl.remove(); pendingListPick.btnEl = null; }
     return;
   }
@@ -3247,7 +3297,7 @@ function updateLatestButtonPosition() {
   const id   = currentLatestPickId();
   const list = document.getElementById('vertex-list');
   const row  = (id !== null && armedVertexId === id) ? list.querySelector(`[data-vertex-id="${id}"]`) : null;
-  if (!row || !listSectionOpen.vertex) {
+  if (!row || !listSectionOpen.vertex || isVertexListHidden(list)) {
     if (latestBtnEl) { latestBtnEl.remove(); latestBtnEl = null; }
     return;
   }
@@ -3270,7 +3320,7 @@ function updateCloseButtonPosition() {
   const id   = currentClosePickId();
   const list = document.getElementById('vertex-list');
   const row  = (id !== null && faceCloseArmed) ? list.querySelector(`[data-vertex-id="${id}"]`) : null;
-  if (!row || !listSectionOpen.vertex) {
+  if (!row || !listSectionOpen.vertex || isVertexListHidden(list)) {
     if (closeBtnEl) { closeBtnEl.remove(); closeBtnEl = null; }
     return;
   }
@@ -5148,6 +5198,14 @@ document.getElementById('btn-toggle-controls').addEventListener('click', () => {
   const btn  = document.getElementById('btn-toggle-controls');
   body.classList.toggle('collapsed');
   btn.classList.toggle('active', !body.classList.contains('collapsed'));
+  // Collapsing the whole panel hides the vertex list along with it, but
+  // never told any floating button to notice — bug, user-caught: a
+  // "use"/"close"/"remove" button could be left floating on screen with
+  // nothing left underneath it. updatePendingButtonPosition/
+  // updateArmButtons now detect this themselves (isVertexListHidden), but
+  // still need an actual call after the collapse to act on it.
+  updatePendingButtonPosition();
+  updateArmButtons();
 });
 
 ['view', 'aux', 'disp'].forEach(key => {
@@ -5157,6 +5215,12 @@ document.getElementById('btn-toggle-controls').addEventListener('click', () => {
     const open = sub.style.display === 'none';
     sub.style.display = open ? '' : 'none';
     btn.classList.toggle('active', open);
+    // Only 'disp' actually contains the vertex list, but this is cheap and
+    // a no-op otherwise, same reasoning .list-toggle's own handler already
+    // uses — not worth gating on which key this is. Same bug as the
+    // whole-panel toggle above, same fix.
+    updatePendingButtonPosition();
+    updateArmButtons();
   });
 });
 
@@ -5828,6 +5892,29 @@ document.addEventListener('click', e => {
   if (btn) btn.blur();
 });
 
+// Whether a click is on one of the panel's own navigation/collapse
+// controls — the vertex list's own collapse arrow, any of the three
+// submenu toggles (only "Display" actually contains the vertex list, but
+// see the same reasoning already used elsewhere for not gating on which
+// one), or the whole-panel collapse. None of these are "the user clicked
+// away, abandon the pick" in the sense either outside-click listener below
+// cares about — they're navigation, and the pick (list-driven preview or
+// arm state) is specifically designed to survive being scrolled/collapsed
+// out of view, per each of their own comments. Bug, user-caught: neither
+// listener actually had this exemption for the submenu/whole-panel
+// buttons before (only the pendingListPick one exempted the vertex list's
+// own collapse arrow) — clicking any of those three buttons was itself
+// registering as an outside click and clearing the pick, on top of the
+// separate bug where the floating button never even knew to hide/reshow
+// around the collapse (see updatePendingButtonPosition/updateArmButtons'
+// own isVertexListHidden check).
+function isPanelNavControl(e) {
+  if (e.target.closest('.list-toggle[data-list="vertex"]')) return true;
+  if (e.target.closest('#btn-sub-view, #btn-sub-aux, #btn-sub-disp')) return true;
+  if (e.target.closest('#btn-toggle-controls')) return true;
+  return false;
+}
+
 // Any click anywhere except the pending button itself clears an in-progress
 // list-driven pick (face or segment) — capture phase, same idiom as
 // onOutsideClick/clearNameError above, and the e.target guard is what lets
@@ -5854,15 +5941,33 @@ document.addEventListener('click', e => {
 //     always precedes the pointerup that would otherwise confirm it, so
 //     without this the listener would clear the pick a frame before
 //     handleCanvasClick got to act on it).
-// Every *other* canvas pointerdown — a different vertex, empty space, a
-// segment — still clears the pick exactly as before; only these two exact
-// situations are carved out.
+//
+// A further exemption, user-caught (two bugs, one root cause): *any*
+// pointerdown landing on a vertex-list row is deferred entirely, not just
+// the pending row or a canvas hit. Two symptoms traced back to the same
+// mechanism: (1) touch-scrolling the list, starting from a row that wasn't
+// the pending one, lost the pending pick outright — a touch scroll begins
+// with a genuine pointerdown wherever the finger first lands, so without
+// this exemption every scroll gesture that happened to start on some other
+// row was indistinguishable from a deliberate click on it; (2) even a
+// scroll starting *on* the pending row's own button-adjacent area only
+// survived the first such gesture, since after the row scrolled out from
+// under the finger, the next pointerdown inevitably landed elsewhere.
+// Deferring unconditionally for any row fixes both: nothing is decided
+// until an actual `click` resolves (which a scroll never produces), and
+// that click's own handler (handleListPick/applyFacePick/applySegmentPick)
+// already resolves a *different* vertex's stale pending pick correctly on
+// its own once it runs (each now starts by clearing it — see their own
+// comments) — so no information is lost by not deciding here on
+// pointerdown. Every non-row target (an unrelated control, empty space)
+// still clears immediately, unchanged.
 document.addEventListener('pointerdown', e => {
   if (!pendingListPick) return;
   if (e.target === pendingListPick.btnEl) return;
-  if (e.target.closest('.list-toggle[data-list="vertex"]')) return;
+  if (isPanelNavControl(e)) return;
   if (isControlPointDragStart(e)) return;
   if (isPointerOnVertex(e, pendingListPick.vertexId)) return;
+  if (e.target.closest && e.target.closest('.vertex-entry')) return;
   clearPendingListPick();
 }, true);
 
@@ -5873,18 +5978,44 @@ document.addEventListener('pointerdown', e => {
 // own, invoked from pointerup, and would otherwise have its arm cleared out
 // from under it by this pointerdown-phase listener before that handler
 // ever runs (the same race the pendingListPick.btnEl exemption above
-// solves for its own button). Also exempts the armed vertex's own row (or
-// v0's row, while its close-arm is active) and both companion buttons, for
-// the identical reason — those are exactly the taps meant to *resolve* the
-// arm, not cancel it.
+// solves for its own button).
+//
+// Every vertex-list row is deferred entirely too, for the identical reason
+// spelled out on the pendingListPick listener above — this used to exempt
+// only the armed vertex's own row (or v0's, while close-armed), clearing
+// immediately for every *other* row. Two real bugs traced to that
+// narrower version, both user-caught:
+//   - Clicking a genuinely different row while something was armed took
+//     two clicks, not one — the immediate clearArmedStates()+
+//     renderVertexList() call rebuilt that row from scratch before the
+//     pointerup-driven click could land on it (browsers suppress a click
+//     whose target was removed mid-gesture rather than redirecting it —
+//     see NOTES7's earlier writeup of this same mechanism).
+//   - Touch-scrolling the list from any row other than the armed one lost
+//     the arm outright — a scroll's opening pointerdown was
+//     indistinguishable from a deliberate click on whatever row it
+//     started on.
+//   - A related bug, same root, worth naming separately: the two narrow
+//     exemptions this replaced compared `rowId === armedVertexId` even
+//     when `row` itself was null (e.g. clicking some unrelated control)
+//     — `null === null` is true, so *any* non-row click while only
+//     `faceCloseArmed` was set (armedVertexId itself is null in that
+//     state) was wrongly exempted, meaning the close-arm never cleared
+//     on an outside click at all. Requiring an actual row makes the
+//     comparison meaningful again; the wider row-deferral below makes the
+//     two specific checks moot anyway, since every row now defers
+//     regardless of which vertex it belongs to.
+// Deferring is safe because a real click's own handler
+// (applyFacePick/applySegmentPick, or handleListPick for append/reject)
+// already resolves the arm state itself once it actually runs — arming a
+// fresh vertex, or clicking an already-armed row (a no-op by design, see
+// renderVertexList's row dispatch), both come out correct either way.
 document.addEventListener('pointerdown', e => {
   if (armedVertexId === null && !faceCloseArmed) return;
   if (e.target === canvas) return;
   if (e.target === latestBtnEl || e.target === closeBtnEl) return;
-  const row   = e.target.closest && e.target.closest('.vertex-entry');
-  const rowId = row ? Number(row.dataset.vertexId) : null;
-  if (rowId === armedVertexId) return;
-  if (faceCloseArmed && facePickOrder.length > 0 && rowId === facePickOrder[0]) return;
+  if (isPanelNavControl(e)) return;
+  if (e.target.closest && e.target.closest('.vertex-entry')) return;
   clearArmedStates();
   renderVertexList();
   draw();
