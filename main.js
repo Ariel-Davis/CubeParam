@@ -4383,7 +4383,7 @@ function renderVertexList() {
 
       const name = document.createElement('span');
       name.className = 'v-name';
-      name.textContent = v.name;
+      name.textContent = v.name + ':';
       if (_rejectedVertexId === v.id) setNameError(name);
 
       const coords = document.createElement('span');
@@ -4981,12 +4981,12 @@ function renderFaceList() {
     });
 
     const swatch = document.createElement('span');
-    swatch.className = 's-swatch';
+    swatch.className = 'f-swatch';
     swatch.style.background = f.color;
 
     const label = document.createElement('span');
     label.className = 's-name';
-    label.textContent = f.name;
+    label.textContent = f.name + ':';
 
     const visibleWrap = document.createElement('span');
     visibleWrap.className = 'v-toggle-wrap';

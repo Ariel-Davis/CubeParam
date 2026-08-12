@@ -1066,6 +1066,14 @@ body.dark-mode .list-toggle {
   flex-shrink: 0;
 }
 
+.f-swatch {
+  width: 12px;
+  height: 11px;
+  flex-shrink: 0;
+  -webkit-clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+
 .s-name {
   flex: 1;
   font-family: monospace;
