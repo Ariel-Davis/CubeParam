@@ -152,6 +152,8 @@ let segments         = [];
 let nextSegmentId    = 0;
 let faces            = [];
 let nextFaceId       = 0;
+let curves           = [];
+let nextCurveId      = 0;
 let selectedVertexIds = new Set();
 let segmentMode       = 'off';     // 'off' | 'on' | 'on++'
 let focusedVertexId   = null;      // vertex id highlighted in the list (canvas click)
@@ -186,7 +188,7 @@ let listSectionOpen = { vertex: true, segment: true, face: true };
 
 let codeOpen         = false;  // true while the Code submenu is open
 let codeLineRecords  = [];     // last parseCodeText() result, one entry per textarea line
-let previewOverride  = null;   // { vertices, segments } staged preview while editing, or null
+let previewOverride  = null;   // { vertices, segments, faces, curves } staged preview while editing, or null
 
 // The "set" cluster shown at the top of VERTICES/SEGMENTS on a fresh Load —
 // updated on every Save so the last-saved governing values are what greets
@@ -197,6 +199,7 @@ let previewOverride  = null;   // { vertices, segments } staged preview while ed
 let lastSetVertex  = { color: undefined, r: undefined, visible: undefined, label: undefined, naming: undefined, counter: undefined };
 let lastSetSegment = { color: undefined, width: undefined, visible: undefined, naming: undefined, counter: undefined };
 let lastSetFace    = { color: undefined, visible: undefined, naming: undefined, counter: undefined };
+let lastSetCurve   = { color: undefined, visible: undefined, naming: undefined, counter: undefined };
 
 // Reparsing/validation is gated on "leaving a line after changing it" (not on
 // every keystroke) — these track the line the caret was in and its text as of
@@ -226,9 +229,10 @@ function captureState() {
     vertices:          vertices.map(v => ({ ...v, coords: [...v.coords], exprs: [...(v.exprs ?? ['','',''])] })),
     segments:          segments.map(s => ({ ...s, vertexIds: [...s.vertexIds] })),
     faces:             faces.map(f => ({ ...f, vertexIds: [...f.vertexIds] })),
+    curves:            curves.map(c => ({ ...c, points: [...(c.points ?? [])] })),
     selectedVertexIds: new Set(selectedVertexIds),
     constants:         constants.map(c => ({ ...c })),
-    nextVertexId, nextSegmentId, nextFaceId, nextConstantId,
+    nextVertexId, nextSegmentId, nextFaceId, nextCurveId, nextConstantId,
     nameCounters:      { ...nameCounters },
   };
 }
@@ -244,11 +248,13 @@ function restoreState(state) {
   vertices               = state.vertices;
   segments               = state.segments;
   faces                  = state.faces ?? [];
+  curves                 = state.curves ?? [];
   selectedVertexIds      = state.selectedVertexIds;
   constants              = state.constants ?? [];
   nextVertexId           = state.nextVertexId;
   nextSegmentId          = state.nextSegmentId;
   nextFaceId             = state.nextFaceId;
+  nextCurveId            = state.nextCurveId ?? 0;
   nextConstantId         = state.nextConstantId;
   nameCounters           = { ...state.nameCounters };
   editingVertexId        = null;
@@ -509,9 +515,10 @@ function resolveBoolAttr(exprText, boolEnv) {
 
 // One dispatch point for "does this expression fit this *locked* const
 // kind" — shared by buildEnvs (per-render cache refresh), parseCodeText's
-// 'const' branch when a kind is declared, `edit const`'s validation, and
-// the constants list row's direct value edit, so the answer is identical
-// everywhere a constant's kind can no longer change but its value can.
+// number/color/bool branch, `edit number`/`edit color`/`edit bool`'s
+// validation, and the constants list row's direct value edit, so the
+// answer is identical everywhere a constant's kind can no longer change
+// but its value can.
 function resolveConstByKind(kind, exprText, envs) {
   return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv) :
          kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv) :
@@ -580,9 +587,12 @@ function resolveEditFields(type, explicitAttrs, envs) {
 
 // Builds all three constant environments in one order-dependent left-to-
 // right pass (a constant can only reference an earlier constant of the same
-// kind). Kind is no longer guessed here — it's declared once at creation
-// and stored on `c.kind` for life (see the 'const' branch of parseCodeText
-// and resolveEditFields's `edit const` handling), so this just resolves
+// kind). Kind is no longer guessed here — it's fixed forever by which
+// keyword (number/color/bool) created it and stored on `c.kind` for life
+// (see that branch of parseCodeText, and the edit dispatch's own
+// number/color/bool branch, both of which resolve via resolveConstByKind
+// rather than resolveEditFields — a const's edit is a bare value, not
+// field=value tokens), so this just resolves
 // each constant's current expression against its own already-known kind,
 // mirroring the `def.kind` dispatch used throughout ATTR_DEFS-driven code.
 // An expression that fails to resolve under its locked kind (e.g. a
@@ -601,6 +611,99 @@ function buildEnvs() {
     else envs.numericEnv[c.name] = c.value;
   }
   return envs;
+}
+
+// Perpendicular distance from p to the segment a-b (clamped projection,
+// not the infinite line) — the "is this chord still a good approximation
+// of the curve" measurement tessellateCurve's adaptive refinement uses.
+function pointToSegmentDistance3D(p, a, b) {
+  const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2];
+  const apx = p[0] - a[0], apy = p[1] - a[1], apz = p[2] - a[2];
+  const abLenSq = abx * abx + aby * aby + abz * abz;
+  const t = abLenSq === 0 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLenSq));
+  const cx = a[0] + t * abx, cy = a[1] + t * aby, cz = a[2] + t * abz;
+  return Math.hypot(p[0] - cx, p[1] - cy, p[2] - cz);
+}
+
+const CURVE_MAX_DEPTH      = 16;
+const CURVE_TOLERANCE      = 0.01;
+// Checked against the chord at each candidate split, not just the exact
+// midpoint. Deliberately golden-ratio-derived (frac(n*phi) for n=1,2,3),
+// not round fractions like 0.25/0.5/0.75 — the golden ratio is famously
+// the real number *worst* approximated by rationals, which is exactly the
+// property wanted here: a periodic curve (sin/cos-based) tested at simple
+// fractions of a domain that's a round multiple of its period lands every
+// test point on an exact repeat of the period, measuring zero deviation
+// for a chord that actually loops around several times — confirmed as a
+// real failure (t in [0, 8*pi], a plain circle: 4 exact periods, three
+// simple-fraction test points all landing on repeats, the whole curve
+// accepted as a straight line). Irrational-ratio fractions make that kind
+// of exact alignment enormously less likely for any "round" domain a user
+// would actually choose.
+const CURVE_TEST_FRACTIONS = [0.236, 0.618, 0.854];
+// Forces at least this many levels of unconditional subdivision before the
+// deviation test is even consulted — a structural backstop, not just a
+// probabilistic one: no single top-level (or near-top-level) chord can
+// ever be accepted outright no matter how its sample points happen to
+// align, however unluckily. Adaptive refinement almost always exceeds
+// this floor anyway for genuinely curved content, so it rarely ends up
+// being the limiting factor — it only bites for the specific pathological
+// case this exists to catch.
+const CURVE_MIN_DEPTH      = 5;
+
+// Tessellates a curve into a polyline via pure recursive chord-deviation
+// subdivision, starting from just the two domain endpoints — deliberately
+// *not* seeded with a fixed number of uniform samples first (an earlier
+// version of this function was, and that was a real bug: a fixed seed
+// count spread over the domain makes the starting resolution a function
+// of domain *length*, not curve geometry — a longer domain got coarser
+// seed spacing regardless of how much the curve actually curves, so two
+// domains of different length over the same-shaped curve visibly
+// tessellated at different granularities. Purely recursive, deviation-
+// triggered subdivision has no such coupling: how finely a stretch of
+// curve gets split depends only on how much it deviates from a straight
+// chord, never on the raw size of the domain it happens to sit in.
+// Called from reEvalObjects (the cache-invalidation step for a curve's
+// resolved `.points`, same role vertex's exprs->coords resolution plays)
+// and at creation time in parseCodeText.
+function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
+  function evalAt(t) {
+    const env = { ...numericEnv, [param]: t };
+    return [evalExpr(xExpr, env), evalExpr(yExpr, env), evalExpr(zExpr, env)];
+  }
+  function isFinitePoint(p) {
+    return Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2]);
+  }
+  function chordNeedsSplit(tLo, tHi, pLo, pHi) {
+    for (const frac of CURVE_TEST_FRACTIONS) {
+      const p = evalAt(tLo + (tHi - tLo) * frac);
+      if (!isFinitePoint(p) || pointToSegmentDistance3D(p, pLo, pHi) > CURVE_TOLERANCE) return true;
+    }
+    return false;
+  }
+
+  const points = [];
+  const p0 = evalAt(lo);
+  points.push(p0);
+
+  function subdivide(tLo, tHi, pLo, pHi, depth) {
+    // A NaN endpoint (e.g. domain touches an asymptote) can't have its
+    // deviation measured — accept the chord as-is rather than recursing
+    // toward a discontinuity that will never converge; drawCurves breaks
+    // the rendered path at the NaN point instead of connecting through it.
+    const mustSplit = depth < CURVE_MIN_DEPTH;
+    if (!isFinitePoint(pLo) || !isFinitePoint(pHi) || depth >= CURVE_MAX_DEPTH || (!mustSplit && !chordNeedsSplit(tLo, tHi, pLo, pHi))) {
+      points.push(pHi);
+      return;
+    }
+    const tMid = (tLo + tHi) / 2;
+    const pMid = evalAt(tMid);
+    subdivide(tLo, tMid, pLo, pMid, depth + 1);
+    subdivide(tMid, tHi, pMid, pHi, depth + 1);
+  }
+
+  subdivide(lo, hi, p0, evalAt(hi), 0);
+  return points;
 }
 
 // Re-resolves every expression-backed field (coordinates plus color/radius/
@@ -627,6 +730,20 @@ function reEvalObjects() {
   for (const fc of faces) {
     if (fc.colorExpr)   { const r = resolveColorAttr(fc.colorExpr, colorEnv); if (r.ok) fc.color   = r.value; }
     if (fc.visibleExpr) { const r = resolveBoolAttr(fc.visibleExpr, boolEnv); if (r.ok) fc.visible  = r.value; }
+  }
+  for (const cv of curves) {
+    if (cv.colorExpr)   { const r = resolveColorAttr(cv.colorExpr, colorEnv); if (r.ok) cv.color   = r.value; }
+    if (cv.visibleExpr) { const r = resolveBoolAttr(cv.visibleExpr, boolEnv); if (r.ok) cv.visible  = r.value; }
+    // Domain bounds are expressions too (may reference constants) — re-
+    // resolve before re-tessellating, same relationship vertex's
+    // exprs->coords has to reEvalObjects.
+    const lo = evalExpr(cv.domainLoExpr, numericEnv);
+    const hi = evalExpr(cv.domainHiExpr, numericEnv);
+    if (Number.isFinite(lo) && Number.isFinite(hi) && lo < hi) {
+      cv.domainLo = lo;
+      cv.domainHi = hi;
+      cv.points = tessellateCurve(cv.xExpr, cv.yExpr, cv.zExpr, cv.param, lo, hi, numericEnv);
+    }
   }
 }
 
@@ -663,7 +780,14 @@ function renameConstantEverywhere(oldName, newName) {
     if (!t.list) continue;
     for (const obj of t.list()) {
       for (const f of Object.keys(obj)) {
-        if (f.endsWith('Expr') && obj[f]) obj[f] = renameInExpr(obj[f], oldName, newName);
+        if (!f.endsWith('Expr') || !obj[f]) continue;
+        // A curve's own bound parameter shadows any same-named constant
+        // within its x=/y=/z= body — renaming that constant elsewhere must
+        // not corrupt what's actually a reference to the local parameter.
+        // (obj.param is undefined for every other type, so this is a
+        // no-op everywhere except curves.)
+        if (obj.param && oldName === obj.param && (f === 'xExpr' || f === 'yExpr' || f === 'zExpr')) continue;
+        obj[f] = renameInExpr(obj[f], oldName, newName);
       }
     }
     const stateObj = t.lastSet?.();
@@ -672,22 +796,23 @@ function renameConstantEverywhere(oldName, newName) {
       if (stateObj[f] === oldName) stateObj[f] = newName;
     }
   }
-  // Vertex coordinates (`exprs`) are the one exception: a plain array, not
-  // a `*Expr`-suffixed field, so they need their own pass.
+  // Vertex coordinates (`exprs`) are a structural exception: a plain array,
+  // not a `*Expr`-suffixed field, so they need their own pass.
   for (const v of vertices) {
     if (v.exprs) v.exprs = v.exprs.map(e => renameInExpr(e, oldName, newName));
   }
 }
 
-function isNameTakenIn(name, vertexList, constList, faceList = [], segList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null) {
+function isNameTakenIn(name, vertexList, constList, faceList = [], segList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null, curveList = [], excludeCurveId = null) {
   return vertexList.some(v => v.name === name && v.id !== excludeVertexId)
       || constList.some(c => c.name === name && c.id !== excludeConstId)
       || faceList.some(f => f.name === name && f.id !== excludeFaceId)
-      || segList.some(s => s.name === name && s.id !== excludeSegId);
+      || segList.some(s => s.name === name && s.id !== excludeSegId)
+      || curveList.some(cv => cv.name === name && cv.id !== excludeCurveId);
 }
 
-function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null) {
-  return isNameTakenIn(name, vertices, constants, faces, segments, excludeVertexId, excludeConstId, excludeFaceId, excludeSegId);
+function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null, excludeCurveId = null) {
+  return isNameTakenIn(name, vertices, constants, faces, segments, excludeVertexId, excludeConstId, excludeFaceId, excludeSegId, curves, excludeCurveId);
 }
 
 // Persistent per-prefix auto-name counters for controls-driven creation —
@@ -697,7 +822,7 @@ function isNameTaken(name, excludeVertexId = null, excludeConstId = null, exclud
 // actually consumed (including any collision skip below, folded into the
 // same lookup) or when undo/redo restores a prior value — never on an
 // explicit typed name, a rename, or a deletion.
-let nameCounters = { P: 0, S: 0, F: 0 };
+let nameCounters = { P: 0, S: 0, F: 0, C: 0 };
 
 // Next free `${prefix}${n}` name, starting from that prefix's own counter
 // (in whichever `counters` map — the live one above, or a code-file parse's
@@ -805,27 +930,42 @@ let vColorPicker, segColorPicker, faceColorPicker, cAddColorPicker;
 
 // ─── Code submenu: parser & serializer ─────────────────────────────────────────
 //
-// Canonical text format (see NOTES2.md for the full spec). A leading '#'
-// opens a section header — '=' bars for the two auxiliary (non-drawn)
-// sections, '-' bars for the three display (drawn) sections:
-//   #======== CONSTANTS ========
-//   #======== FUNCTIONS ========
+// Canonical text format (see NOTES2.md for the early spec sketch — the real
+// grammar has moved on from it in several ways, this comment is the current
+// source of truth). A leading '#' opens a section header — '=' bars for the
+// auxiliary (non-drawn) sections, '-' bars for the display (drawn) ones:
+//   #======== VIEW SETTINGS ========      (cosmetic banner — no
+//                                           OBJECT_TYPES entry, nothing
+//                                           routes here yet)
+//   #======== AUXILIARY CONSTANTS ========
+//   #======== POLYTOPES ========          (cosmetic banner, wraps the next
+//                                           three — each still its own
+//                                           independent real section)
 //   #-------- VERTICES --------
 //   #-------- SEGMENTS --------
+//   #-------- FACES --------
+//   #======== AUXILIARY FUNCTIONS ========  (holds both function and
+//                                             domain lines, flatly, no
+//                                             subheaders)
 //   #-------- CURVES --------
 //   #----------------------------------------     (divider — no name)
 // A '#' line that isn't one of those header-bar shapes is a plain comment —
-// ignored by parsing, left exactly where it is by Sort.
+// ignored by parsing, left exactly where it is by Sort. A header-bar-shaped
+// line whose title doesn't match any OBJECT_TYPES entry (VIEW SETTINGS,
+// POLYTOPES) is classified the same inert way — never relocated, never
+// treated as an insertion anchor for real object lines.
 // Below the divider is the scratch area: a place to type new objects of any
 // kind without caring which section they belong in. Sort always relocates
 // every *valid* recognized object out of the scratch area into its home
 // section, leaving only invalid/unrecognized text behind there.
 //
-// Object lines: "keyword name?: rest". const/vertex/segment are supported;
-// function/slider/curve are recognized but rejected (Phase 1 — no evaluator
-// support for them yet, but their sections still exist so the file format
-// doesn't need to change again once they are). Everything else is
-// 'unrecognized'.
+// Object lines: "keyword name?: rest". number/color/bool/vertex/segment/
+// face/curve are supported; domain/function/slider are recognized but
+// rejected (no evaluator support for them yet, but their sections still
+// exist so the file format doesn't need to change again once they are).
+// curve's own grammar is `curve NAME: x=expr ; y=expr ; z=expr ; PARAM in
+// [lo, hi] [color=... visible=...]` — see the keyword === 'curve' branch.
+// Everything else is 'unrecognized'.
 //
 // parseCodeText() is a pure function: it only reads its `text` argument and
 // calls evalExpr()/isNameTakenIn(), so it can build a fully independent staged
@@ -849,30 +989,35 @@ let vColorPicker, segColorPicker, faceColorPicker, cAddColorPicker;
 //     is the single source of truth for per-type settable attributes now —
 //     faces have no add-row, but lastSetFace still governs bare face lines)
 const OBJECT_TYPES = [
-  { key: 'constants', title: 'CONSTANTS', style: 'eq',   match: /CONSTANT/i },
-  { key: 'functions', title: 'FUNCTIONS', style: 'eq',   match: /FUNCTION/i },
+  { key: 'constants', title: 'AUXILIARY CONSTANTS', style: 'eq', match: /CONSTANT/i },
   { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i,
     list: () => vertices, lastSet: () => lastSetVertex },
   { key: 'segments',  title: 'SEGMENTS',  style: 'dash', match: /SEGMENT/i,
     list: () => segments, lastSet: () => lastSetSegment },
   { key: 'faces',     title: 'FACES',     style: 'dash', match: /FACE/i,
     list: () => faces, lastSet: () => lastSetFace },
-  // No `list` yet — curves aren't implemented. This entry existing at all is
-  // what makes it hard to forget the section-parsing side of introducing them.
-  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i },
+  // Both `function` and `domain` keyword lines route into this one section
+  // (rec.targetSection = 'functions' for both — see the object-creation
+  // dispatch below) — a single key, a single header emission, no
+  // subheaders. A second OBJECT_TYPES entry for 'domain' would make
+  // sortCodeText's per-key loop emit a second, duplicate "AUXILIARY
+  // FUNCTIONS" header, since that loop emits one section per SECTION_ORDER
+  // key regardless of title text.
+  { key: 'functions', title: 'AUXILIARY FUNCTIONS', style: 'eq', match: /FUNCTION/i },
+  { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i,
+    list: () => curves, lastSet: () => lastSetCurve },
 ];
 const SECTION_ORDER = OBJECT_TYPES.map(d => d.key);
 
 const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
-const CODE_OBJECT_RE = /^(const|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
+const CODE_OBJECT_RE = /^(number|color|bool|domain|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
 // Canonical form is colon-uniform (`set vertex: color=X`), matching every
 // other line kind — but the colon is optional on read: `set vertex
 // color=X` (the original, pre-decision shape) still parses, silently
-// normalized to the colon form on next Sort/Save, same backward-compat
-// treatment `const`'s shortcut forms already get.
-const CODE_SET_RE    = /^set\s+(vertex|segment|face)(?:\s*:\s*|\s+)(.+)$/;
-const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|const)\b\s*([^:]*):(.*)$/;
+// normalized to the colon form on next Sort/Save.
+const CODE_SET_RE    = /^set\s+(vertex|segment|face|curve)(?:\s*:\s*|\s+)(.+)$/;
+const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|number|color|bool)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
 
@@ -995,19 +1140,22 @@ function parseFaceVertexListEdit(positional, target, vertexByName) {
 
   return { error: `unrecognized face edit verb '${verb}'` };
 }
-// A const's kind (number/color/bool) is declared once at creation and
-// locked forever after — see the 'const' branch below and resolveConstKind.
-// 'bool' is the DSL-facing keyword; internally a boolean-kind constant's
-// `.kind` is still stored as 'boolean', matching every existing reader of
-// that field (renderConstValSpan, buildEnvs, etc.) — only the parser needs
-// to know about the shorter keyword.
-const CONST_KIND_KEYWORDS = ['number', 'color', 'bool'];
+// A const's kind (number/color/bool) is fixed forever by which bare
+// keyword created it — see the number/color/bool branch below. 'bool' is
+// the DSL-facing keyword; internally a boolean-kind constant's `.kind` is
+// still stored as 'boolean', matching every existing reader of that field
+// (renderConstValSpan, buildEnvs, etc.) — only the parser needs to know
+// about the shorter keyword. No reserved-word list is needed for these
+// three anymore (unlike when they could optionally appear as a kind-token
+// inside `const`'s name-field position) — they're true top-level keywords
+// now, matched before name-position is ever reached, so a constant can
+// legally be named "number" the same way a vertex can be named "vertex".
 
 // field -> canonical syntax token name (also used by tokenizeAttrs' error text)
 const FIELD_TOKEN_NAME = { color: 'color', r: 'r', width: 'w', visible: 'visible', label: 'label', x: 'x', y: 'y', z: 'z', naming: 'naming', counter: 'counter' };
 
 // Built-in auto-name prefix per type, absent any `naming=` override.
-const AUTO_NAME_PREFIX = { vertex: 'P', segment: 'S', face: 'F' };
+const AUTO_NAME_PREFIX = { vertex: 'P', segment: 'S', face: 'F', curve: 'C' };
 
 function formatFieldToken(field, value) {
   return `${FIELD_TOKEN_NAME[field]}=${value}`;
@@ -1057,6 +1205,7 @@ const SET_FIELD_ORDER = {
   vertex:  ['color', 'r', 'visible', 'label', 'naming'],
   segment: ['color', 'width', 'visible', 'naming'],
   face:    ['color', 'visible', 'naming'],
+  curve:   ['color', 'visible', 'naming'],
 };
 // `counter=` is also settable via a `set` line, but deliberately left out
 // of SET_FIELD_ORDER above — unlike naming (a stable template choice),
@@ -1072,6 +1221,7 @@ const SET_SETTABLE_FIELDS = {
   vertex:  [...SET_FIELD_ORDER.vertex,  'counter'],
   segment: [...SET_FIELD_ORDER.segment, 'counter'],
   face:    [...SET_FIELD_ORDER.face,    'counter'],
+  curve:   [...SET_FIELD_ORDER.curve,   'counter'],
 };
 // Text-typed (not number/boolean) for consistency — every field is raw expr
 // text everywhere else now, so these fall-back defaults are too.
@@ -1079,6 +1229,7 @@ const BUILTIN_SET_DEFAULTS = {
   vertex:  { color: DEFAULT_COLOR, r: '5', visible: 'true', label: 'true', naming: AUTO_NAME_PREFIX.vertex },
   segment: { color: DEFAULT_COLOR, width: '1.5', visible: 'true', naming: AUTO_NAME_PREFIX.segment },
   face:    { color: DEFAULT_COLOR, visible: 'true', naming: AUTO_NAME_PREFIX.face },
+  curve:   { color: DEFAULT_COLOR, visible: 'true', naming: AUTO_NAME_PREFIX.curve },
 };
 
 // Per-type table of settable attributes: the set/object-line token (matches
@@ -1101,6 +1252,10 @@ const ATTR_DEFS = {
     { token: 'visible', expr: 'visibleExpr', value: 'visible',   kind: 'bool'   },
   ],
   face: [
+    { token: 'color',   expr: 'colorExpr',   value: 'color',   kind: 'color' },
+    { token: 'visible', expr: 'visibleExpr', value: 'visible', kind: 'bool'  },
+  ],
+  curve: [
     { token: 'color',   expr: 'colorExpr',   value: 'color',   kind: 'color' },
     { token: 'visible', expr: 'visibleExpr', value: 'visible', kind: 'bool'  },
   ],
@@ -1186,6 +1341,7 @@ function parseCodeText(text) {
   const stagedVertices  = [];
   const stagedSegments  = [];
   const stagedFaces     = [];
+  const stagedCurves    = [];
   // Three environments, built incrementally in the same left-to-right walk
   // as everything else — a const can only reference an earlier const of the
   // same kind, exactly like the pre-existing numeric-only rule.
@@ -1196,6 +1352,7 @@ function parseCodeText(text) {
   const segmentByName   = new Map(); // name -> staged segment, built incrementally (edit target lookup)
   const faceByName      = new Map(); // name -> staged face, built incrementally (edit target lookup)
   const constByName     = new Map(); // name -> staged constant, built incrementally (edit target lookup)
+  const curveByName     = new Map(); // name -> staged curve, built incrementally
   let autoConstN   = 0;
   // Per-prefix auto-name counters, local to this one parse (mutations here
   // never touch the live nameCounters directly — see syncNameCounterFromParse,
@@ -1228,6 +1385,7 @@ function parseCodeText(text) {
     vertex:  { color: undefined, r: undefined, visible: undefined, label: undefined, naming: undefined, counter: undefined },
     segment: { color: undefined, width: undefined, visible: undefined, naming: undefined, counter: undefined },
     face:    { color: undefined, visible: undefined, naming: undefined, counter: undefined },
+    curve:   { color: undefined, visible: undefined, naming: undefined, counter: undefined },
   };
 
   for (const raw of text.split('\n')) {
@@ -1284,17 +1442,27 @@ function parseCodeText(text) {
       }
 
       // A constant only ever has one editable thing — its value — so
-      // `edit const NAME: value` takes a bare expression, not field=value
-      // tokens like the other three types, and never touches the
-      // constant's own locked kind: the new expression is resolved against
-      // whatever kind this constant already has (resolveConstByKind),
+      // `edit number/color/bool NAME: value` takes a bare expression, not
+      // field=value tokens like the other three types, and never touches
+      // the constant's own locked kind: the new expression is resolved
+      // against whatever kind this constant already has (resolveConstByKind),
       // rejected if it doesn't fit. Kind can't move between environments
       // mid-parse now that it's locked, so a later line in the same parse
       // just needs this one env entry refreshed to see the new value.
-      if (editType === 'const') {
+      if (editType === 'number' || editType === 'color' || editType === 'bool') {
+        // Since the edit keyword now states a kind explicitly (unlike the
+        // old generic `edit const`), a mismatched keyword needs its own
+        // rejection — otherwise it would silently resolve against the
+        // target's real kind and the wrong keyword would go unnoticed.
+        const editKind = editType === 'bool' ? 'boolean' : editType;
+        if (target.kind !== editKind) {
+          rec.valid = false;
+          rec.errorMsg = `'${targetName}' is a ${target.kind === 'boolean' ? 'bool' : target.kind}, not a ${editType}`;
+          lines.push(rec); continue;
+        }
         const newExpr = editRest.trim();
         if (newExpr === '') {
-          rec.valid = false; rec.errorMsg = 'edit const requires a value'; lines.push(rec); continue;
+          rec.valid = false; rec.errorMsg = `edit ${editType} requires a value`; lines.push(rec); continue;
         }
         const res = resolveConstByKind(target.kind, newExpr, { numericEnv, colorEnv, boolEnv });
         if (!res.ok) {
@@ -1498,7 +1666,7 @@ function parseCodeText(text) {
     }
 
     // "new" is optional, purely-cosmetic sugar on any creation line ("new
-    // const number c: 5", "new vertex P0: ...") — stripped here before
+    // number c: 5", "new vertex P0: ...") — stripped here before
     // matching, and never re-emitted by the canonical formatters (see
     // formatConstLine/formatVertexLine/etc.), so it never round-trips
     // through Sort/Save even when the user typed it.
@@ -1508,7 +1676,7 @@ function parseCodeText(text) {
       rec.kind = 'unrecognized';
       rec.valid = false;
       rec.errorMsg = trimmed.includes(':')
-        ? 'unknown object type (expected const/vertex/segment)'
+        ? 'unknown object type (expected number/color/bool/vertex/segment/face)'
         : "missing ':' — expected 'keyword: ...'";
       lines.push(rec);
       continue;
@@ -1518,66 +1686,42 @@ function parseCodeText(text) {
     const name = nameRaw.trim();
     const rest = restRaw.trim();
 
-    if (keyword === 'function' || keyword === 'slider' || keyword === 'curve') {
+    if (keyword === 'function' || keyword === 'slider' || keyword === 'domain') {
       rec.kind = 'unsupported';
       rec.valid = false;
       rec.errorMsg = `${keyword} objects are not yet supported`;
-      rec.targetSection = keyword === 'function' ? 'functions' : keyword === 'curve' ? 'curves' : null;
+      rec.targetSection = (keyword === 'function' || keyword === 'domain') ? 'functions' : null;
       lines.push(rec);
       continue;
     }
 
-    if (keyword === 'const') {
+    if (keyword === 'number' || keyword === 'color' || keyword === 'bool') {
       rec.kind = 'const';
       rec.targetSection = 'constants';
-
-      // An optional kind token (number/color/bool) may lead the name field
-      // — "const number c: 5". Declaring it locks the constant's kind for
-      // life (see buildEnvs/resolveEditFields's `edit const` branch below);
-      // omitting it falls back to the old shape-inference behavior, run
-      // once here at creation instead of on every render, which is what
-      // makes the shorter legacy forms ("const c: 5") keep working.
-      const nameTokens = name === '' ? [] : name.split(/\s+/);
-      let declaredKind = null;
-      if (nameTokens.length && CONST_KIND_KEYWORDS.includes(nameTokens[0])) {
-        const kindTok = nameTokens.shift();
-        declaredKind = kindTok === 'bool' ? 'boolean' : kindTok; // 'number' | 'color'
-      }
-      let finalName = nameTokens.join(' ');
+      // The keyword itself is now the kind — no more optional leading
+      // kind-token to extract from the name field, no more shape-inference
+      // fallback for an omitted one. 'bool' maps to the internal 'boolean'
+      // literal every existing reader of c.kind already expects.
+      const kind = keyword === 'bool' ? 'boolean' : keyword;
+      let finalName = name;
 
       if (finalName === '') {
-        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid constant name '${finalName}'`; lines.push(rec); continue;
-      } else if (finalName === 'true' || finalName === 'false' || CONST_KIND_KEYWORDS.includes(finalName)) {
+      } else if (finalName === 'true' || finalName === 'false') {
         rec.valid = false; rec.errorMsg = `'${finalName}' is reserved and cannot be used as a constant name`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      let kind, value, resOk = true, errMsg = 'invalid expression';
-      if (declaredKind) {
-        kind = declaredKind;
-        const res = resolveConstByKind(kind, rest, { numericEnv, colorEnv, boolEnv });
-        value = res.value; resOk = res.ok;
-        errMsg = kind === 'color' ? `unknown color '${rest}'` : kind === 'boolean' ? `invalid bool value '${rest}'` : 'invalid expression';
-      } else {
-        // No kind declared — infer once from rest's shape: #rrggbb -> color,
-        // true/false -> boolean, an identifier already known in colorEnv/
-        // boolEnv -> aliases that kind, otherwise numeric.
-        const asColor = resolveColorAttr(rest, colorEnv);
-        const asBool  = resolveBoolAttr(rest, boolEnv);
-        if (CODE_COLOR_RE.test(rest) || (asColor.ok && CODE_IDENT_RE.test(rest))) {
-          kind = 'color'; value = asColor.value;
-        } else if (rest === 'true' || rest === 'false' || (asBool.ok && CODE_IDENT_RE.test(rest))) {
-          kind = 'boolean'; value = asBool.value;
-        } else {
-          kind = 'number';
-          value = evalExpr(rest, numericEnv);
-          resOk = Number.isFinite(value);
-        }
+      const res = resolveConstByKind(kind, rest, { numericEnv, colorEnv, boolEnv });
+      if (!res.ok) {
+        rec.valid = false;
+        rec.errorMsg = kind === 'color' ? `unknown color '${rest}'` : kind === 'boolean' ? `invalid bool value '${rest}'` : 'invalid expression';
+        lines.push(rec); continue;
       }
-      if (!resOk) { rec.valid = false; rec.errorMsg = errMsg; lines.push(rec); continue; }
+      const value = res.value;
 
       const obj = { name: finalName, expr: rest, value, kind };
       if (kind === 'number') numericEnv[finalName] = value;
@@ -1616,10 +1760,10 @@ function parseCodeText(text) {
       let finalName = name;
       if (finalName === '') {
         finalName = advanceAutoName(parseNameCounters, currentSet.vertex.naming ?? AUTO_NAME_PREFIX.vertex,
-          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid vertex name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
       const coords = coordExprs.map(t => evalExpr(t, numericEnv));
@@ -1663,10 +1807,10 @@ function parseCodeText(text) {
       let finalName = name;
       if (finalName === '') {
         finalName = advanceAutoName(parseNameCounters, currentSet.face.naming ?? AUTO_NAME_PREFIX.face,
-          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid face name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
@@ -1680,6 +1824,103 @@ function parseCodeText(text) {
       };
       stagedFaces.push(obj);
       faceByName.set(finalName, obj);
+      rec.parsed = obj;
+      lines.push(rec);
+      continue;
+    }
+
+    if (keyword === 'curve') {
+      rec.kind = 'curve';
+      rec.targetSection = 'curves';
+
+      // Semicolons are the clause separator here, not whitespace inside
+      // tokenizeAttrs (which has no idea `;` exists at all) — this DSL's
+      // only prior semicolon precedent (face's `edit` verb) strips them to
+      // spaces before its own tokenizeAttrs call; curve's clauses have a
+      // different grammatical shape per position (x=/y=/z=/domain), so
+      // splitting on `;` up front and parsing each piece by position is
+      // more direct than trying to force everything through one call.
+      const clauses = rest.split(';').map(s => s.trim()).filter(s => s !== '');
+      if (clauses.length !== 4) {
+        rec.valid = false;
+        rec.errorMsg = `expected 4 clauses (x=... ; y=... ; z=... ; PARAM in [a,b]), found ${clauses.length}`;
+        lines.push(rec); continue;
+      }
+      const [xClause, yClause, zClause, domainClause] = clauses;
+      if (!xClause.startsWith('x=')) { rec.valid = false; rec.errorMsg = `expected 'x=...' as the first clause`; lines.push(rec); continue; }
+      if (!yClause.startsWith('y=')) { rec.valid = false; rec.errorMsg = `expected 'y=...' as the second clause`; lines.push(rec); continue; }
+      if (!zClause.startsWith('z=')) { rec.valid = false; rec.errorMsg = `expected 'z=...' as the third clause`; lines.push(rec); continue; }
+      const xExpr = xClause.slice(2).trim();
+      const yExpr = yClause.slice(2).trim();
+      const zExpr = zClause.slice(2).trim();
+      if (!xExpr || !yExpr || !zExpr) {
+        rec.valid = false; rec.errorMsg = 'x=/y=/z= clauses cannot be empty'; lines.push(rec); continue;
+      }
+
+      // Domain clause: "PARAM in [lo, hi]", optionally followed by trailing
+      // color=/visible= attrs. PARAM is inferred here, never hardcoded to
+      // "t" — any valid identifier names the bound variable.
+      const domainMatch = domainClause.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+\[\s*([^,\]]+?)\s*,\s*([^,\]]+?)\s*\](.*)$/);
+      if (!domainMatch) {
+        rec.valid = false;
+        rec.errorMsg = `expected 'PARAM in [lo, hi]' as the fourth clause`;
+        lines.push(rec); continue;
+      }
+      const [, param, loExprRaw, hiExprRaw, attrTail] = domainMatch;
+      if (!CODE_IDENT_RE.test(param)) {
+        rec.valid = false; rec.errorMsg = `invalid parameter name '${param}'`; lines.push(rec); continue;
+      }
+
+      const tok = tokenizeAttrs(attrTail.trim(), ['color', 'visible']);
+      if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
+      if (tok.positional.length > 0) {
+        rec.valid = false; rec.errorMsg = `unexpected '${tok.positional[0]}' after the domain clause`; lines.push(rec); continue;
+      }
+
+      const domainLo = evalExpr(loExprRaw, numericEnv);
+      const domainHi = evalExpr(hiExprRaw, numericEnv);
+      if (!Number.isFinite(domainLo) || !Number.isFinite(domainHi)) {
+        rec.valid = false; rec.errorMsg = 'invalid domain bound expression'; lines.push(rec); continue;
+      }
+      if (domainLo >= domainHi) {
+        rec.valid = false; rec.errorMsg = 'domain lower bound must be less than upper bound'; lines.push(rec); continue;
+      }
+
+      let finalName = name;
+      if (finalName === '') {
+        finalName = advanceAutoName(parseNameCounters, currentSet.curve.naming ?? AUTO_NAME_PREFIX.curve,
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
+      } else if (!CODE_IDENT_RE.test(finalName)) {
+        rec.valid = false; rec.errorMsg = `invalid curve name '${finalName}'`; lines.push(rec); continue;
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
+        rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
+      }
+
+      // Sanity-check x=/y=/z= at the domain's own lower bound (with the
+      // bound parameter present) so a typo'd/unknown name surfaces as a
+      // clear parse error immediately, rather than silently producing an
+      // empty/NaN-riddled tessellation at render time.
+      const testEnv = { ...numericEnv, [param]: domainLo };
+      const testX = evalExpr(xExpr, testEnv);
+      const testY = evalExpr(yExpr, testEnv);
+      const testZ = evalExpr(zExpr, testEnv);
+      if (!Number.isFinite(testX) || !Number.isFinite(testY) || !Number.isFinite(testZ)) {
+        rec.valid = false; rec.errorMsg = 'invalid x=/y=/z= expression'; lines.push(rec); continue;
+      }
+
+      const attrRes = resolveGoverningAttrs('curve', tok.attrs, currentSet.curve, { numericEnv, colorEnv, boolEnv });
+      if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
+
+      const obj = {
+        name: finalName,
+        xExpr, yExpr, zExpr, param,
+        domainLoExpr: loExprRaw.trim(), domainHiExpr: hiExprRaw.trim(),
+        domainLo, domainHi,
+        points: tessellateCurve(xExpr, yExpr, zExpr, param, domainLo, domainHi, numericEnv),
+        ...attrRes.fields,
+      };
+      stagedCurves.push(obj);
+      curveByName.set(finalName, obj);
       rec.parsed = obj;
       lines.push(rec);
       continue;
@@ -1703,10 +1944,10 @@ function parseCodeText(text) {
     let finalName = name;
     if (finalName === '') {
       finalName = advanceAutoName(parseNameCounters, currentSet.segment.naming ?? AUTO_NAME_PREFIX.segment,
-        n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments));
+        n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
     } else if (!CODE_IDENT_RE.test(finalName)) {
       rec.valid = false; rec.errorMsg = `invalid segment name '${finalName}'`; lines.push(rec); continue;
-    } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments)) {
+    } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
       rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
     }
 
@@ -1725,7 +1966,7 @@ function parseCodeText(text) {
     lines.push(rec);
   }
 
-  return { lines, stagedConstants, stagedVertices, stagedSegments, stagedFaces, finalSet: currentSet, nameCounters: parseNameCounters };
+  return { lines, stagedConstants, stagedVertices, stagedSegments, stagedFaces, stagedCurves, finalSet: currentSet, nameCounters: parseNameCounters };
 }
 
 function formatCoordExpr(v, i) {
@@ -1736,7 +1977,7 @@ function formatCoordExpr(v, i) {
 
 function formatConstLine(c) {
   const kindTok = c.kind === 'boolean' ? 'bool' : c.kind; // 'number' | 'color' | 'bool'
-  return `const ${kindTok} ${c.name}: ${c.expr}`;
+  return `${kindTok} ${c.name}: ${c.expr}`;
 }
 
 // Every field is always written out explicitly — necessary now that a
@@ -1777,6 +2018,12 @@ function formatFaceLine(vertsForFace, f) {
   return `face ${f.name}: ${names}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
 }
 
+function formatCurveLine(c) {
+  const colorExpr   = c.colorExpr   ?? c.color ?? DEFAULT_COLOR;
+  const visibleExpr = c.visibleExpr ?? String(c.visible !== false);
+  return `curve ${c.name}: x=${c.xExpr} ; y=${c.yExpr} ; z=${c.zExpr} ; ${c.param} in [${c.domainLoExpr}, ${c.domainHiExpr}]  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
+}
+
 function formatSetLine(parsed) {
   return `set ${parsed.setType}: ${formatFieldToken(parsed.field, parsed.value)}`;
 }
@@ -1792,14 +2039,24 @@ function formatLineForOutput(rec) {
   if (rec.kind === 'vertex')  return formatVertexLine(rec.parsed);
   if (rec.kind === 'segment') return formatSegmentLine({ name: rec.parsed.v1Name }, { name: rec.parsed.v2Name }, rec.parsed);
   if (rec.kind === 'face')    return formatFaceLine(rec.parsed.vertexNames.map(n => ({ name: n })), rec.parsed);
+  if (rec.kind === 'curve')   return formatCurveLine(rec.parsed);
   if (rec.kind === 'set')     return formatSetLine(rec.parsed);
   return rec.raw;
 }
 
-function serializeState(vertsArr, constsArr, segsArr, facesArr) {
+function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr) {
   const out = [];
-  emitSection(out, 'eq',   'CONSTANTS', constsArr.map(formatConstLine));
-  emitSection(out, 'eq',   'FUNCTIONS', []);
+  // VIEW SETTINGS and POLYTOPES are purely decorative banners — no
+  // OBJECT_TYPES entry, never classified by classifyHeaderSection, never
+  // touched by Sort's relocation logic. They have to be emitted explicitly
+  // here (rather than relying on Sort to preserve them) because this
+  // function rebuilds the textarea from scratch from live state, not from
+  // whatever text happened to be typed before.
+  out.push(makeHeaderLine('eq', 'VIEW SETTINGS'));
+  out.push('');
+  emitSection(out, 'eq',   'AUXILIARY CONSTANTS', constsArr.map(formatConstLine));
+  out.push(makeHeaderLine('eq', 'POLYTOPES'));
+  out.push('');
   // Committed vertex/segment/face objects carry no memory of any `set` line
   // that once governed them individually (each one's own resolved value/expr
   // is what persists, via its own color=/r=/etc.) — but the *cluster itself*
@@ -1818,19 +2075,24 @@ function serializeState(vertsArr, constsArr, segsArr, facesArr) {
     return verts.every(Boolean) ? formatFaceLine(verts, f) : null;
   }).filter(Boolean);
   emitSection(out, 'dash', 'FACES', buildSetBlock('face', lastSetFace), faceLines);
-  emitSection(out, 'dash', 'CURVES', []);
+  // Functions/domain moved here (after FACES, before CURVES) to match the
+  // control-panel submenu order (View / Auxiliary / Polytopes / Curves /
+  // Functions) — was previously emitted right after AUXILIARY CONSTANTS.
+  emitSection(out, 'eq',   'AUXILIARY FUNCTIONS', []);
+  const curveLines = (curvesArr ?? []).map(formatCurveLine);
+  emitSection(out, 'dash', 'CURVES', buildSetBlock('curve', lastSetCurve), curveLines);
   out.push(makeDividerLine());
   out.push('');
   return out.join('\n');
 }
 
-// Rebuilds the file from scratch: five canonical sections (each followed by
+// Rebuilds the file from scratch: canonical sections (each followed by
 // exactly one blank line when it has content, none of the growing-gap effect
 // a naive splice-in-place produces), a divider, then the scratch area. Every
-// *valid* recognized const/vertex/segment always lands in its home section
-// regardless of where it started (which is what empties the scratch area of
-// anything usable), and gets reformatted to its fully-explicit canonical form
-// in the process. Invalid/unrecognized lines never move — they stay within
+// *valid* recognized number/color/bool/vertex/segment/face line always
+// lands in its home section regardless of where it started (which is what
+// empties the scratch area of anything usable), and gets reformatted to
+// its fully-explicit canonical form in the process. Invalid/unrecognized lines never move — they stay within
 // whichever section (or the scratch area) they were structurally sitting in,
 // raw text untouched. `set` lines are also never moved (their effect is
 // purely positional — which object lines follow them — so relocating one
@@ -1916,6 +2178,8 @@ function sortCodeText(text) {
       emitSection(out, def.style, def.title, buildSetBlock('segment', finalSet.segment), objectLines);
     } else if (key === 'faces') {
       emitSection(out, def.style, def.title, buildSetBlock('face', finalSet.face), objectLines);
+    } else if (key === 'curves') {
+      emitSection(out, def.style, def.title, buildSetBlock('curve', finalSet.curve), objectLines);
     } else {
       emitSection(out, def.style, def.title, objectLines);
     }
@@ -2405,6 +2669,38 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
   }
 }
 
+// Renders each curve's cached tessellated points (see tessellateCurve) as
+// a continuous stroke — but breaks the path (new subpath) at any point
+// that fails to project, rather than silently connecting across the gap
+// the way drawFacePickPreview's preview line does. Connecting point i-1
+// straight to i+1 across a skipped point would draw a spurious line
+// through invalid space, and the more points a primitive has the worse
+// that gets — unlike a 2-point segment (drawSegments), where "skip the
+// whole thing" is really the only option anyway.
+function drawCurves(curvesArr, vecs, heights, scale, normS) {
+  for (const cv of curvesArr) {
+    if (!cv.visible) continue;
+    const pts = cv.points ?? [];
+    if (pts.length < 2) continue;
+    ctx.save();
+    ctx.strokeStyle = themeColor(cv.color);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let penDown = false;
+    for (const coords of pts) {
+      const { pt, depth } = projectPoint(coords, vecs, heights);
+      if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) { penDown = false; continue; }
+      const a = applyPerspective(pt, depth, normS);
+      if (!a.ok) { penDown = false; continue; }
+      const scr = toScreen(a.pt, scale);
+      if (penDown) ctx.lineTo(scr.x, scr.y);
+      else { ctx.moveTo(scr.x, scr.y); penDown = true; }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // Dashed preview line through the vertices picked so far for an in-progress
 // face (canvas- or list-driven) — not closed back to the first vertex, since
 // the face isn't committed yet. A vertex that fails to project is just
@@ -2635,10 +2931,12 @@ function draw() {
   const activeVerts = codeOpen && previewOverride ? previewOverride.vertices : vertices;
   const activeSegs  = codeOpen && previewOverride ? previewOverride.segments : segments;
   const activeFaces = codeOpen && previewOverride ? previewOverride.faces : faces;
+  const activeCurves = codeOpen && previewOverride ? previewOverride.curves : curves;
   if (displayMode === 'B') drawDiskBoundary(base);
   if (showAxes) drawAxes(vecs, display);
   drawFaces(activeFaces, activeVerts, vecs, heights, display, s);
   drawSegments(activeSegs, activeVerts, vecs, heights, display, s);
+  drawCurves(activeCurves, vecs, heights, display, s);
   drawFacePickPreview(activeVerts, vecs, heights, display, s);
   drawVertices(activeVerts, vecs, heights, display, s);
   if (showPointer) drawControlPoint(base);
@@ -3635,7 +3933,7 @@ function renderConstList() {
     nameInp.addEventListener('change', () => {
       const n = nameInp.value.trim();
       if (n && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n)) {
-        if (n === 'true' || n === 'false' || CONST_KIND_KEYWORDS.includes(n)) { nameInp.value = c.name; setNameError(nameInp); return; }
+        if (n === 'true' || n === 'false') { nameInp.value = c.name; setNameError(nameInp); return; }
         if (isNameTaken(n, null, c.id)) { nameInp.value = c.name; setNameError(nameInp); return; }
         snapshot();
         const oldName = c.name;
@@ -3666,8 +3964,9 @@ function renderConstList() {
     renderConstValSpan(valSpan, c);
 
     // The value can still change freely; the kind it must resolve under
-    // cannot — resolveConstByKind is the same check `edit const` uses, so
-    // a wrong-kind edit is rejected here exactly as it would be from the
+    // cannot — resolveConstByKind is the same check `edit number`/`edit
+    // color`/`edit bool` use, so a wrong-kind edit is rejected here exactly
+    // as it would be from the
     // code file/interpreter, closing the hole a plain always-accepting text
     // box used to leave open (see the const-editing design notes).
     const commitExprChange = newExpr => {
@@ -3871,7 +4170,7 @@ document.getElementById('btn-add-const').addEventListener('click', () => {
   const name = nameInp.value.trim();
   const expr = exprInp.value.trim();
   if (!name || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return;
-  if (name === 'true' || name === 'false' || CONST_KIND_KEYWORDS.includes(name)) { setNameError(nameInp); return; }
+  if (name === 'true' || name === 'false') { setNameError(nameInp); return; }
   if (isNameTaken(name)) { setNameError(nameInp); return; }
   if (!addConstKind || !expr) { setNameError(exprInp); return; }
   const res = resolveConstByKind(addConstKind, expr, buildEnvs());
@@ -5269,7 +5568,20 @@ function buildCommittedArraysFromStaged(staged) {
     color: f.color,     colorExpr: f.colorExpr,
     visible: f.visible, visibleExpr: f.visibleExpr,
   }));
-  return { newVertices, newConstants, newSegments, newFaces };
+  // A curve's geometry comes from its own x/y/z expressions, not vertex
+  // membership, so unlike segment/face it needs no nameToId translation.
+  const newCurves = (staged.stagedCurves ?? []).map((c, i) => ({
+    id: i,
+    name: c.name,
+    xExpr: c.xExpr, yExpr: c.yExpr, zExpr: c.zExpr,
+    param: c.param,
+    domainLoExpr: c.domainLoExpr, domainHiExpr: c.domainHiExpr,
+    domainLo: c.domainLo,         domainHi: c.domainHi,
+    color: c.color,     colorExpr: c.colorExpr,
+    visible: c.visible, visibleExpr: c.visibleExpr,
+    points: c.points ?? [],
+  }));
+  return { newVertices, newConstants, newSegments, newFaces, newCurves };
 }
 
 function refreshCodeGutterAndErrors() {
@@ -5322,8 +5634,8 @@ function reparseAndPreview() {
   const textarea = document.getElementById('code-textarea');
   const staged = parseCodeText(textarea.value);
   codeLineRecords = staged.lines;
-  const { newVertices, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
-  previewOverride = { vertices: newVertices, segments: newSegments, faces: newFaces };
+  const { newVertices, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
+  previewOverride = { vertices: newVertices, segments: newSegments, faces: newFaces, curves: newCurves };
   refreshCodeGutterAndErrors();
   draw();
 }
@@ -5355,18 +5667,20 @@ function codeSave() {
   codeSort();
   const textarea = document.getElementById('code-textarea');
   const staged = parseCodeText(textarea.value);
-  const { newVertices, newConstants, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
+  const { newVertices, newConstants, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
   // Remember this save's governing `set` values so the next Load starts
   // from here instead of resetting to the built-in defaults.
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
   lastSetFace    = { ...staged.finalSet.face };
+  lastSetCurve   = { ...staged.finalSet.curve };
   // Let an explicit `counter=` (or a run of blank-name lines under a custom
   // `naming=`) carry forward into future controls-driven creation too.
   syncNameCounterFromParse(lastSetVertex,  AUTO_NAME_PREFIX.vertex,  staged);
   syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
   syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
+  syncNameCounterFromParse(lastSetCurve,   AUTO_NAME_PREFIX.curve,   staged);
 
   snapshot();
   vertices          = newVertices;
@@ -5377,6 +5691,8 @@ function codeSave() {
   nextSegmentId     = newSegments.length;
   faces             = newFaces;
   nextFaceId        = newFaces.length;
+  curves            = newCurves;
+  nextCurveId       = newCurves.length;
   selectedVertexIds = new Set();
   focusedVertexId   = null;
   selectedSegmentId = null;
@@ -5426,7 +5742,7 @@ function openCodeSubmenu() {
   resizeInterpreterInput();
 
   const textarea = document.getElementById('code-textarea');
-  textarea.value = serializeState(vertices, constants, segments, faces);
+  textarea.value = serializeState(vertices, constants, segments, faces, curves);
   // '#sub-code' is already display:'' by this point (set above), so
   // reparseAndPreview()'s auto-grow (inside refreshCodeGutterAndErrors)
   // measures a real, laid-out scrollHeight here — no separate height-sync
@@ -5513,7 +5829,7 @@ function submitInterpreterLine() {
   const line  = input.value;
   if (line.trim() === '') return;
 
-  const staged    = parseCodeText(serializeState(vertices, constants, segments, faces) + '\n' + line);
+  const staged    = parseCodeText(serializeState(vertices, constants, segments, faces, curves) + '\n' + line);
   // The submitted content is always exactly the tail of the combined text —
   // serializeState(...) supplies everything before it — so its own line
   // count pinpoints which staged.lines entries are newly submitted, however
@@ -5547,7 +5863,7 @@ function submitInterpreterLine() {
     // the one value, already validated against the constant's locked kind
     // during the parse above (resolveConstByKind) — so it gets its own
     // tiny commit rather than reusing the vertex/segment/face shape below.
-    if (editType === 'const') {
+    if (editType === 'number' || editType === 'color' || editType === 'bool') {
       const target = constants.find(c => c.name === targetName);
       snapshot();
       target.expr  = parsed.newExpr;
@@ -5609,11 +5925,12 @@ function submitInterpreterLine() {
     return;
   }
 
-  const { newVertices, newConstants, newSegments, newFaces } = buildCommittedArraysFromStaged(staged);
+  const { newVertices, newConstants, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
   lastSetFace    = { ...staged.finalSet.face };
+  lastSetCurve   = { ...staged.finalSet.curve };
   // lastSet* just changed — renderConstList() below (via its own
   // renderAddRowDefaults() call) picks it up automatically, since the
   // add-rows now read lastSetVertex/lastSetSegment/lastSetFace directly
@@ -5621,6 +5938,7 @@ function submitInterpreterLine() {
   syncNameCounterFromParse(lastSetVertex,  AUTO_NAME_PREFIX.vertex,  staged);
   syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
   syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
+  syncNameCounterFromParse(lastSetCurve,   AUTO_NAME_PREFIX.curve,   staged);
 
   snapshot();
   vertices          = newVertices;
@@ -5631,6 +5949,8 @@ function submitInterpreterLine() {
   nextSegmentId     = newSegments.length;
   faces             = newFaces;
   nextFaceId        = newFaces.length;
+  curves            = newCurves;
+  nextCurveId       = newCurves.length;
   selectedVertexIds = new Set();
   focusedVertexId   = null;
   selectedSegmentId = null;
