@@ -625,8 +625,67 @@ function pointToSegmentDistance3D(p, a, b) {
   return Math.hypot(p[0] - cx, p[1] - cy, p[2] - cz);
 }
 
+function vecSub3D(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function vecLen3D(v) { return Math.hypot(v[0], v[1], v[2]); }
+function dot3D(u, v) { return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]; }
+function cross3D(u, v) {
+  return [
+    u[1] * v[2] - u[2] * v[1],
+    u[2] * v[0] - u[0] * v[2],
+    u[0] * v[1] - u[1] * v[0],
+  ];
+}
+
+// Menger curvature of three points — 1/(circumradius of the triangle they
+// span), equal to 4*Area/(|ab|*|bc|*|ca|). Converges to the curve's true
+// curvature as the three points converge to one; used as a cheap,
+// derivative-free local curvature estimate built from points already being
+// evaluated for the distance test, no extra curve evaluations needed.
+function mengerCurvature(a, b, c) {
+  const ab = vecLen3D(vecSub3D(b, a));
+  const bc = vecLen3D(vecSub3D(c, b));
+  const ca = vecLen3D(vecSub3D(a, c));
+  if (ab === 0 || bc === 0 || ca === 0) return 0;
+  const twiceArea = vecLen3D(cross3D(vecSub3D(b, a), vecSub3D(c, a)));
+  return (2 * twiceArea) / (ab * bc * ca);
+}
+
+// Angle between the incoming segment (a->b) and outgoing segment (b->c) —
+// 0 for a straight continuation, up to pi for a full reversal. A pair of
+// coincident sample points carries no direction information, so it's
+// treated as "no deflection" and left to the distance/curvature test.
+function deflectionAngle(a, b, c) {
+  const v1 = vecSub3D(b, a), v2 = vecSub3D(c, b);
+  const l1 = vecLen3D(v1), l2 = vecLen3D(v2);
+  if (l1 === 0 || l2 === 0) return 0;
+  const cosAngle = Math.max(-1, Math.min(1, dot3D(v1, v2) / (l1 * l2)));
+  return Math.acos(cosAngle);
+}
+
 const CURVE_MAX_DEPTH      = 16;
-const CURVE_TOLERANCE      = 0.01;
+// Dimensionless: allowed chord sagitta as a fraction of the LOCAL radius of
+// curvature (via mengerCurvature below), not a fixed world-space distance.
+// A fixed absolute tolerance made tessellation density depend on the
+// curve's raw size in model units — confirmed as a real bug: the same
+// helix at radius 1 and radius 1/8 (compensated by view zoom to look the
+// same size on screen) tessellated to smooth loops and to visible octagons
+// respectively, because the same 0.01 world-space sagitta is generous
+// relative to a radius-1 curve and barely inside a radius-1/8 curve's own
+// 45-degree-step sagitta. A curvature-relative tolerance is scale-covariant
+// by construction (scale the curve, both sagitta and local radius scale
+// together, ratio unchanged) and, critically, local — a large curve with a
+// small sharply-curved feature gets fine resolution exactly there, not
+// coarsened by the curve's own overall size. 0.01 chosen to reproduce, at
+// unit local radius, the same absolute behavior the old fixed 0.01 gave.
+const CURVE_REL_TOLERANCE  = 0.01;
+// Max allowed direction change (radians) between consecutive sampled
+// sub-segments before a chord is rejected outright, independent of the
+// distance test above — catches a low-amplitude S-bend that can sit close
+// to its chord in distance terms while still visibly changing direction, a
+// blind spot pure chord-distance testing can't see (it bounds position
+// error, not tangent direction). ~8.6 degrees, a first-guess default like
+// every other tunable here — not yet tuned under real testing.
+const CURVE_ANGLE_TOLERANCE = 0.15;
 // Checked against the chord at each candidate split, not just the exact
 // midpoint. Deliberately golden-ratio-derived (frac(n*phi) for n=1,2,3),
 // not round fractions like 0.25/0.5/0.75 — the golden ratio is famously
@@ -639,7 +698,11 @@ const CURVE_TOLERANCE      = 0.01;
 // simple-fraction test points all landing on repeats, the whole curve
 // accepted as a straight line). Irrational-ratio fractions make that kind
 // of exact alignment enormously less likely for any "round" domain a user
-// would actually choose.
+// would actually choose. Note this only reduces the *chance* of periodic
+// aliasing, same as CURVE_MIN_DEPTH below only bounds it structurally for
+// near-top-level chords — neither guarantees congruent tessellation of two
+// exact repeats of a period; see the tessellateCurve comment below for why
+// that needs real period detection, not a tweak here.
 const CURVE_TEST_FRACTIONS = [0.236, 0.618, 0.854];
 // Forces at least this many levels of unconditional subdivision before the
 // deviation test is even consulted — a structural backstop, not just a
@@ -663,9 +726,152 @@ const CURVE_MIN_DEPTH      = 5;
 // triggered subdivision has no such coupling: how finely a stretch of
 // curve gets split depends only on how much it deviates from a straight
 // chord, never on the raw size of the domain it happens to sit in.
+function isFiniteXYZ(p) {
+  return Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2]);
+}
+
+// How many straight-line sub-segments the final render polyline uses per
+// adaptively-chosen interval, each evaluating the natural cubic spline (not
+// the raw curve) below. The adaptive tessellation still decides *where*
+// detail is needed (via curvature/angle/distance); this only decides how
+// finely the resulting genuinely-C^2 spline gets flattened into straight
+// lines for canvas rendering — cheap (line segments, not curve
+// evaluations), affects visual smoothness only, never geometry. First-guess
+// default, like every other tunable here.
+const CURVE_SPLINE_SAMPLES_PER_SEGMENT = 8;
+
+// Natural cubic spline through (t_i, y_i) pairs — matches value, first
+// derivative, AND second derivative at every interior knot (true C^2
+// continuity), with the standard "natural" boundary condition (zero second
+// derivative at both ends — appropriate for an open arc; a closed curve
+// whose two ends coincide would show a slight flattening right at the seam
+// under this convention, a known, not-yet-addressed limitation — a periodic
+// boundary condition would remove it but isn't implemented here). Solves
+// the standard tridiagonal moment system via the Thomas algorithm: n-1
+// unknowns for n+1 knots, since the two endpoint moments are fixed at 0 by
+// the boundary condition. Diagonally dominant by construction (each
+// diagonal entry 2*(h[i-1]+h[i]) strictly exceeds |h[i-1]|+|h[i]| for
+// positive interval widths), so this never needs pivoting.
+function solveNaturalCubicSpline(ts, ys) {
+  const n = ts.length - 1;
+  const M = new Array(n + 1).fill(0);
+  if (n < 2) return M; // 0 or 1 interval: nothing interior to solve
+
+  const h = new Array(n);
+  for (let i = 0; i < n; i++) h[i] = ts[i + 1] - ts[i];
+
+  const m = n - 1; // interior knots M[1..n-1], stored 0-based as k = i-1
+  const sub = new Array(m), diag = new Array(m), sup = new Array(m), rhs = new Array(m);
+  for (let k = 0; k < m; k++) {
+    const i = k + 1;
+    sub[k]  = h[i - 1];
+    diag[k] = 2 * (h[i - 1] + h[i]);
+    sup[k]  = h[i];
+    rhs[k]  = 6 * ((ys[i + 1] - ys[i]) / h[i] - (ys[i] - ys[i - 1]) / h[i - 1]);
+  }
+  for (let k = 1; k < m; k++) {
+    const w = sub[k] / diag[k - 1];
+    diag[k] -= w * sup[k - 1];
+    rhs[k]  -= w * rhs[k - 1];
+  }
+  const Minterior = new Array(m);
+  Minterior[m - 1] = rhs[m - 1] / diag[m - 1];
+  for (let k = m - 2; k >= 0; k--) {
+    Minterior[k] = (rhs[k] - sup[k] * Minterior[k + 1]) / diag[k];
+  }
+  for (let k = 0; k < m; k++) M[k + 1] = Minterior[k];
+  return M;
+}
+
+// Evaluates the natural-cubic-spline segment covering [tLo, tHi] at
+// parameter t, given that segment's endpoint values/moments. Standard
+// normalized moment-form cubic spline evaluation (a+b=1 by construction):
+// reduces to plain linear interpolation when both moments are 0 (the
+// 0-or-1-interval fallback from solveNaturalCubicSpline above).
+function evalSplineSegment(t, tLo, tHi, yLo, yHi, mLo, mHi) {
+  const h = tHi - tLo;
+  const a = (tHi - t) / h, b = (t - tLo) / h;
+  return a * yLo + b * yHi + ((a * a * a - a) * mLo + (b * b * b - b) * mHi) * (h * h) / 6;
+}
+
+// Fits a natural cubic spline through one contiguous, all-finite run of
+// (ts[i], points[i]) knots — independently for x(t), y(t), z(t), sharing
+// the same t knots — then re-evaluates it at a denser, uniform-within-
+// each-interval grid for final rendering.
+function splineResampleRun(ts, points) {
+  const n = ts.length - 1;
+  const xs = points.map(p => p[0]), ys = points.map(p => p[1]), zs = points.map(p => p[2]);
+  const Mx = solveNaturalCubicSpline(ts, xs);
+  const My = solveNaturalCubicSpline(ts, ys);
+  const Mz = solveNaturalCubicSpline(ts, zs);
+
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const tLo = ts[i], tHi = ts[i + 1];
+    for (let k = 0; k < CURVE_SPLINE_SAMPLES_PER_SEGMENT; k++) {
+      const t = tLo + (tHi - tLo) * (k / CURVE_SPLINE_SAMPLES_PER_SEGMENT);
+      out.push([
+        evalSplineSegment(t, tLo, tHi, xs[i], xs[i + 1], Mx[i], Mx[i + 1]),
+        evalSplineSegment(t, tLo, tHi, ys[i], ys[i + 1], My[i], My[i + 1]),
+        evalSplineSegment(t, tLo, tHi, zs[i], zs[i + 1], Mz[i], Mz[i + 1]),
+      ]);
+    }
+  }
+  out.push(points[n]); // exact final knot — the loop above only ever emits t < tHi
+  return out;
+}
+
+// Turns the raw, adaptively-tessellated (ts[i], points[i]) knots into the
+// final rendered polyline by fitting the natural cubic spline above through
+// them — this is what makes the rendered curve C^2 (matching value,
+// tangent, and curvature at every knot) rather than the raw tessellation's
+// piecewise-*linear* polyline, which is only ever C^0 no matter how finely
+// it's adaptively refined: refining *where* straight segments sit can never
+// make their joints stop being joints, only fitting an actually-smooth
+// interpolant between them can.
+//
+// A spline fit is global — one non-finite knot would corrupt every
+// segment's moments, not just the ones touching it, since the tridiagonal
+// solve couples every interior point together. tessellateCurve relies on a
+// non-finite point marking a genuine break (an asymptote/discontinuity
+// within the domain), which drawCurves uses to lift the pen rather than
+// draw through it — so this splits the raw tessellation into maximal
+// finite runs first, splines each run independently, and re-inserts a
+// single non-finite marker between runs to preserve that exact break
+// behavior.
+function splineResample(ts, points) {
+  const out = [];
+  let runTs = [], runPts = [];
+  function flushRun() {
+    if (runPts.length === 0) return;
+    if (out.length > 0) out.push([NaN, NaN, NaN]);
+    out.push(...splineResampleRun(runTs, runPts));
+    runTs = []; runPts = [];
+  }
+  for (let i = 0; i < points.length; i++) {
+    if (!isFiniteXYZ(points[i])) { flushRun(); continue; }
+    runTs.push(ts[i]);
+    runPts.push(points[i]);
+  }
+  flushRun();
+  return out;
+}
+
 // Called from reEvalObjects (the cache-invalidation step for a curve's
 // resolved `.points`, same role vertex's exprs->coords resolution plays)
 // and at creation time in parseCodeText.
+//
+// Known open limitation, not fixed by anything below: two exact repeats of
+// a periodic curve (e.g. two loops of a helix) are only guaranteed to
+// tessellate congruently when (domain width / period) happens to be a
+// power of two — the recursion always bisects whatever interval it's
+// currently holding at that interval's own midpoint, so the full set of
+// possible breakpoints is a dyadic grid of the *domain*, and dyadic
+// (base-2) splitting can only land exactly on period boundaries when the
+// period count is itself a power of two. No choice of anchor point fixes
+// this for other period counts (3, 5, 6, ...) — it would need genuine
+// period detection in the parsed expression (tessellate one period,
+// replicate it), a separate, larger feature, not implemented here.
 function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
   function evalAt(t) {
     const env = { ...numericEnv, [param]: t };
@@ -675,16 +881,35 @@ function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
     return Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2]);
   }
   function chordNeedsSplit(tLo, tHi, pLo, pHi) {
-    for (const frac of CURVE_TEST_FRACTIONS) {
-      const p = evalAt(tLo + (tHi - tLo) * frac);
-      if (!isFinitePoint(p) || pointToSegmentDistance3D(p, pLo, pHi) > CURVE_TOLERANCE) return true;
+    const pts = CURVE_TEST_FRACTIONS.map(frac => evalAt(tLo + (tHi - tLo) * frac));
+    if (pts.some(p => !isFinitePoint(p))) return true;
+
+    // Curvature-relative distance test: local radius of curvature from the
+    // interval's endpoints and its middle test point (mengerCurvature). A
+    // zero-curvature (locally straight) reading allows an unbounded chord
+    // — correct, a straight stretch needs no further splitting regardless
+    // of how long it is.
+    const kappa = mengerCurvature(pLo, pts[1], pHi);
+    const localTolerance = kappa > 0 ? CURVE_REL_TOLERANCE / kappa : Infinity;
+    for (const p of pts) {
+      if (pointToSegmentDistance3D(p, pLo, pHi) > localTolerance) return true;
     }
+
+    // Angle test, independent of the distance test above — see
+    // CURVE_ANGLE_TOLERANCE.
+    const chain = [pLo, ...pts, pHi];
+    for (let i = 1; i < chain.length - 1; i++) {
+      if (deflectionAngle(chain[i - 1], chain[i], chain[i + 1]) > CURVE_ANGLE_TOLERANCE) return true;
+    }
+
     return false;
   }
 
   const points = [];
+  const ts = [];
   const p0 = evalAt(lo);
   points.push(p0);
+  ts.push(lo);
 
   function subdivide(tLo, tHi, pLo, pHi, depth) {
     // A NaN endpoint (e.g. domain touches an asymptote) can't have its
@@ -694,6 +919,7 @@ function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
     const mustSplit = depth < CURVE_MIN_DEPTH;
     if (!isFinitePoint(pLo) || !isFinitePoint(pHi) || depth >= CURVE_MAX_DEPTH || (!mustSplit && !chordNeedsSplit(tLo, tHi, pLo, pHi))) {
       points.push(pHi);
+      ts.push(tHi);
       return;
     }
     const tMid = (tLo + tHi) / 2;
@@ -703,7 +929,7 @@ function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
   }
 
   subdivide(lo, hi, p0, evalAt(hi), 0);
-  return points;
+  return splineResample(ts, points);
 }
 
 // Re-resolves every expression-backed field (coordinates plus color/radius/
