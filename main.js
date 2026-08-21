@@ -135,6 +135,8 @@ let darkMode        = false;
 
 let constants      = [];   // [{ id, name, expr, value }]
 let nextConstantId = 0;
+let functions       = [];  // [{ id, name, params: [...], bodyExpr }] — no `value`/auto-name (see parseCodeText's function branch): a function is registered, not evaluated, until something calls it, and an unnamed function would be uncallable.
+let nextFunctionId  = 0;
 let omegaMode      = 'off';  // 'off' | 'on' | 'on++' — math keyboard
 let logicMode      = 'off';  // 'off' | 'on' — logic keyboard (bool-kind consts only)
 let addConstKind   = null;   // 'number' | 'color' | 'boolean' | null — add-row's currently picked kind
@@ -232,7 +234,8 @@ function captureState() {
     curves:            curves.map(c => ({ ...c, points: [...(c.points ?? [])] })),
     selectedVertexIds: new Set(selectedVertexIds),
     constants:         constants.map(c => ({ ...c })),
-    nextVertexId, nextSegmentId, nextFaceId, nextCurveId, nextConstantId,
+    functions:         functions.map(f => ({ ...f, params: [...f.params] })),
+    nextVertexId, nextSegmentId, nextFaceId, nextCurveId, nextConstantId, nextFunctionId,
     nameCounters:      { ...nameCounters },
   };
 }
@@ -251,11 +254,13 @@ function restoreState(state) {
   curves                 = state.curves ?? [];
   selectedVertexIds      = state.selectedVertexIds;
   constants              = state.constants ?? [];
+  functions              = state.functions ?? [];
   nextVertexId           = state.nextVertexId;
   nextSegmentId          = state.nextSegmentId;
   nextFaceId             = state.nextFaceId;
   nextCurveId            = state.nextCurveId ?? 0;
   nextConstantId         = state.nextConstantId;
+  nextFunctionId         = state.nextFunctionId ?? 0;
   nameCounters           = { ...state.nameCounters };
   editingVertexId        = null;
   editingOriginal        = null;
@@ -368,27 +373,48 @@ function fromScreen(px, py, scale) {
 
 // ─── Expression parser ────────────────────────────────────────────────────────
 //
-// Evaluates a math expression string in an environment of named constants.
-// Supports: numbers, +  -  *  /  ^, unary minus, parentheses,
-//           \pi  \e  \sin(x)  \cos(x)  \tan(x)  \sqrt(x)  \abs(x),
-//           and any user-defined constant name (identifier).
-// Returns NaN on parse error or domain error (div-by-zero, sqrt of negative).
+// Two-stage design (parse once to an AST, then either evaluate it or
+// statically walk it for name references) — needed once user-defined
+// functions exist: evaluating a call means re-evaluating the callee's own
+// body against fresh argument bindings (can't be done inline against raw
+// text the way the old single-pass evaluator worked), and the dependency
+// graph that lets constants/functions reference each other in any order
+// (see topoSortDependencies below) needs to know *which names* an
+// expression references without evaluating it at all.
+//
+// Grammar: numbers, +  -  *  /  ^, unary minus, parentheses,
+//          \pi  \e  \sin(x)  \cos(x)  \tan(x)  \sqrt(x)  \abs(x) (builtins,
+//          always backslash-prefixed, fixed arity — 0 for \pi/\e, 1 for the
+//          rest, never user-overridable),
+//          a bare identifier (a constant or a function parameter), and
+//          NAME(arg [, arg ...]) — a call to a user-defined function
+//          (bare, never backslash-prefixed — the backslash is what keeps
+//          "the fixed builtin vocabulary" and "the open user namespace"
+//          from ever colliding syntactically).
 
-function evalExpr(src, env) {
+// Parses `src` into an AST or returns { ok:false } on a syntax error —
+// separated from evaluation because collectAstRefs (below) needs a parsed
+// AST but no environment at all, and evalAst needs the AST but no
+// re-parsing. Node shapes: {type:'num',value}, {type:'id',name},
+// {type:'neg',arg}, {type:'binop',op,left,right},
+// {type:'builtin',name,arg} (one of sin/cos/tan/sqrt/abs — pi/e are
+// resolved immediately to a 'num' node, they're literals, not calls),
+// {type:'call',name,args} (a user function call).
+function parseExprAst(src) {
   let pos = 0;
   const s = (src ?? '').trim();
+  let failed = false;
 
   function skipWS() { while (pos < s.length && /\s/.test(s[pos])) pos++; }
   function peek()   { return s[pos]; }
 
-  function parseExpr()    { return parseAddSub(); }
+  function parseExpr() { return parseAddSub(); }
 
   function parseAddSub() {
     let v = parseMulDiv(); skipWS();
     while (pos < s.length && (peek() === '+' || peek() === '-')) {
       const op = s[pos++]; skipWS();
-      const r  = parseMulDiv();
-      v = op === '+' ? v + r : v - r;
+      v = { type: 'binop', op, left: v, right: parseMulDiv() };
       skipWS();
     }
     return v;
@@ -398,8 +424,7 @@ function evalExpr(src, env) {
     let v = parsePow(); skipWS();
     while (pos < s.length && (peek() === '*' || peek() === '/')) {
       const op = s[pos++]; skipWS();
-      const r  = parsePow();
-      v = op === '*' ? v * r : (r === 0 ? NaN : v / r);
+      v = { type: 'binop', op, left: v, right: parsePow() };
       skipWS();
     }
     return v;
@@ -409,82 +434,227 @@ function evalExpr(src, env) {
     const base = parseUnary(); skipWS();
     if (pos < s.length && peek() === '^') {
       pos++; skipWS();
-      return Math.pow(base, parseUnary());
+      return { type: 'binop', op: '^', left: base, right: parseUnary() };
     }
     return base;
   }
 
   function parseUnary() {
     skipWS();
-    if (pos < s.length && peek() === '-') { pos++; skipWS(); return -parseAtom(); }
-    if (pos < s.length && peek() === '+') { pos++; skipWS(); return  parseAtom(); }
+    if (pos < s.length && peek() === '-') { pos++; skipWS(); return { type: 'neg', arg: parseAtom() }; }
+    if (pos < s.length && peek() === '+') { pos++; skipWS(); return parseAtom(); }
     return parseAtom();
   }
 
-  function applyFunc(fn) {
+  // Builtins are strictly one-arg, no commas — matches the pre-existing
+  // grammar exactly (only comma-separated argument lists, parsed by
+  // parseArgList below, are new — reserved for user function calls).
+  function parseSingleArg() {
     skipWS();
-    if (peek() !== '(') return NaN;
+    if (peek() !== '(') { failed = true; return { type: 'num', value: NaN }; }
     pos++;
     const arg = parseExpr();
     skipWS();
-    if (pos < s.length && peek() === ')') pos++;
-    return fn(arg);
+    if (peek() === ')') pos++; else failed = true;
+    return arg;
+  }
+
+  function parseArgList() {
+    skipWS();
+    if (peek() !== '(') { failed = true; return []; }
+    pos++; skipWS();
+    const args = [];
+    if (peek() === ')') { pos++; return args; }
+    args.push(parseExpr()); skipWS();
+    while (peek() === ',') {
+      pos++; skipWS();
+      args.push(parseExpr()); skipWS();
+    }
+    if (peek() === ')') pos++; else failed = true;
+    return args;
   }
 
   function parseAtom() {
     skipWS();
-    if (pos >= s.length) return NaN;
+    if (pos >= s.length) { failed = true; return { type: 'num', value: NaN }; }
 
-    // Parenthesised sub-expression
     if (peek() === '(') {
       pos++;
       const v = parseExpr();
       skipWS();
-      if (pos < s.length && peek() === ')') pos++;
+      if (pos < s.length && peek() === ')') pos++; else failed = true;
       return v;
     }
 
-    // Number literal (with optional scientific notation)
     if (/[\d.]/.test(peek())) {
       const m = /^\d*\.?\d+([eE][+\-]?\d+)?/.exec(s.slice(pos));
-      if (m) { pos += m[0].length; return parseFloat(m[0]); }
-      return NaN;
+      if (m) { pos += m[0].length; return { type: 'num', value: parseFloat(m[0]) }; }
+      failed = true; return { type: 'num', value: NaN };
     }
 
-    // Backslash token: \pi, \e, \sin, \cos, \tan, \sqrt, \abs
     if (peek() === '\\') {
       pos++;
       let name = '';
       while (pos < s.length && /[a-zA-Z]/.test(s[pos])) name += s[pos++];
-      switch (name) {
-        case 'pi':   return Math.PI;
-        case 'e':    return Math.E;
-        case 'sin':  return applyFunc(Math.sin);
-        case 'cos':  return applyFunc(Math.cos);
-        case 'tan':  return applyFunc(Math.tan);
-        case 'sqrt': return applyFunc(x => x < 0 ? NaN : Math.sqrt(x));
-        case 'abs':  return applyFunc(Math.abs);
-        default:     return NaN;
+      if (name === 'pi') return { type: 'num', value: Math.PI };
+      if (name === 'e')  return { type: 'num', value: Math.E };
+      if (name === 'sin' || name === 'cos' || name === 'tan' || name === 'sqrt' || name === 'abs') {
+        return { type: 'builtin', name, arg: parseSingleArg() };
       }
+      failed = true; return { type: 'num', value: NaN };
     }
 
-    // Identifier: user constant name
     if (/[a-zA-Z_]/.test(peek())) {
       let name = '';
       while (pos < s.length && /[a-zA-Z0-9_]/.test(s[pos])) name += s[pos++];
-      return (name in env) ? env[name] : NaN;
+      const save = pos;
+      skipWS();
+      if (peek() === '(') return { type: 'call', name, args: parseArgList() };
+      pos = save; // no call parens — plain identifier, don't consume trailing whitespace we peeked past
+      return { type: 'id', name };
     }
 
-    return NaN;
+    failed = true;
+    return { type: 'num', value: NaN };
   }
 
-  try {
-    const result = parseExpr();
-    skipWS();
-    return pos < s.length ? NaN : result;  // leftover chars = parse error
-  } catch (_) {
-    return NaN;
+  const ast = parseExpr();
+  skipWS();
+  if (pos < s.length) failed = true;
+  return failed ? { ok: false } : { ok: true, ast };
+}
+
+// Evaluates a parsed AST. ctx = { numericEnv, functionEnv }. A function
+// call binds its params into a *fresh copy* of the caller's numericEnv
+// (never mutates the caller's), so recursion through several distinct
+// functions naturally nests correctly — recursion back into the *same*
+// function can't happen at all, since a genuine self-reference is a
+// self-loop in the dependency graph and gets rejected as a cycle before
+// any function is ever registered (see topoSortDependencies).
+function evalAst(ast, ctx) {
+  switch (ast.type) {
+    case 'num': return ast.value;
+    case 'id':  return (ast.name in ctx.numericEnv) ? ctx.numericEnv[ast.name] : NaN;
+    case 'neg': return -evalAst(ast.arg, ctx);
+    case 'binop': {
+      const l = evalAst(ast.left, ctx), r = evalAst(ast.right, ctx);
+      if (ast.op === '+') return l + r;
+      if (ast.op === '-') return l - r;
+      if (ast.op === '*') return l * r;
+      if (ast.op === '/') return r === 0 ? NaN : l / r;
+      if (ast.op === '^') return Math.pow(l, r);
+      return NaN;
+    }
+    case 'builtin': {
+      const v = evalAst(ast.arg, ctx);
+      if (ast.name === 'sin')  return Math.sin(v);
+      if (ast.name === 'cos')  return Math.cos(v);
+      if (ast.name === 'tan')  return Math.tan(v);
+      if (ast.name === 'sqrt') return v < 0 ? NaN : Math.sqrt(v);
+      if (ast.name === 'abs')  return Math.abs(v);
+      return NaN;
+    }
+    case 'call': {
+      const fn = ctx.functionEnv?.[ast.name];
+      if (!fn || ast.args.length !== fn.params.length) return NaN;
+      const argVals = ast.args.map(a => evalAst(a, ctx));
+      const localNumericEnv = { ...ctx.numericEnv };
+      fn.params.forEach((p, i) => { localNumericEnv[p] = argVals[i]; });
+      return evalAst(fn.bodyAst, { numericEnv: localNumericEnv, functionEnv: ctx.functionEnv });
+    }
+    default: return NaN;
   }
+}
+
+// Statically collects the set of GLOBAL names (other constants/functions)
+// an AST references — used to build the dependency graph in
+// topoSortDependencies below, *not* used during ordinary evaluation.
+// `localNames` (a function's own parameters) are excluded — they're bound
+// at call time, not global references, exactly mirroring how a curve's own
+// bound parameter already shadows a same-named constant within its body.
+// Builtins never contribute an edge (they're not part of the user
+// namespace at all, backslash-prefixed specifically so they can never be
+// confused with one).
+function collectAstRefs(ast, localNames) {
+  const refs = new Set();
+  function walk(node) {
+    if (!node) return;
+    switch (node.type) {
+      case 'id':
+        if (!localNames.has(node.name)) refs.add(node.name);
+        return;
+      case 'call':
+        if (!localNames.has(node.name)) refs.add(node.name);
+        node.args.forEach(walk);
+        return;
+      case 'neg':    walk(node.arg); return;
+      case 'binop':  walk(node.left); walk(node.right); return;
+      case 'builtin': walk(node.arg); return;
+    }
+  }
+  walk(ast);
+  return refs;
+}
+
+// Evaluates a math expression string in an environment of named constants
+// and (optionally) user-defined functions. Thin wrapper over parse+eval —
+// functionEnv defaults to empty, so every pre-existing 2-argument call site
+// keeps working unchanged (a function call there just resolves to NaN via
+// the normal "unknown identifier" path, same as any other unmet reference,
+// rather than erroring differently).
+// Returns NaN on parse error or domain error (div-by-zero, sqrt of negative,
+// unknown identifier/function, wrong argument count).
+function evalExpr(src, numericEnv, functionEnv = {}) {
+  const parsed = parseExprAst(src);
+  if (!parsed.ok) return NaN;
+  return evalAst(parsed.ast, { numericEnv, functionEnv });
+}
+
+// Topologically sorts a set of named items that can reference each other —
+// number-kind constants and functions, the only two kinds able to
+// participate in cross-references at all (color/bool constants can only
+// ever reference an earlier same-kind constant, an independent, far
+// simpler track this graph doesn't need to touch — see the "Named object
+// resolution" section of parseCodeText). `items` is a Map<name, {ast,
+// localNames}>. Uses depth-first search with a 3-state visit marker
+// (unvisited/visiting/done) to detect a cycle *and* name one concrete
+// path through it, not just report "a cycle exists somewhere" — e.g.
+// `number a: b`, `function b: -> a` (a 0-arg function, legal per the
+// grammar) reports the cycle as ['a','b','a']. A reference to a name
+// outside this combined set (unknown identifier, or belonging to a
+// different kind entirely) is simply not an edge here — it resolves to
+// NaN at evaluation time and surfaces as an ordinary "invalid expression"
+// error downstream, exactly like every other unmet reference already does.
+function topoSortDependencies(items) {
+  const deps = new Map();
+  for (const [name, item] of items) {
+    deps.set(name, new Set([...collectAstRefs(item.ast, item.localNames)].filter(r => items.has(r))));
+  }
+
+  const order = [];
+  const state = new Map();
+  let cycle = null;
+
+  function visit(name, path) {
+    if (cycle || state.get(name) === 'done') return;
+    if (state.get(name) === 'visiting') {
+      cycle = path.slice(path.indexOf(name)).concat(name);
+      return;
+    }
+    state.set(name, 'visiting');
+    for (const dep of deps.get(name)) {
+      visit(dep, [...path, name]);
+      if (cycle) return;
+    }
+    state.set(name, 'done');
+    order.push(name);
+  }
+
+  for (const name of items.keys()) {
+    visit(name, []);
+    if (cycle) return { ok: false, cycle };
+  }
+  return { ok: true, order };
 }
 
 // A settable field's raw text (typed literally, or a reference to a
@@ -499,8 +669,8 @@ function resolveColorAttr(exprText, colorEnv) {
   if (CODE_IDENT_RE.test(exprText) && exprText in colorEnv) return { ok: true, value: colorEnv[exprText] };
   return { ok: false };
 }
-function resolveNumAttr(exprText, numericEnv) {
-  const v = evalExpr(exprText, numericEnv);
+function resolveNumAttr(exprText, numericEnv, functionEnv = {}) {
+  const v = evalExpr(exprText, numericEnv, functionEnv);
   // isFinite, not just isNaN — evalExpr can overflow to Infinity (a literal
   // like 1e400, or arithmetic like 1e200*1e200) without ever producing NaN,
   // and every caller here downstream only meant "a real, usable number."
@@ -522,7 +692,7 @@ function resolveBoolAttr(exprText, boolEnv) {
 function resolveConstByKind(kind, exprText, envs) {
   return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv) :
          kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv) :
-                               resolveNumAttr(exprText, envs.numericEnv);
+                               resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv);
 }
 
 // Resolves one object's full attribute set (per ATTR_DEFS[type]) against
@@ -541,7 +711,7 @@ function resolveGoverningAttrs(type, explicitAttrs, governingText, envs) {
     const exprText = explicitAttrs[def.token] ?? governingText[def.token] ?? BUILTIN_SET_DEFAULTS[type][def.token];
     const res =
       def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv) :
-      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv) :
                                resolveBoolAttr(exprText, envs.boolEnv);
     if (!res.ok) {
       const errorMsg =
@@ -570,7 +740,7 @@ function resolveEditFields(type, explicitAttrs, envs) {
     const exprText = explicitAttrs[def.token];
     const res =
       def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv) :
-      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv) :
                                resolveBoolAttr(exprText, envs.boolEnv);
     if (!res.ok) {
       const errorMsg =
@@ -585,32 +755,81 @@ function resolveEditFields(type, explicitAttrs, envs) {
   return { ok: true, fields };
 }
 
-// Builds all three constant environments in one order-dependent left-to-
-// right pass (a constant can only reference an earlier constant of the same
-// kind). Kind is no longer guessed here — it's fixed forever by which
-// keyword (number/color/bool) created it and stored on `c.kind` for life
-// (see that branch of parseCodeText, and the edit dispatch's own
-// number/color/bool branch, both of which resolve via resolveConstByKind
-// rather than resolveEditFields — a const's edit is a bare value, not
-// field=value tokens), so this just resolves
-// each constant's current expression against its own already-known kind,
-// mirroring the `def.kind` dispatch used throughout ATTR_DEFS-driven code.
-// An expression that fails to resolve under its locked kind (e.g. a
-// dangling reference after something it depended on was deleted) leaves
-// `c.value` at NaN/undefined and is simply not registered in that kind's
-// env, so anything referencing it fails with a clear "unknown identifier"
-// rather than silently propagating a broken value.
+// Builds all four environments (numeric, color, bool, function). Color and
+// bool constants keep their original, simpler treatment — a strict order-
+// dependent left-to-right chain, only ever referencing an earlier
+// same-kind constant, resolved via resolveConstByKind exactly as before
+// (they never go through evalExpr's numeric grammar, so a function call
+// can never appear in one anyway). Number-kind constants and functions are
+// different: since either can now reference the other, in *any* order (a
+// function built from named constants, or a constant defined via a
+// function call — see NOTES9), a simple left-to-right pass can no longer
+// answer "what does this reference" — this builds a real dependency graph
+// (collectAstRefs) and resolves it via topoSortDependencies, same as the
+// code-editor parser's own resolveConstantsAndFunctions. A cycle removes
+// every member of that cycle from resolution (matches the pre-existing
+// "failed to resolve" convention: c.value stays undefined, nothing gets
+// registered in any env, so any reference to it fails as a plain unknown-
+// identifier rather than something bespoke) and keeps going — one cycle in
+// a corner of the model shouldn't block everything else. Kind is fixed
+// forever by which keyword (number/color/bool) created a constant, stored
+// on `c.kind` for life — this never re-derives it.
 function buildEnvs() {
-  const envs = { numericEnv: {}, colorEnv: {}, boolEnv: {} };
+  const colorEnv = {};
+  const boolEnv  = {};
+
+  const items = new Map(); // name -> { ast, localNames, kind, ref, params? }
   for (const c of constants) {
-    const res = resolveConstByKind(c.kind, c.expr.trim(), envs);
-    c.value = res.ok ? res.value : undefined;
-    if (!res.ok) continue;
-    if (c.kind === 'color') envs.colorEnv[c.name] = c.value;
-    else if (c.kind === 'boolean') envs.boolEnv[c.name] = c.value;
-    else envs.numericEnv[c.name] = c.value;
+    if (c.kind !== 'number') continue;
+    const parsed = parseExprAst(c.expr.trim());
+    if (parsed.ok) items.set(c.name, { ast: parsed.ast, localNames: new Set(), kind: 'number', ref: c });
   }
-  return envs;
+  for (const fn of functions) {
+    const parsed = parseExprAst(fn.bodyExpr);
+    if (parsed.ok) items.set(fn.name, { ast: parsed.ast, localNames: new Set(fn.params), kind: 'function', ref: fn, params: fn.params });
+  }
+
+  const numericEnv  = {};
+  const functionEnv = {};
+  let workingItems = items;
+  while (true) {
+    const topo = topoSortDependencies(workingItems);
+    if (topo.ok) {
+      for (const name of topo.order) {
+        const item = workingItems.get(name);
+        if (item.kind === 'number') {
+          const value = evalAst(item.ast, { numericEnv, functionEnv });
+          item.ref.value = Number.isFinite(value) ? value : undefined;
+          if (Number.isFinite(value)) numericEnv[name] = value;
+        } else {
+          functionEnv[name] = { params: item.params, bodyAst: item.ast };
+        }
+      }
+      break;
+    }
+    workingItems = new Map(workingItems);
+    for (const name of new Set(topo.cycle)) {
+      const item = workingItems.get(name);
+      if (item.kind === 'number') item.ref.value = undefined;
+      workingItems.delete(name);
+    }
+  }
+
+  for (const c of constants) {
+    if (c.kind === 'number') {
+      if (!items.has(c.name)) c.value = undefined; // failed to even parse
+    } else if (c.kind === 'color') {
+      const res = resolveColorAttr(c.expr.trim(), colorEnv);
+      c.value = res.ok ? res.value : undefined;
+      if (res.ok) colorEnv[c.name] = c.value;
+    } else {
+      const res = resolveBoolAttr(c.expr.trim(), boolEnv);
+      c.value = res.ok ? res.value : undefined;
+      if (res.ok) boolEnv[c.name] = c.value;
+    }
+  }
+
+  return { numericEnv, colorEnv, boolEnv, functionEnv };
 }
 
 // Perpendicular distance from p to the segment a-b (clamped projection,
@@ -872,10 +1091,10 @@ function splineResample(ts, points) {
 // this for other period counts (3, 5, 6, ...) — it would need genuine
 // period detection in the parsed expression (tessellate one period,
 // replicate it), a separate, larger feature, not implemented here.
-function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
+function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv, functionEnv = {}) {
   function evalAt(t) {
     const env = { ...numericEnv, [param]: t };
-    return [evalExpr(xExpr, env), evalExpr(yExpr, env), evalExpr(zExpr, env)];
+    return [evalExpr(xExpr, env, functionEnv), evalExpr(yExpr, env, functionEnv), evalExpr(zExpr, env, functionEnv)];
   }
   function isFinitePoint(p) {
     return Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2]);
@@ -937,20 +1156,20 @@ function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv) {
 // `constants` changes — the mechanism that makes editing a constant bulk-
 // update everything referencing it, persistently, across Saves.
 function reEvalObjects() {
-  const { numericEnv, colorEnv, boolEnv } = buildEnvs();
+  const { numericEnv, colorEnv, boolEnv, functionEnv } = buildEnvs();
   for (const v of vertices) {
     for (let i = 0; i < 3; i++) {
       const expr = v.exprs?.[i];
-      if (expr) v.coords[i] = evalExpr(expr, numericEnv);
+      if (expr) v.coords[i] = evalExpr(expr, numericEnv, functionEnv);
     }
     if (v.colorExpr)   { const r = resolveColorAttr(v.colorExpr, colorEnv);  if (r.ok) v.color     = r.value; }
-    if (v.radiusExpr)  { const r = resolveNumAttr(v.radiusExpr, numericEnv); if (r.ok) v.radius    = r.value; }
+    if (v.radiusExpr)  { const r = resolveNumAttr(v.radiusExpr, numericEnv, functionEnv); if (r.ok) v.radius    = r.value; }
     if (v.visibleExpr) { const r = resolveBoolAttr(v.visibleExpr, boolEnv);  if (r.ok) v.visible   = r.value; }
     if (v.labelExpr)   { const r = resolveBoolAttr(v.labelExpr, boolEnv);    if (r.ok) v.showLabel = r.value; }
   }
   for (const s of segments) {
     if (s.colorExpr)   { const r = resolveColorAttr(s.colorExpr, colorEnv);  if (r.ok) s.color     = r.value; }
-    if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv);  if (r.ok) s.lineWidth = r.value; }
+    if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv, functionEnv);  if (r.ok) s.lineWidth = r.value; }
     if (s.visibleExpr) { const r = resolveBoolAttr(s.visibleExpr, boolEnv);  if (r.ok) s.visible   = r.value; }
   }
   for (const fc of faces) {
@@ -963,12 +1182,12 @@ function reEvalObjects() {
     // Domain bounds are expressions too (may reference constants) — re-
     // resolve before re-tessellating, same relationship vertex's
     // exprs->coords has to reEvalObjects.
-    const lo = evalExpr(cv.domainLoExpr, numericEnv);
-    const hi = evalExpr(cv.domainHiExpr, numericEnv);
+    const lo = evalExpr(cv.domainLoExpr, numericEnv, functionEnv);
+    const hi = evalExpr(cv.domainHiExpr, numericEnv, functionEnv);
     if (Number.isFinite(lo) && Number.isFinite(hi) && lo < hi) {
       cv.domainLo = lo;
       cv.domainHi = hi;
-      cv.points = tessellateCurve(cv.xExpr, cv.yExpr, cv.zExpr, cv.param, lo, hi, numericEnv);
+      cv.points = tessellateCurve(cv.xExpr, cv.yExpr, cv.zExpr, cv.param, lo, hi, numericEnv, functionEnv);
     }
   }
 }
@@ -1013,6 +1232,12 @@ function renameConstantEverywhere(oldName, newName) {
         // (obj.param is undefined for every other type, so this is a
         // no-op everywhere except curves.)
         if (obj.param && oldName === obj.param && (f === 'xExpr' || f === 'yExpr' || f === 'zExpr')) continue;
+        // A function's own parameters shadow a same-named constant within
+        // its body, same principle as a curve's bound parameter just
+        // above — a function can have several params, unlike a curve's
+        // single one, so this checks membership in the whole list rather
+        // than equality against one field.
+        if (obj.params && obj.params.includes(oldName) && f === 'bodyExpr') continue;
         obj[f] = renameInExpr(obj[f], oldName, newName);
       }
     }
@@ -1029,16 +1254,17 @@ function renameConstantEverywhere(oldName, newName) {
   }
 }
 
-function isNameTakenIn(name, vertexList, constList, faceList = [], segList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null, curveList = [], excludeCurveId = null) {
+function isNameTakenIn(name, vertexList, constList, faceList = [], segList = [], excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null, curveList = [], excludeCurveId = null, functionList = [], excludeFunctionId = null) {
   return vertexList.some(v => v.name === name && v.id !== excludeVertexId)
       || constList.some(c => c.name === name && c.id !== excludeConstId)
       || faceList.some(f => f.name === name && f.id !== excludeFaceId)
       || segList.some(s => s.name === name && s.id !== excludeSegId)
-      || curveList.some(cv => cv.name === name && cv.id !== excludeCurveId);
+      || curveList.some(cv => cv.name === name && cv.id !== excludeCurveId)
+      || functionList.some(fn => fn.name === name && fn.id !== excludeFunctionId);
 }
 
-function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null, excludeCurveId = null) {
-  return isNameTakenIn(name, vertices, constants, faces, segments, excludeVertexId, excludeConstId, excludeFaceId, excludeSegId, curves, excludeCurveId);
+function isNameTaken(name, excludeVertexId = null, excludeConstId = null, excludeFaceId = null, excludeSegId = null, excludeCurveId = null, excludeFunctionId = null) {
+  return isNameTakenIn(name, vertices, constants, faces, segments, excludeVertexId, excludeConstId, excludeFaceId, excludeSegId, curves, excludeCurveId, functions, excludeFunctionId);
 }
 
 // Persistent per-prefix auto-name counters for controls-driven creation —
@@ -1228,8 +1454,10 @@ const OBJECT_TYPES = [
   // subheaders. A second OBJECT_TYPES entry for 'domain' would make
   // sortCodeText's per-key loop emit a second, duplicate "AUXILIARY
   // FUNCTIONS" header, since that loop emits one section per SECTION_ORDER
-  // key regardless of title text.
-  { key: 'functions', title: 'AUXILIARY FUNCTIONS', style: 'eq', match: /FUNCTION/i },
+  // key regardless of title text. `domain` is still unimplemented (see
+  // parseCodeText) — `list` only ever walks real `function` objects.
+  { key: 'functions', title: 'AUXILIARY FUNCTIONS', style: 'eq', match: /FUNCTION/i,
+    list: () => functions },
   { key: 'curves',    title: 'CURVES',    style: 'dash', match: /CURVE/i,
     list: () => curves, lastSet: () => lastSetCurve },
 ];
@@ -1561,25 +1789,173 @@ function tokenizeAttrs(rest, allowedAttrs) {
   return { positional, attrs };
 }
 
+// Pre-scans the raw text once, before parseCodeText's main per-line walk,
+// to fully resolve every number/color/bool/function line — this is what
+// lets a number constant and a function reference each other in *any*
+// order (see topoSortDependencies), rather than the strict "only an
+// earlier constant" rule alone. Color/bool constants are NOT part of the
+// dependency graph here — they can only ever reference an earlier
+// same-kind constant (colors/bools never go through evalExpr's numeric
+// grammar at all), an independent, far simpler track still resolved in
+// true file order; only their NAME gets assigned here (so the one shared
+// blank-name counter across number/color/bool stays correct — see below),
+// their VALUE is still resolved inline in the main walk, unchanged.
+//
+// Collision-checking here only covers *this* combined set (numbers,
+// colors, bools, functions all share one namespace, same as every other
+// pair of kinds in this DSL) — not vertex/segment/face/curve names, which
+// aren't known until the main walk runs. That's fine, not a gap: the main
+// walk's own existing checks already test every vertex/segment/face/curve
+// name against stagedConstants (and, once this lands, stagedFunctions),
+// and this function's results are staged before the main walk starts, so
+// a cross-kind collision is still always caught — just reported from
+// whichever line the main walk reaches second, not necessarily the one
+// that would have reported it under the old single-pass design.
+//
+// Returns { byLineIdx: Map<number, result>, numericEnv, functionEnv }.
+// A `result` is either { ok:false, errorMsg } or one of:
+//   { ok:true, keyword:'number'|'color'|'bool', name, rest }
+//   { ok:true, keyword:'function', name, params, bodyExpr, bodyAst, value }
+// (value only meaningful for number; rest is the raw, not-yet-resolved
+// expression text for color/bool, resolved inline in the main walk same
+// as always).
+function resolveConstantsAndFunctions(rawLines) {
+  const candidates = []; // { lineIdx, keyword, name, rest, error }
+  const seenNames  = new Set();
+  let autoConstN   = 0;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const trimmed = rawLines[i].trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const objLine = trimmed.replace(/^new\b\s*/, '');
+    const m = objLine.match(CODE_OBJECT_RE);
+    if (!m) continue;
+    const [, keyword, nameRaw, restRaw] = m;
+    if (keyword !== 'number' && keyword !== 'color' && keyword !== 'bool' && keyword !== 'function') continue;
+    const nameTyped = nameRaw.trim();
+    const rest = restRaw.trim();
+    let name = nameTyped;
+    let error = null;
+
+    // Unlike every other kind here, a blank function name is a hard error,
+    // not an auto-name candidate — an anonymous function could never
+    // actually be called by anything.
+    if (keyword === 'function') {
+      if (name === '') error = 'function requires a name';
+    } else if (name === '') {
+      do { name = `k${autoConstN++}`; } while (seenNames.has(name));
+    }
+    if (!error && name !== '') {
+      if (!CODE_IDENT_RE.test(name)) error = `invalid ${keyword} name '${name}'`;
+      else if (name === 'true' || name === 'false') error = `'${name}' is reserved and cannot be used as a name`;
+      else if (seenNames.has(name)) error = `name '${name}' already used`;
+    }
+    if (!error) seenNames.add(name);
+    candidates.push({ lineIdx: i, keyword, name, rest, error });
+  }
+
+  // Parse every syntactically-named number/function body into an AST (a
+  // malformed expression fails right here, independent of the graph), and
+  // build the combined dependency graph from those ASTs.
+  const items       = new Map(); // name -> { ast, localNames, keyword, params?, bodyExpr? }
+  const parseErrors = new Map(); // name -> error message
+  for (const c of candidates) {
+    if (c.error || (c.keyword !== 'number' && c.keyword !== 'function')) continue;
+    if (c.keyword === 'number') {
+      const parsed = parseExprAst(c.rest);
+      if (!parsed.ok) { parseErrors.set(c.name, 'invalid expression'); continue; }
+      items.set(c.name, { ast: parsed.ast, localNames: new Set(), keyword: 'number' });
+    } else {
+      const arrowIdx = c.rest.indexOf('->');
+      if (arrowIdx === -1) { parseErrors.set(c.name, "expected 'PARAM[, PARAM...] -> expr'"); continue; }
+      const paramsPart = c.rest.slice(0, arrowIdx).trim();
+      const bodyPart   = c.rest.slice(arrowIdx + 2).trim();
+      const params = paramsPart === '' ? [] : paramsPart.split(',').map(p => p.trim());
+      const badParam = params.find(p => !CODE_IDENT_RE.test(p));
+      if (badParam !== undefined) { parseErrors.set(c.name, `invalid parameter name '${badParam}'`); continue; }
+      if (new Set(params).size !== params.length) { parseErrors.set(c.name, 'duplicate parameter name'); continue; }
+      if (bodyPart === '') { parseErrors.set(c.name, 'function body cannot be empty'); continue; }
+      const parsed = parseExprAst(bodyPart);
+      if (!parsed.ok) { parseErrors.set(c.name, 'invalid function body'); continue; }
+      items.set(c.name, { ast: parsed.ast, localNames: new Set(params), keyword: 'function', params, bodyExpr: bodyPart });
+    }
+  }
+
+  // Topologically sort, removing and re-trying past any cycle found —
+  // every member of a cycle gets the same precise "circular dependency"
+  // error, naming the cycle; everything outside it still resolves
+  // normally, in dependency order. Loops rather than a single retry
+  // because more than one independent cycle can exist in the same file.
+  let workingItems = items;
+  let order;
+  while (true) {
+    const topo = topoSortDependencies(workingItems);
+    if (topo.ok) { order = topo.order; break; }
+    const msg = `circular dependency: ${topo.cycle.join(' → ')}`;
+    workingItems = new Map(workingItems);
+    for (const name of new Set(topo.cycle)) {
+      parseErrors.set(name, msg);
+      workingItems.delete(name);
+    }
+  }
+
+  const numericEnv  = {};
+  const functionEnv = {};
+  const resultByName = new Map();
+  for (const name of order) {
+    const item = items.get(name);
+    if (item.keyword === 'number') {
+      const value = evalAst(item.ast, { numericEnv, functionEnv });
+      if (!Number.isFinite(value)) { parseErrors.set(name, 'invalid expression'); continue; }
+      numericEnv[name] = value;
+      resultByName.set(name, { ok: true, keyword: 'number', name, value });
+    } else {
+      functionEnv[name] = { params: item.params, bodyAst: item.ast };
+      resultByName.set(name, { ok: true, keyword: 'function', name, params: item.params, bodyExpr: item.bodyExpr, bodyAst: item.ast });
+    }
+  }
+
+  const byLineIdx = new Map();
+  for (const c of candidates) {
+    if (c.error) { byLineIdx.set(c.lineIdx, { ok: false, errorMsg: c.error }); continue; }
+    if (c.keyword === 'color' || c.keyword === 'bool') {
+      byLineIdx.set(c.lineIdx, { ok: true, keyword: c.keyword, name: c.name, rest: c.rest });
+      continue;
+    }
+    if (parseErrors.has(c.name)) { byLineIdx.set(c.lineIdx, { ok: false, errorMsg: parseErrors.get(c.name) }); continue; }
+    byLineIdx.set(c.lineIdx, resultByName.get(c.name));
+  }
+
+  return { byLineIdx, numericEnv, functionEnv };
+}
+
 function parseCodeText(text) {
-  const lines           = [];
-  const stagedConstants = [];
-  const stagedVertices  = [];
-  const stagedSegments  = [];
-  const stagedFaces     = [];
-  const stagedCurves    = [];
-  // Three environments, built incrementally in the same left-to-right walk
-  // as everything else — a const can only reference an earlier const of the
-  // same kind, exactly like the pre-existing numeric-only rule.
-  const numericEnv       = {};
-  const colorEnv         = {};
-  const boolEnv          = {};
+  const rawLines         = text.split('\n');
+  const lines            = [];
+  const stagedConstants  = [];
+  const stagedFunctions  = [];
+  const stagedVertices   = [];
+  const stagedSegments   = [];
+  const stagedFaces      = [];
+  const stagedCurves     = [];
+  // Number-kind constants and functions are fully resolved *before* this
+  // walk even starts — see resolveConstantsAndFunctions — since either can
+  // now reference the other in any order, not just "an earlier one." So
+  // numericEnv/functionEnv start out already complete here, never mutated
+  // again below; colorEnv/boolEnv are the opposite — still built
+  // incrementally in this same left-to-right walk, exactly as before (a
+  // color/bool constant can only ever reference an earlier same-kind one).
+  const constFns          = resolveConstantsAndFunctions(rawLines);
+  const numericEnv        = constFns.numericEnv;
+  const functionEnv       = constFns.functionEnv;
+  const colorEnv          = {};
+  const boolEnv           = {};
   const vertexByName    = new Map(); // name -> staged vertex, built incrementally
   const segmentByName   = new Map(); // name -> staged segment, built incrementally (edit target lookup)
   const faceByName      = new Map(); // name -> staged face, built incrementally (edit target lookup)
   const constByName     = new Map(); // name -> staged constant, built incrementally (edit target lookup)
+  const functionByName  = new Map(); // name -> staged function, built incrementally
   const curveByName     = new Map(); // name -> staged curve, built incrementally
-  let autoConstN   = 0;
   // Per-prefix auto-name counters, local to this one parse (mutations here
   // never touch the live nameCounters directly — see syncNameCounterFromParse,
   // called only after a real commit) — but *seeded* from the live session's
@@ -1614,7 +1990,8 @@ function parseCodeText(text) {
     curve:   { color: undefined, visible: undefined, naming: undefined, counter: undefined },
   };
 
-  for (const raw of text.split('\n')) {
+  for (let lineIdx = 0; lineIdx < rawLines.length; lineIdx++) {
+    const raw = rawLines[lineIdx];
     const trimmed = raw.trim();
     const rec = { raw, kind: 'blank', targetSection: null, headerSection: null, valid: true, errorMsg: null, parsed: null };
 
@@ -1690,7 +2067,7 @@ function parseCodeText(text) {
         if (newExpr === '') {
           rec.valid = false; rec.errorMsg = `edit ${editType} requires a value`; lines.push(rec); continue;
         }
-        const res = resolveConstByKind(target.kind, newExpr, { numericEnv, colorEnv, boolEnv });
+        const res = resolveConstByKind(target.kind, newExpr, { numericEnv, colorEnv, boolEnv, functionEnv });
         if (!res.ok) {
           rec.valid = false;
           rec.errorMsg =
@@ -1756,7 +2133,7 @@ function parseCodeText(text) {
         // any other whitespace.
         const tok = tokenizeAttrs(editRest.replace(/;/g, ' ').trim(), ['color', 'visible']);
         if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
-        fieldsRes = resolveEditFields('face', tok.attrs, { numericEnv, colorEnv, boolEnv });
+        fieldsRes = resolveEditFields('face', tok.attrs, { numericEnv, colorEnv, boolEnv, functionEnv });
         if (!fieldsRes.ok) { rec.valid = false; rec.errorMsg = fieldsRes.errorMsg; lines.push(rec); continue; }
         if (tok.positional.length > 0) {
           const verbResult = parseFaceVertexListEdit(tok.positional, target, vertexByName);
@@ -1771,7 +2148,7 @@ function parseCodeText(text) {
         if (tok.error || tok.positional.length > 0) {
           rec.valid = false; rec.errorMsg = tok.error || `unexpected '${tok.positional[0]}'`; lines.push(rec); continue;
         }
-        fieldsRes = resolveEditFields(editType, tok.attrs, { numericEnv, colorEnv, boolEnv });
+        fieldsRes = resolveEditFields(editType, tok.attrs, { numericEnv, colorEnv, boolEnv, functionEnv });
         if (!fieldsRes.ok) { rec.valid = false; rec.errorMsg = fieldsRes.errorMsg; lines.push(rec); continue; }
 
         // Coordinate edits: any subset of x/y/z, each independently optional —
@@ -1784,7 +2161,7 @@ function parseCodeText(text) {
           for (const axis of ['x', 'y', 'z']) {
             if (!(axis in tok.attrs)) continue;
             const exprText = tok.attrs[axis];
-            const val = evalExpr(exprText, numericEnv);
+            const val = evalExpr(exprText, numericEnv, functionEnv);
             if (!Number.isFinite(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
             coordEdits[axis] = { expr: exprText, value: val };
           }
@@ -1912,46 +2289,65 @@ function parseCodeText(text) {
     const name = nameRaw.trim();
     const rest = restRaw.trim();
 
-    if (keyword === 'function' || keyword === 'slider' || keyword === 'domain') {
+    if (keyword === 'slider' || keyword === 'domain') {
       rec.kind = 'unsupported';
       rec.valid = false;
       rec.errorMsg = `${keyword} objects are not yet supported`;
-      rec.targetSection = (keyword === 'function' || keyword === 'domain') ? 'functions' : null;
+      rec.targetSection = (keyword === 'domain') ? 'functions' : null;
       lines.push(rec);
       continue;
     }
 
-    if (keyword === 'number' || keyword === 'color' || keyword === 'bool') {
+    // number/color/bool/function are all fully resolved already, up front,
+    // by resolveConstantsAndFunctions — this just looks up that result and
+    // stages it. See that function's own comment for why: number and
+    // function can reference each other in any order, so resolving them
+    // one line at a time in this walk (as color/bool below still do) can't
+    // work anymore.
+    if (keyword === 'number' || keyword === 'function') {
+      rec.kind = keyword === 'number' ? 'const' : 'function';
+      rec.targetSection = keyword === 'number' ? 'constants' : 'functions';
+      const res = constFns.byLineIdx.get(lineIdx);
+      if (!res.ok) { rec.valid = false; rec.errorMsg = res.errorMsg; lines.push(rec); continue; }
+      if (isNameTakenIn(res.name, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
+        rec.valid = false; rec.errorMsg = `name '${res.name}' already used`; lines.push(rec); continue;
+      }
+      if (keyword === 'number') {
+        const obj = { name: res.name, expr: rest, value: res.value, kind: 'number' };
+        stagedConstants.push(obj);
+        constByName.set(res.name, obj);
+        rec.parsed = obj;
+      } else {
+        const obj = { name: res.name, params: res.params, bodyExpr: res.bodyExpr, bodyAst: res.bodyAst };
+        stagedFunctions.push(obj);
+        functionByName.set(res.name, obj);
+        rec.parsed = obj;
+      }
+      lines.push(rec);
+      continue;
+    }
+
+    if (keyword === 'color' || keyword === 'bool') {
       rec.kind = 'const';
       rec.targetSection = 'constants';
-      // The keyword itself is now the kind — no more optional leading
-      // kind-token to extract from the name field, no more shape-inference
-      // fallback for an omitted one. 'bool' maps to the internal 'boolean'
-      // literal every existing reader of c.kind already expects.
       const kind = keyword === 'bool' ? 'boolean' : keyword;
-      let finalName = name;
-
-      if (finalName === '') {
-        do { finalName = `k${autoConstN++}`; } while (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
-      } else if (!CODE_IDENT_RE.test(finalName)) {
-        rec.valid = false; rec.errorMsg = `invalid constant name '${finalName}'`; lines.push(rec); continue;
-      } else if (finalName === 'true' || finalName === 'false') {
-        rec.valid = false; rec.errorMsg = `'${finalName}' is reserved and cannot be used as a constant name`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
+      const res = constFns.byLineIdx.get(lineIdx);
+      if (!res.ok) { rec.valid = false; rec.errorMsg = res.errorMsg; lines.push(rec); continue; }
+      const finalName = res.name;
+      if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      const res = resolveConstByKind(kind, rest, { numericEnv, colorEnv, boolEnv });
-      if (!res.ok) {
+      const valRes = resolveConstByKind(kind, res.rest, { numericEnv, colorEnv, boolEnv, functionEnv });
+      if (!valRes.ok) {
         rec.valid = false;
-        rec.errorMsg = kind === 'color' ? `unknown color '${rest}'` : kind === 'boolean' ? `invalid bool value '${rest}'` : 'invalid expression';
+        rec.errorMsg = kind === 'color' ? `unknown color '${res.rest}'` : `invalid bool value '${res.rest}'`;
         lines.push(rec); continue;
       }
-      const value = res.value;
+      const value = valRes.value;
 
-      const obj = { name: finalName, expr: rest, value, kind };
-      if (kind === 'number') numericEnv[finalName] = value;
-      else if (kind === 'color') colorEnv[finalName] = value;
+      const obj = { name: finalName, expr: res.rest, value, kind };
+      if (kind === 'color') colorEnv[finalName] = value;
       else boolEnv[finalName] = value;
       stagedConstants.push(obj);
       constByName.set(finalName, obj);
@@ -1986,18 +2382,18 @@ function parseCodeText(text) {
       let finalName = name;
       if (finalName === '') {
         finalName = advanceAutoName(parseNameCounters, currentSet.vertex.naming ?? AUTO_NAME_PREFIX.vertex,
-          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid vertex name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
-      const coords = coordExprs.map(t => evalExpr(t, numericEnv));
+      const coords = coordExprs.map(t => evalExpr(t, numericEnv, functionEnv));
       if (coords.some(c => !Number.isFinite(c))) {
         rec.valid = false; rec.errorMsg = 'invalid coordinate expression'; lines.push(rec); continue;
       }
 
-      const attrRes = resolveGoverningAttrs('vertex', tok.attrs, currentSet.vertex, { numericEnv, colorEnv, boolEnv });
+      const attrRes = resolveGoverningAttrs('vertex', tok.attrs, currentSet.vertex, { numericEnv, colorEnv, boolEnv, functionEnv });
       if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
       const obj = {
@@ -2033,14 +2429,14 @@ function parseCodeText(text) {
       let finalName = name;
       if (finalName === '') {
         finalName = advanceAutoName(parseNameCounters, currentSet.face.naming ?? AUTO_NAME_PREFIX.face,
-          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid face name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      const attrRes = resolveGoverningAttrs('face', tok.attrs, currentSet.face, { numericEnv, colorEnv, boolEnv });
+      const attrRes = resolveGoverningAttrs('face', tok.attrs, currentSet.face, { numericEnv, colorEnv, boolEnv, functionEnv });
       if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
       const obj = {
@@ -2103,8 +2499,8 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = `unexpected '${tok.positional[0]}' after the domain clause`; lines.push(rec); continue;
       }
 
-      const domainLo = evalExpr(loExprRaw, numericEnv);
-      const domainHi = evalExpr(hiExprRaw, numericEnv);
+      const domainLo = evalExpr(loExprRaw, numericEnv, functionEnv);
+      const domainHi = evalExpr(hiExprRaw, numericEnv, functionEnv);
       if (!Number.isFinite(domainLo) || !Number.isFinite(domainHi)) {
         rec.valid = false; rec.errorMsg = 'invalid domain bound expression'; lines.push(rec); continue;
       }
@@ -2115,10 +2511,10 @@ function parseCodeText(text) {
       let finalName = name;
       if (finalName === '') {
         finalName = advanceAutoName(parseNameCounters, currentSet.curve.naming ?? AUTO_NAME_PREFIX.curve,
-          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
+          n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions));
       } else if (!CODE_IDENT_RE.test(finalName)) {
         rec.valid = false; rec.errorMsg = `invalid curve name '${finalName}'`; lines.push(rec); continue;
-      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
+      } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
@@ -2127,14 +2523,14 @@ function parseCodeText(text) {
       // clear parse error immediately, rather than silently producing an
       // empty/NaN-riddled tessellation at render time.
       const testEnv = { ...numericEnv, [param]: domainLo };
-      const testX = evalExpr(xExpr, testEnv);
-      const testY = evalExpr(yExpr, testEnv);
-      const testZ = evalExpr(zExpr, testEnv);
+      const testX = evalExpr(xExpr, testEnv, functionEnv);
+      const testY = evalExpr(yExpr, testEnv, functionEnv);
+      const testZ = evalExpr(zExpr, testEnv, functionEnv);
       if (!Number.isFinite(testX) || !Number.isFinite(testY) || !Number.isFinite(testZ)) {
         rec.valid = false; rec.errorMsg = 'invalid x=/y=/z= expression'; lines.push(rec); continue;
       }
 
-      const attrRes = resolveGoverningAttrs('curve', tok.attrs, currentSet.curve, { numericEnv, colorEnv, boolEnv });
+      const attrRes = resolveGoverningAttrs('curve', tok.attrs, currentSet.curve, { numericEnv, colorEnv, boolEnv, functionEnv });
       if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
       const obj = {
@@ -2142,7 +2538,7 @@ function parseCodeText(text) {
         xExpr, yExpr, zExpr, param,
         domainLoExpr: loExprRaw.trim(), domainHiExpr: hiExprRaw.trim(),
         domainLo, domainHi,
-        points: tessellateCurve(xExpr, yExpr, zExpr, param, domainLo, domainHi, numericEnv),
+        points: tessellateCurve(xExpr, yExpr, zExpr, param, domainLo, domainHi, numericEnv, functionEnv),
         ...attrRes.fields,
       };
       stagedCurves.push(obj);
@@ -2170,14 +2566,14 @@ function parseCodeText(text) {
     let finalName = name;
     if (finalName === '') {
       finalName = advanceAutoName(parseNameCounters, currentSet.segment.naming ?? AUTO_NAME_PREFIX.segment,
-        n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves));
+        n => isNameTakenIn(n, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions));
     } else if (!CODE_IDENT_RE.test(finalName)) {
       rec.valid = false; rec.errorMsg = `invalid segment name '${finalName}'`; lines.push(rec); continue;
-    } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves)) {
+    } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
       rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
     }
 
-    const attrRes = resolveGoverningAttrs('segment', tok.attrs, currentSet.segment, { numericEnv, colorEnv, boolEnv });
+    const attrRes = resolveGoverningAttrs('segment', tok.attrs, currentSet.segment, { numericEnv, colorEnv, boolEnv, functionEnv });
     if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
 
     const obj = {
@@ -2192,7 +2588,7 @@ function parseCodeText(text) {
     lines.push(rec);
   }
 
-  return { lines, stagedConstants, stagedVertices, stagedSegments, stagedFaces, stagedCurves, finalSet: currentSet, nameCounters: parseNameCounters };
+  return { lines, stagedConstants, stagedFunctions, stagedVertices, stagedSegments, stagedFaces, stagedCurves, finalSet: currentSet, nameCounters: parseNameCounters };
 }
 
 function formatCoordExpr(v, i) {
@@ -2244,6 +2640,10 @@ function formatFaceLine(vertsForFace, f) {
   return `face ${f.name}: ${names}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
 }
 
+function formatFunctionLine(fn) {
+  return `function ${fn.name}: ${fn.params.join(', ')} -> ${fn.bodyExpr}`;
+}
+
 function formatCurveLine(c) {
   const colorExpr   = c.colorExpr   ?? c.color ?? DEFAULT_COLOR;
   const visibleExpr = c.visibleExpr ?? String(c.visible !== false);
@@ -2261,16 +2661,17 @@ function formatSetLine(parsed) {
 // after Save instead of disappearing (no cascade-delete).
 function formatLineForOutput(rec) {
   if (!rec.valid || !rec.parsed) return rec.raw;
-  if (rec.kind === 'const')   return formatConstLine(rec.parsed);
-  if (rec.kind === 'vertex')  return formatVertexLine(rec.parsed);
-  if (rec.kind === 'segment') return formatSegmentLine({ name: rec.parsed.v1Name }, { name: rec.parsed.v2Name }, rec.parsed);
-  if (rec.kind === 'face')    return formatFaceLine(rec.parsed.vertexNames.map(n => ({ name: n })), rec.parsed);
-  if (rec.kind === 'curve')   return formatCurveLine(rec.parsed);
-  if (rec.kind === 'set')     return formatSetLine(rec.parsed);
+  if (rec.kind === 'const')    return formatConstLine(rec.parsed);
+  if (rec.kind === 'function') return formatFunctionLine(rec.parsed);
+  if (rec.kind === 'vertex')   return formatVertexLine(rec.parsed);
+  if (rec.kind === 'segment')  return formatSegmentLine({ name: rec.parsed.v1Name }, { name: rec.parsed.v2Name }, rec.parsed);
+  if (rec.kind === 'face')     return formatFaceLine(rec.parsed.vertexNames.map(n => ({ name: n })), rec.parsed);
+  if (rec.kind === 'curve')    return formatCurveLine(rec.parsed);
+  if (rec.kind === 'set')      return formatSetLine(rec.parsed);
   return rec.raw;
 }
 
-function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr) {
+function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr, functionsArr) {
   const out = [];
   // VIEW SETTINGS and POLYTOPES are purely decorative banners — no
   // OBJECT_TYPES entry, never classified by classifyHeaderSection, never
@@ -2304,7 +2705,8 @@ function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr) {
   // Functions/domain moved here (after FACES, before CURVES) to match the
   // control-panel submenu order (View / Auxiliary / Polytopes / Curves /
   // Functions) — was previously emitted right after AUXILIARY CONSTANTS.
-  emitSection(out, 'eq',   'AUXILIARY FUNCTIONS', []);
+  const functionLines = (functionsArr ?? []).map(formatFunctionLine);
+  emitSection(out, 'eq',   'AUXILIARY FUNCTIONS', functionLines);
   const curveLines = (curvesArr ?? []).map(formatCurveLine);
   emitSection(out, 'dash', 'CURVES', buildSetBlock('curve', lastSetCurve), curveLines);
   out.push(makeDividerLine());
@@ -5779,6 +6181,12 @@ function buildCommittedArraysFromStaged(staged) {
     value: c.value,
     kind: c.kind,
   }));
+  const newFunctions = (staged.stagedFunctions ?? []).map((fn, i) => ({
+    id: i,
+    name: fn.name,
+    params: [...fn.params],
+    bodyExpr: fn.bodyExpr,
+  }));
   const newSegments = staged.stagedSegments.map((s, i) => ({
     id: i,
     name: s.name,
@@ -5807,7 +6215,7 @@ function buildCommittedArraysFromStaged(staged) {
     visible: c.visible, visibleExpr: c.visibleExpr,
     points: c.points ?? [],
   }));
-  return { newVertices, newConstants, newSegments, newFaces, newCurves };
+  return { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves };
 }
 
 function refreshCodeGutterAndErrors() {
@@ -5893,7 +6301,7 @@ function codeSave() {
   codeSort();
   const textarea = document.getElementById('code-textarea');
   const staged = parseCodeText(textarea.value);
-  const { newVertices, newConstants, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
+  const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
   // Remember this save's governing `set` values so the next Load starts
   // from here instead of resetting to the built-in defaults.
@@ -5913,6 +6321,8 @@ function codeSave() {
   nextVertexId      = newVertices.length;
   constants         = newConstants;
   nextConstantId    = newConstants.length;
+  functions         = newFunctions;
+  nextFunctionId    = newFunctions.length;
   segments          = newSegments;
   nextSegmentId     = newSegments.length;
   faces             = newFaces;
@@ -5968,7 +6378,7 @@ function openCodeSubmenu() {
   resizeInterpreterInput();
 
   const textarea = document.getElementById('code-textarea');
-  textarea.value = serializeState(vertices, constants, segments, faces, curves);
+  textarea.value = serializeState(vertices, constants, segments, faces, curves, functions);
   // '#sub-code' is already display:'' by this point (set above), so
   // reparseAndPreview()'s auto-grow (inside refreshCodeGutterAndErrors)
   // measures a real, laid-out scrollHeight here — no separate height-sync
@@ -6055,7 +6465,7 @@ function submitInterpreterLine() {
   const line  = input.value;
   if (line.trim() === '') return;
 
-  const staged    = parseCodeText(serializeState(vertices, constants, segments, faces, curves) + '\n' + line);
+  const staged    = parseCodeText(serializeState(vertices, constants, segments, faces, curves, functions) + '\n' + line);
   // The submitted content is always exactly the tail of the combined text —
   // serializeState(...) supplies everything before it — so its own line
   // count pinpoints which staged.lines entries are newly submitted, however
@@ -6151,7 +6561,7 @@ function submitInterpreterLine() {
     return;
   }
 
-  const { newVertices, newConstants, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
+  const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
   lastSetVertex  = { ...staged.finalSet.vertex };
   lastSetSegment = { ...staged.finalSet.segment };
@@ -6171,6 +6581,8 @@ function submitInterpreterLine() {
   nextVertexId      = newVertices.length;
   constants         = newConstants;
   nextConstantId    = newConstants.length;
+  functions         = newFunctions;
+  nextFunctionId    = newFunctions.length;
   segments          = newSegments;
   nextSegmentId     = newSegments.length;
   faces             = newFaces;
