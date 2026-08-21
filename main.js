@@ -231,7 +231,7 @@ function captureState() {
     vertices:          vertices.map(v => ({ ...v, coords: [...v.coords], exprs: [...(v.exprs ?? ['','',''])] })),
     segments:          segments.map(s => ({ ...s, vertexIds: [...s.vertexIds] })),
     faces:             faces.map(f => ({ ...f, vertexIds: [...f.vertexIds] })),
-    curves:            curves.map(c => ({ ...c, points: [...(c.points ?? [])] })),
+    curves:            curves.map(c => ({ ...c, points: [...(c.points ?? [])], domainIntervals: c.domainIntervals.map(iv => ({ ...iv })) })),
     selectedVertexIds: new Set(selectedVertexIds),
     constants:         constants.map(c => ({ ...c })),
     functions:         functions.map(f => ({ ...f, params: [...f.params] })),
@@ -1076,10 +1076,26 @@ function splineResample(ts, points) {
   return out;
 }
 
+// Public entry point: tessellates a curve over a *disjoint union* of one
+// or more parameter intervals (see parseDomainIntervals) — each interval
+// gets its own independent call to tessellateOneInterval below, and the
+// results are concatenated with a non-finite break marker between them,
+// reusing the exact mechanism drawCurves already uses to lift the pen at
+// a genuine discontinuity (splineResample already relies on this same
+// idea internally, to keep one bad knot from corrupting a whole spline
+// fit — a union's gap between intervals is architecturally the same kind
+// of break, just intentional rather than a domain touching an asymptote).
 // Called from reEvalObjects (the cache-invalidation step for a curve's
-// resolved `.points`, same role vertex's exprs->coords resolution plays)
-// and at creation time in parseCodeText.
-//
+// resolved `.points`) and at creation time in parseCodeText.
+function tessellateCurve(xExpr, yExpr, zExpr, param, intervals, numericEnv, functionEnv = {}) {
+  const out = [];
+  for (const { lo, hi } of intervals) {
+    if (out.length > 0) out.push([NaN, NaN, NaN]);
+    out.push(...tessellateOneInterval(xExpr, yExpr, zExpr, param, lo, hi, numericEnv, functionEnv));
+  }
+  return out;
+}
+
 // Known open limitation, not fixed by anything below: two exact repeats of
 // a periodic curve (e.g. two loops of a helix) are only guaranteed to
 // tessellate congruently when (domain width / period) happens to be a
@@ -1091,7 +1107,7 @@ function splineResample(ts, points) {
 // this for other period counts (3, 5, 6, ...) — it would need genuine
 // period detection in the parsed expression (tessellate one period,
 // replicate it), a separate, larger feature, not implemented here.
-function tessellateCurve(xExpr, yExpr, zExpr, param, lo, hi, numericEnv, functionEnv = {}) {
+function tessellateOneInterval(xExpr, yExpr, zExpr, param, lo, hi, numericEnv, functionEnv) {
   function evalAt(t) {
     const env = { ...numericEnv, [param]: t };
     return [evalExpr(xExpr, env, functionEnv), evalExpr(yExpr, env, functionEnv), evalExpr(zExpr, env, functionEnv)];
@@ -1180,14 +1196,21 @@ function reEvalObjects() {
     if (cv.colorExpr)   { const r = resolveColorAttr(cv.colorExpr, colorEnv); if (r.ok) cv.color   = r.value; }
     if (cv.visibleExpr) { const r = resolveBoolAttr(cv.visibleExpr, boolEnv); if (r.ok) cv.visible  = r.value; }
     // Domain bounds are expressions too (may reference constants) — re-
-    // resolve before re-tessellating, same relationship vertex's
-    // exprs->coords has to reEvalObjects.
-    const lo = evalExpr(cv.domainLoExpr, numericEnv, functionEnv);
-    const hi = evalExpr(cv.domainHiExpr, numericEnv, functionEnv);
-    if (Number.isFinite(lo) && Number.isFinite(hi) && lo < hi) {
-      cv.domainLo = lo;
-      cv.domainHi = hi;
-      cv.points = tessellateCurve(cv.xExpr, cv.yExpr, cv.zExpr, cv.param, lo, hi, numericEnv, functionEnv);
+    // resolve every interval before re-tessellating, same relationship
+    // vertex's exprs->coords has to reEvalObjects. Only commits (and
+    // re-tessellates) if *every* interval still resolves — a single bad
+    // interval leaves the curve at its last-good tessellation rather than
+    // silently dropping to a partial union.
+    let intervalsOk = true;
+    const resolvedIntervals = cv.domainIntervals.map(iv => {
+      const lo = evalExpr(iv.loExpr, numericEnv, functionEnv);
+      const hi = evalExpr(iv.hiExpr, numericEnv, functionEnv);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo >= hi) intervalsOk = false;
+      return { ...iv, lo, hi };
+    });
+    if (intervalsOk) {
+      cv.domainIntervals = resolvedIntervals;
+      cv.points = tessellateCurve(cv.xExpr, cv.yExpr, cv.zExpr, cv.param, resolvedIntervals, numericEnv, functionEnv);
     }
   }
 }
@@ -1251,6 +1274,21 @@ function renameConstantEverywhere(oldName, newName) {
   // not a `*Expr`-suffixed field, so they need their own pass.
   for (const v of vertices) {
     if (v.exprs) v.exprs = v.exprs.map(e => renameInExpr(e, oldName, newName));
+  }
+  // A curve's domain bounds (`domainIntervals`) are the same kind of
+  // exception — an array of {loExpr, hiExpr} pairs, not flat `*Expr`
+  // fields. No shadowing concern here unlike x=/y=/z= above: domain bounds
+  // are resolved in the ambient environment, before the curve's own bound
+  // parameter is ever bound to a value, so it can never legitimately
+  // appear in one.
+  for (const cv of curves) {
+    if (cv.domainIntervals) {
+      cv.domainIntervals = cv.domainIntervals.map(iv => ({
+        ...iv,
+        loExpr: renameInExpr(iv.loExpr, oldName, newName),
+        hiExpr: renameInExpr(iv.hiExpr, oldName, newName),
+      }));
+    }
   }
 }
 
@@ -1483,6 +1521,67 @@ const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
 // a pure name-list check, independent of how the list was produced.
 function hasDuplicateVertexNames(names) {
   return new Set(names).size !== names.length;
+}
+
+// Finds the first comma not nested inside parentheses. Needed because a
+// domain bound expression can itself contain a function call with its own
+// comma-separated arguments (`[0, f(1,2)]`) — a naive first-comma split
+// would misparse that as lo="f(1", hi="2), 3" or similar. Returns
+// [before, after] or null if no top-level comma exists.
+function splitTopLevelComma(s) {
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '(') depth++;
+    else if (s[i] === ')') depth--;
+    else if (s[i] === ',' && depth === 0) return [s.slice(0, i), s.slice(i + 1)];
+  }
+  return null;
+}
+
+// Parses "[lo1, hi1] U [lo2, hi2] U ... [loN, hiN]" — a curve domain as a
+// disjoint union of one or more intervals — followed by optional trailing
+// attributes (color=/visible=). `U` is bare, never backslash-prefixed
+// (unlike the fixed builtin vocabulary \sin/\pi/etc.) and case-sensitive
+// (a lowercase `u` is deliberately not recognized, user's own call) — safe
+// because it only ever appears in this one fixed structural position,
+// right after a closing `]` and before the next `[`, never confusable
+// with a same-named constant used *inside* a bound expression (`[0, U]`
+// — that U sits inside the brackets, a different position entirely),
+// exactly the same "keywords only appear in fixed structural positions"
+// principle every other bare keyword in this grammar already relies on.
+// Not required to be disjoint or in increasing order — a union doesn't
+// mathematically require either, and rejecting either would be an
+// arbitrary restriction with no correctness payoff.
+// Returns { intervals: [{loExpr, hiExpr}, ...], attrTail } or { error }.
+function parseDomainIntervals(s) {
+  const intervals = [];
+  let pos = 0;
+  while (true) {
+    while (pos < s.length && /\s/.test(s[pos])) pos++;
+    if (s[pos] !== '[') {
+      if (intervals.length === 0) return { error: `expected '[lo, hi]'` };
+      break;
+    }
+    const closeIdx = s.indexOf(']', pos);
+    if (closeIdx === -1) return { error: `unterminated '[' in domain clause` };
+    const inner = s.slice(pos + 1, closeIdx);
+    const split = splitTopLevelComma(inner);
+    if (!split) return { error: `expected 'lo, hi' inside '[...]'` };
+    const loExpr = split[0].trim();
+    const hiExpr = split[1].trim();
+    if (!loExpr || !hiExpr) return { error: `expected 'lo, hi' inside '[...]'` };
+    intervals.push({ loExpr, hiExpr });
+    pos = closeIdx + 1;
+    while (pos < s.length && /\s/.test(s[pos])) pos++;
+    // A standalone 'U' token (not the start of a longer identifier like
+    // "Undefined") continues to another interval; anything else — trailing
+    // attrs, or nothing — ends the domain clause here.
+    if (s[pos] !== 'U' || /[a-zA-Z0-9_]/.test(s[pos + 1] ?? '')) break;
+    pos += 1;
+    while (pos < s.length && /\s/.test(s[pos])) pos++;
+    if (s[pos] !== '[') return { error: `expected '[lo, hi]' after 'U'` };
+  }
+  return { intervals, attrTail: s.slice(pos) };
 }
 
 // Parses a `replace OLD with NEW OLD with NEW ...` payload into an ordered
@@ -2479,34 +2578,42 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = 'x=/y=/z= clauses cannot be empty'; lines.push(rec); continue;
       }
 
-      // Domain clause: "PARAM in [lo, hi]", optionally followed by trailing
-      // color=/visible= attrs. PARAM is inferred here, never hardcoded to
-      // "t" — any valid identifier names the bound variable.
-      const domainMatch = domainClause.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+\[\s*([^,\]]+?)\s*,\s*([^,\]]+?)\s*\](.*)$/);
-      if (!domainMatch) {
+      // Domain clause: "PARAM in [lo, hi] [U [lo2, hi2] ...]", optionally
+      // followed by trailing color=/visible= attrs — a disjoint union of
+      // one or more intervals (see parseDomainIntervals). PARAM is
+      // inferred here, never hardcoded to "t" — any valid identifier names
+      // the bound variable.
+      const inMatch = domainClause.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+(.*)$/);
+      if (!inMatch) {
         rec.valid = false;
         rec.errorMsg = `expected 'PARAM in [lo, hi]' as the fourth clause`;
         lines.push(rec); continue;
       }
-      const [, param, loExprRaw, hiExprRaw, attrTail] = domainMatch;
+      const [, param, afterIn] = inMatch;
       if (!CODE_IDENT_RE.test(param)) {
         rec.valid = false; rec.errorMsg = `invalid parameter name '${param}'`; lines.push(rec); continue;
       }
+      const domainParse = parseDomainIntervals(afterIn);
+      if (domainParse.error) {
+        rec.valid = false; rec.errorMsg = domainParse.error; lines.push(rec); continue;
+      }
 
-      const tok = tokenizeAttrs(attrTail.trim(), ['color', 'visible']);
+      const tok = tokenizeAttrs(domainParse.attrTail.trim(), ['color', 'visible']);
       if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
       if (tok.positional.length > 0) {
         rec.valid = false; rec.errorMsg = `unexpected '${tok.positional[0]}' after the domain clause`; lines.push(rec); continue;
       }
 
-      const domainLo = evalExpr(loExprRaw, numericEnv, functionEnv);
-      const domainHi = evalExpr(hiExprRaw, numericEnv, functionEnv);
-      if (!Number.isFinite(domainLo) || !Number.isFinite(domainHi)) {
-        rec.valid = false; rec.errorMsg = 'invalid domain bound expression'; lines.push(rec); continue;
+      const domainIntervals = [];
+      let domainErr = null;
+      for (const { loExpr, hiExpr } of domainParse.intervals) {
+        const lo = evalExpr(loExpr, numericEnv, functionEnv);
+        const hi = evalExpr(hiExpr, numericEnv, functionEnv);
+        if (!Number.isFinite(lo) || !Number.isFinite(hi)) { domainErr = 'invalid domain bound expression'; break; }
+        if (lo >= hi) { domainErr = 'domain lower bound must be less than upper bound'; break; }
+        domainIntervals.push({ loExpr, hiExpr, lo, hi });
       }
-      if (domainLo >= domainHi) {
-        rec.valid = false; rec.errorMsg = 'domain lower bound must be less than upper bound'; lines.push(rec); continue;
-      }
+      if (domainErr) { rec.valid = false; rec.errorMsg = domainErr; lines.push(rec); continue; }
 
       let finalName = name;
       if (finalName === '') {
@@ -2518,11 +2625,11 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      // Sanity-check x=/y=/z= at the domain's own lower bound (with the
-      // bound parameter present) so a typo'd/unknown name surfaces as a
-      // clear parse error immediately, rather than silently producing an
-      // empty/NaN-riddled tessellation at render time.
-      const testEnv = { ...numericEnv, [param]: domainLo };
+      // Sanity-check x=/y=/z= at the first interval's own lower bound
+      // (with the bound parameter present) so a typo'd/unknown name
+      // surfaces as a clear parse error immediately, rather than silently
+      // producing an empty/NaN-riddled tessellation at render time.
+      const testEnv = { ...numericEnv, [param]: domainIntervals[0].lo };
       const testX = evalExpr(xExpr, testEnv, functionEnv);
       const testY = evalExpr(yExpr, testEnv, functionEnv);
       const testZ = evalExpr(zExpr, testEnv, functionEnv);
@@ -2536,9 +2643,8 @@ function parseCodeText(text) {
       const obj = {
         name: finalName,
         xExpr, yExpr, zExpr, param,
-        domainLoExpr: loExprRaw.trim(), domainHiExpr: hiExprRaw.trim(),
-        domainLo, domainHi,
-        points: tessellateCurve(xExpr, yExpr, zExpr, param, domainLo, domainHi, numericEnv, functionEnv),
+        domainIntervals,
+        points: tessellateCurve(xExpr, yExpr, zExpr, param, domainIntervals, numericEnv, functionEnv),
         ...attrRes.fields,
       };
       stagedCurves.push(obj);
@@ -2647,7 +2753,8 @@ function formatFunctionLine(fn) {
 function formatCurveLine(c) {
   const colorExpr   = c.colorExpr   ?? c.color ?? DEFAULT_COLOR;
   const visibleExpr = c.visibleExpr ?? String(c.visible !== false);
-  return `curve ${c.name}: x=${c.xExpr} ; y=${c.yExpr} ; z=${c.zExpr} ; ${c.param} in [${c.domainLoExpr}, ${c.domainHiExpr}]  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
+  const domainStr = c.domainIntervals.map(iv => `[${iv.loExpr}, ${iv.hiExpr}]`).join(' U ');
+  return `curve ${c.name}: x=${c.xExpr} ; y=${c.yExpr} ; z=${c.zExpr} ; ${c.param} in ${domainStr}  ${formatFieldToken('color', colorExpr)}  ${formatFieldToken('visible', visibleExpr)}`;
 }
 
 function formatSetLine(parsed) {
@@ -6209,8 +6316,7 @@ function buildCommittedArraysFromStaged(staged) {
     name: c.name,
     xExpr: c.xExpr, yExpr: c.yExpr, zExpr: c.zExpr,
     param: c.param,
-    domainLoExpr: c.domainLoExpr, domainHiExpr: c.domainHiExpr,
-    domainLo: c.domainLo,         domainHi: c.domainHi,
+    domainIntervals: c.domainIntervals.map(iv => ({ ...iv })),
     color: c.color,     colorExpr: c.colorExpr,
     visible: c.visible, visibleExpr: c.visibleExpr,
     points: c.points ?? [],
