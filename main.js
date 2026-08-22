@@ -3114,276 +3114,434 @@ function applyPerspective(pt, depth, normS) {
   return { pt: pt.scale(1 / d), ok: true, factor: 1 / d };
 }
 
-// ─── Face depth-ordering ──────────────────────────────────────────────────────
+// ─── Face BSP (object-space depth ordering) ────────────────────────────────────
 //
-// Faces are planar, so depth is an *affine* function of pre-perspective
-// projected (x,y): depth(x,y) = A*x + B*y + C. Solved once per face per frame
-// from any 3 of its projected vertices (closed-form, no iteration) — this is
-// what lets two faces be compared correctly at the specific point where they
-// actually overlap, rather than by a lossy single "average depth" number,
-// which can get the order backwards even for convex, non-scissoring geometry
-// (a large tilted face's average can be dragged far from its own near-peak's
-// true local depth — see the plan for the worked counterexample).
+// Replaced the old per-frame, post-projection pairwise depth comparison
+// (computeFaceDrawOrder and its dependencies — removed entirely, see
+// NOTES10 for the full design arc) with a real binary space partition
+// built from faces' true 3D planes — the tree structure itself never
+// depends on the current view or on perspective; only per-frame
+// *traversal* does (see NOTES10 for the full reasoning, including why a
+// finite perspective eye position — not just a view direction — is needed
+// to traverse correctly, and the F≈5 near-degenerate case that turned out,
+// on rigorous verification, not to actually need a special-case backstop).
 //
-// That "point where they actually overlap" has to be measured in the same
-// space as what's actually painted — the POST-perspective screen point (see
-// applyPerspective), not the pre-perspective (x,y) the affine formula above
-// is stated in. Perspective divides each face by its own d(x,y) = 1-depth/F,
-// which is a different warp per face (their planes differ), so two faces can
-// overlap on screen with no overlap pre-perspective, or the reverse — using
-// pre-perspective (x,y) for overlap/comparison is simply asking about the
-// wrong picture once perspective is on. faceScreenDepthFn below inverts the
-// divide in closed form so the comparison can be done correctly, in the
-// space that's actually rendered.
+// This section holds the geometry primitives (plane construction, point/
+// polygon classification, half-space clipping) and the tree build itself;
+// the traversal functions live in their own section further down, and
+// drawFaces (in the rendering section) is what actually calls all of this.
 
-function det3(m) {
-  return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-       - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-       + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-}
-
-// pts: 3 points [x, y, depth]. Returns { A, B, C } (depth = A*x + B*y + C),
-// or null if the 3 points are (numerically) collinear in projection — caller
-// should retry with a different triple.
-function solveAffineDepth(pts) {
-  const M = pts.map(([x, y]) => [x, y, 1]);
-  const detM = det3(M);
-  if (Math.abs(detM) < 1e-9) return null;
-  const col = i => pts.map(p => p[i]);
-  const withCol = (base, i, replacement) => base.map((row, r) => row.map((v, c) => c === i ? replacement[r] : v));
-  const A = det3(withCol(M, 0, col(2))) / detM;
-  const B = det3(withCol(M, 1, col(2))) / detM;
-  const C = det3(withCol(M, 2, col(2))) / detM;
-  return { A, B, C };
-}
-
-// Tries consecutive vertex triples until a non-degenerate (non-collinear) one
-// is found — handles the common n=3 case trivially and copes with a
-// coincidentally-collinear early triple in larger polygons.
-function faceAffineDepth(pts2D) {
-  for (let k = 2; k < pts2D.length; k++) {
-    const coeffs = solveAffineDepth([pts2D[0], pts2D[1], pts2D[k]]);
-    if (coeffs) return coeffs;
+// Constructs the true 3D plane a planar face lies in, from any 3 of its
+// vertices (tries consecutive triples until a non-collinear one is found).
+// Returns { normal (unit length), d } such that normal·p + d = 0 exactly
+// on the plane and > 0 on the side `normal` points toward — or null if
+// every triple was degenerate (all vertices collinear; shouldn't be
+// reachable given face creation already requires >= 3 vertices, but not
+// assumed here).
+function planeFromPoints(points) {
+  for (let k = 2; k < points.length; k++) {
+    const n = cross3D(vecSub3D(points[1], points[0]), vecSub3D(points[k], points[0]));
+    const len = vecLen3D(n);
+    if (len > 1e-9) {
+      const normal = [n[0] / len, n[1] / len, n[2] / len];
+      return { normal, d: -dot3D(normal, points[0]) };
+    }
   }
   return null;
 }
 
-// Given a face's pre-perspective affine depth coefficients and the focal
-// distance F currently in effect (Infinity when perspective is off), returns
-// a function mapping a POST-perspective screen point — after
-// applyPerspective's 1/d divide, before toScreen's pixel remapping — back to
-// the true depth the face has there.
-//
-// Derivation: screen (xs,ys) = (x,y)/d with d = 1 - depth(x,y)/F and
-// depth(x,y) = A*x+B*y+C, so x = xs*d, y = ys*d. Substituting:
-//   depth = A*xs*d + B*ys*d + C = d*(A*xs+B*ys) + C
-//   d     = 1 - depth/F
-// Solving the pair for depth directly (no iteration):
-//   depth(xs,ys) = (A*xs+B*ys+C) / (1 + (A*xs+B*ys)/F)
-// When F=Infinity this reduces exactly to the plain affine formula, since
-// screen coordinates equal pre-perspective coordinates when there's no
-// perspective divide to invert.
-function faceScreenDepthFn(A, B, C, F) {
-  return (xs, ys) => {
-    const linear = A * xs + B * ys;
-    return (linear + C) / (1 + linear / F);
-  };
+function planeSignedDistance(plane, p) {
+  return dot3D(plane.normal, p) + plane.d;
 }
 
-function pointInPolygon(x, y, poly) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i], [xj, yj] = poly[j];
-    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+// Separates a real classification signal from float noise on a vertex
+// that's exactly (up to precision) shared between two faces — the common
+// case for adjacent polytope faces, not a rare edge case, so this has to
+// be generous enough to treat a shared edge as "on the plane," not
+// spuriously split it.
+const BSP_PLANE_EPS = 1e-6;
+
+function classifyPoint(plane, p, eps = BSP_PLANE_EPS) {
+  const dist = planeSignedDistance(plane, p);
+  if (dist > eps) return 'front';
+  if (dist < -eps) return 'back';
+  return 'on';
+}
+
+// Classifies a whole polygon (list of 3D points) against a plane:
+// 'front' (every vertex front-or-on, at least one strictly front), 'back'
+// (mirror image), 'coplanar' (every vertex within eps — e.g. the splitter
+// face itself, or a genuinely coplanar different face), or 'straddling'
+// (genuine vertices strictly on both sides — needs clipping).
+function classifyPolygon(plane, points, eps = BSP_PLANE_EPS) {
+  let hasFront = false, hasBack = false;
+  for (const p of points) {
+    const c = classifyPoint(plane, p, eps);
+    if (c === 'front') hasFront = true;
+    else if (c === 'back') hasBack = true;
   }
-  return inside;
+  if (hasFront && hasBack) return 'straddling';
+  if (hasFront) return 'front';
+  if (hasBack) return 'back';
+  return 'coplanar';
 }
 
-function polygonCentroid(poly) {
-  let sx = 0, sy = 0;
-  for (const [x, y] of poly) { sx += x; sy += y; }
-  return [sx / poly.length, sy / poly.length];
-}
-
-function segIntersect(p1, p2, p3, p4) {
-  const [x1, y1] = p1, [x2, y2] = p2, [x3, y3] = p3, [x4, y4] = p4;
-  const d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-  if (Math.abs(d) < 1e-9) return null;
-  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d;
-  const u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / d;
-  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
-  return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
-}
-
-// Finds every candidate point worth testing in the intersection of two
-// projected polygons — centroids and their midpoint first (cheap, common
-// case), then vertex-in-polygon, then edge-intersection points. Returns them
-// ALL, in preference order, rather than just the first hit: for two faces
-// that share a 3D edge, the shared vertices sit exactly on both polygons'
-// boundary, so pointInPolygon's ray-cast test can go either way on floating-
-// point noise there — a single-answer version of this function can easily
-// hand back a point exactly on the shared edge, which is meaningless for
-// depth comparison (see compareFaceDepths). Returning every candidate lets
-// the caller skip degenerate ones and keep looking for a real one.
-function findOverlapCandidates(polyA, polyB) {
+// Sutherland–Hodgman: clips a planar polygon (3D points, but coplanar so
+// the algorithm's 2D reasoning still applies edge-by-edge) to one side of
+// a half-space — the front-or-on side if keepFront, back-or-on otherwise.
+// Walks each edge in turn; a vertex on the kept side is emitted as-is, and
+// any edge that crosses the plane contributes the exact intersection
+// point via linear interpolation. Returns a new point list — empty if the
+// whole polygon was clipped away, unchanged (up to floating point) if
+// nothing crossed. The same primitive serves two roles once wired up:
+// splitting a face against another face's plane (BSP build) and clipping
+// a fragment against the current focal plane (fixing the existing whole-
+// face-vanishes-behind-the-camera behavior in drawFaces as a byproduct —
+// see NOTES10).
+function clipPolygonToHalfSpace(points, plane, keepFront) {
+  if (points.length === 0) return [];
+  const side = p => {
+    const d = planeSignedDistance(plane, p);
+    return keepFront ? d : -d;
+  };
   const out = [];
-  const cA = polygonCentroid(polyA), cB = polygonCentroid(polyB);
-  if (pointInPolygon(cA[0], cA[1], polyB)) out.push(cA);
-  if (pointInPolygon(cB[0], cB[1], polyA)) out.push(cB);
-  const mid = [(cA[0] + cB[0]) / 2, (cA[1] + cB[1]) / 2];
-  if (pointInPolygon(mid[0], mid[1], polyA) && pointInPolygon(mid[0], mid[1], polyB)) out.push(mid);
-  for (const v of polyA) if (pointInPolygon(v[0], v[1], polyB)) out.push(v);
-  for (const v of polyB) if (pointInPolygon(v[0], v[1], polyA)) out.push(v);
-  for (let i = 0; i < polyA.length; i++) {
-    const a1 = polyA[i], a2 = polyA[(i + 1) % polyA.length];
-    for (let j = 0; j < polyB.length; j++) {
-      const b1 = polyB[j], b2 = polyB[(j + 1) % polyB.length];
-      const pt = segIntersect(a1, a2, b1, b2);
-      if (pt) out.push(pt);
+  for (let i = 0; i < points.length; i++) {
+    const curr = points[i], next = points[(i + 1) % points.length];
+    const sCurr = side(curr), sNext = side(next);
+    const currIn = sCurr >= -BSP_PLANE_EPS, nextIn = sNext >= -BSP_PLANE_EPS;
+    if (currIn) out.push(curr);
+    if (currIn !== nextIn) {
+      const t = sCurr / (sCurr - sNext);
+      out.push([
+        curr[0] + t * (next[0] - curr[0]),
+        curr[1] + t * (next[1] - curr[1]),
+        curr[2] + t * (next[2] - curr[2]),
+      ]);
     }
   }
   return out;
 }
 
-// Threshold well above float noise on a tied (shared-edge) comparison
-// (observed ~1e-16) and well below any genuine depth difference observed on
-// this app's scenes (observed >= ~1e-2 whenever two faces truly overlap in
-// projection) — separates a real signal from a degenerate tie.
-const FACE_DEPTH_TIE_EPS = 1e-6;
-
-// Compares two faces' true depth at a point where they actually overlap in
-// projection. Walks findOverlapCandidates' list and returns the delta
-// (depthA - depthB) at the first candidate that isn't a near-zero tie —
-// positive means A has the larger depth value (A is nearer the observer,
-// draws last), negative means B is nearer.
-// Returns null if every candidate is a tie (including "no overlap at all",
-// which is the common case for two faces that only touch along a shared
-// edge): since each face's depth is an affine function of (x,y), the two
-// faces' depth difference is also affine, so it is either exactly zero
-// everywhere they're both defined (coplanar) or zero only on a line — a
-// candidate landing near that line, with no other candidate clearing the
-// threshold, means there's no pixel where their order is actually decided,
-// not that the algorithm failed to find one.
-function compareFaceDepths(polyA, depthFnA, polyB, depthFnB) {
-  for (const [x, y] of findOverlapCandidates(polyA, polyB)) {
-    const delta = depthFnA(x, y) - depthFnB(x, y);
-    if (Math.abs(delta) > FACE_DEPTH_TIE_EPS) return delta;
-  }
-  return null;
+// Splits one straddling fragment into its front and back pieces against
+// `plane` — composes two clips (Sutherland-Hodgman only ever keeps one
+// side per pass). A side collapsing to fewer than 3 points (a sliver
+// clipped down to an edge or a point, possible right at a near-tangent
+// crossing) is treated as nothing on that side, not a degenerate polygon.
+function splitFragment(fragment, plane) {
+  const front = clipPolygonToHalfSpace(fragment.polygon, plane, true);
+  const back  = clipPolygonToHalfSpace(fragment.polygon, plane, false);
+  return {
+    front: front.length >= 3 ? { polygon: front, sourceFace: fragment.sourceFace } : null,
+    back:  back.length  >= 3 ? { polygon: back,  sourceFace: fragment.sourceFace } : null,
+  };
 }
 
-// Kahn's algorithm, modified to never fail: `edges` are [fartherIdx, nearerIdx]
-// pairs (farther must draw before nearer). When stuck with a real cycle
-// (genuine mutual occlusion — out of scope for Phase 1's simple layering),
-// breaks it by force-picking the remaining node with the smallest average
-// depth (farthest — depth is larger when nearer) rather than failing to
-// produce an order at all.
-function topoSortFaces(n, edges, avgDepth) {
-  const inDegree = new Array(n).fill(0);
-  const adj = Array.from({ length: n }, () => []);
-  for (const [farther, nearer] of edges) { adj[farther].push(nearer); inDegree[nearer]++; }
-  const remaining = new Set(Array.from({ length: n }, (_, i) => i));
-  const order = [];
-  while (remaining.size > 0) {
-    let next = [...remaining].find(i => inDegree[i] === 0);
-    if (next === undefined) {
-      next = [...remaining].sort((a, b) => avgDepth[a] - avgDepth[b])[0];
-    }
-    order.push(next);
-    remaining.delete(next);
-    for (const nb of adj[next]) inDegree[nb]--;
-  }
-  return order;
-}
-
-// The pluggable ordering step: given projected+depth-annotated face items,
-// returns a back-to-front draw order (indices into `items`). Everything else
-// in drawFaces (projection, screen coordinates, the actual fill calls) is
-// fixed pipeline around this — an alternate strategy (e.g. a precomputed
-// BSP-tree traversal) can replace this function's body without touching
-// anything else.
-function computeFaceDrawOrder(items) {
-  const edges = [];
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      const delta = compareFaceDepths(items[i].screenPoly, items[i].screenDepthFn, items[j].screenPoly, items[j].screenDepthFn);
-      if (delta === null) continue; // no pixel where their order is decided
-      // depth = a1*h1 + a2*h2 + a3*h3 is LARGER when a point is nearer the
-      // observer. Farther (smaller depth) must draw first (painter's algorithm).
-      if (delta > 0) edges.push([j, i]); else edges.push([i, j]);
-    }
-  }
-  return topoSortFaces(items.length, edges, items.map(it => it.avgDepth));
-}
-
-// Projects every visible face's vertices, derives each one's affine depth
-// formula and its screen-space equivalent, computes a back-to-front draw
-// order via computeFaceDrawOrder, and fills each face in that order. Drawn
-// before drawSegments/drawVertices in draw() — faces are a simple base layer
-// for Phase 1, not yet interleaved in depth with the wireframe (see plan).
-function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
-  const F = perspectiveOn ? perspPtoF(perspectiveP) : Infinity;
-  const items = [];
+// Builds one initial fragment per face, in true 3D object-space
+// coordinates — every face regardless of visibility (a hidden-but-
+// selected face still needs to be traversable/renderable as a ghost, same
+// precedent drawFaces' existing `f.id === selectedFaceId` gate follows;
+// visibility is a render-time decision, not a tree-membership one). A
+// face with any non-finite vertex coordinate (a broken expression) is
+// skipped entirely — the post-projection path would already have
+// discarded it downstream, same as today.
+function buildFaceFragments(facesArr, vertsArr) {
+  const fragments = [];
   for (const f of facesArr) {
+    const vs = f.vertexIds.map(id => vertsArr.find(v => v.id === id));
+    if (vs.some(v => !v)) continue;
+    const polygon = vs.map(v => v.coords);
+    if (polygon.some(p => !p.every(Number.isFinite))) continue;
+    fragments.push({ polygon, sourceFace: f });
+  }
+  return fragments;
+}
+
+// Chooses which fragment to use as a node's splitter — minimizes the
+// number of *actual* splits it would induce among the rest (the standard
+// BSP-construction heuristic), not just "whichever's first." A naive
+// always-pick-first choice looked fine on the small test scenes this was
+// originally verified against, but produced severely over-fragmented
+// trees on a real, complex scene (a 24-face trefoil-knot tube mesh — up
+// to 7 fragments for a single face) — the excess splits are directly what
+// caused visible seams between same-colored fragments (see NOTES10).
+// Caps how many candidates get evaluated (`BSP_PIVOT_SAMPLE_CAP`) so this
+// stays affordable at larger fragment counts, since the tree is rebuilt
+// fresh every render call, not cached — a real BSP compiler would do the
+// same kind of sampling for large inputs, not exhaustively search.
+const BSP_PIVOT_SAMPLE_CAP = 24;
+
+function chooseSplitterIndex(fragments) {
+  const n = fragments.length;
+  const sampleCount = Math.min(n, BSP_PIVOT_SAMPLE_CAP);
+  let bestIdx = 0, bestSplits = Infinity;
+  for (let c = 0; c < sampleCount; c++) {
+    const plane = planeFromPoints(fragments[c].polygon);
+    if (!plane) continue;
+    let splits = 0;
+    for (let i = 0; i < n; i++) {
+      if (i === c) continue;
+      if (classifyPolygon(plane, fragments[i].polygon) === 'straddling') splits++;
+    }
+    if (splits < bestSplits) {
+      bestSplits = splits;
+      bestIdx = c;
+      if (splits === 0) break; // can't do better than zero induced splits
+    }
+  }
+  return bestIdx;
+}
+
+// Recursively builds a BSP tree from a flat fragment list (see
+// buildFaceFragments). Every fragment other than the chosen splitter is
+// classified against its plane: cleanly in front or behind joins that
+// side's list unsplit (the common, economical case for adjacent polytope
+// faces — see NOTES10's square/tilted-rectangle example), genuinely
+// straddling gets clipped into exactly two pieces, coplanar (including
+// the splitter itself) joins this node's own bucket. Purely a function of
+// object-space geometry — never touches the current view, perspective, or
+// control point; see traverseFaceBsp for the per-frame, view-dependent
+// part.
+function buildFaceBsp(fragments) {
+  if (fragments.length === 0) return null;
+  const splitterIdx = chooseSplitterIndex(fragments);
+  const splitter = fragments[splitterIdx];
+  const rest = fragments.filter((_, i) => i !== splitterIdx);
+  const plane = planeFromPoints(splitter.polygon);
+  if (!plane) {
+    // Degenerate splitter (collinear vertices) — shouldn't be reachable
+    // for a validly-created face, but don't let a corrupted one crash the
+    // tree: park it in an otherwise-planeless node and keep going.
+    return { splitterFace: splitter.sourceFace, plane: null, coplanar: [splitter], front: null, back: buildFaceBsp(rest) };
+  }
+  const coplanar = [splitter];
+  const front = [];
+  const back = [];
+  for (const frag of rest) {
+    const kind = classifyPolygon(plane, frag.polygon);
+    if (kind === 'front') front.push(frag);
+    else if (kind === 'back') back.push(frag);
+    else if (kind === 'coplanar') coplanar.push(frag);
+    else {
+      const { front: f, back: b } = splitFragment(frag, plane);
+      if (f) front.push(f);
+      if (b) back.push(b);
+    }
+  }
+  return {
+    splitterFace: splitter.sourceFace,
+    plane,
+    coplanar,
+    front: buildFaceBsp(front),
+    back: buildFaceBsp(back),
+  };
+}
+
+// Not cached across frames — built fresh from drawFaces' own `facesArr`/
+// `vertsArr` parameters every call (see drawFaces below). Originally tried
+// caching this at reEvalObjects() time, matching every other resolved
+// value's (vertex coords, curve tessellation) lifecycle — reverted after
+// finding real staleness bugs that approach couldn't cover cleanly: the
+// draw-tool's own face-creation path and the vertex/face delete buttons
+// mutate `faces`/`vertices` without ever calling reEvalObjects(), and the
+// code editor's live-preview mechanism (`previewOverride`) renders an
+// entirely separate pair of arrays that reEvalObjects() never even sees
+// (see NOTES10). Rebuilding fresh from whatever drawFaces was actually
+// asked to render sidesteps every one of those at once, rather than
+// chasing scattered call sites — genuinely cheap at this app's scale (a
+// handful to a few dozen hand-authored faces), so trading the "build once
+// per geometry change" optimization for guaranteed correctness here is a
+// deliberate, considered choice, not an oversight.
+
+// ─── Face BSP traversal (per-frame, view-dependent) ────────────────────────────
+//
+// The tree above is pure object-space geometry, built once. Traversal is
+// the part that depends on the current view — walked fresh every frame,
+// cheap (one plane-vs-eye test per node, no geometry work) — producing a
+// back-to-front (farthest-first) list of fragments ready to paint.
+//
+// Handles both orthographic (F === Infinity) and perspective (finite F) in
+// one walk — they differ only in what "which side of a node's splitting
+// plane is nearer" is tested against, not in the recursion shape.
+//
+// Orthographic: the eye is effectively at infinity along the current view
+// direction (`heights`), so the test is a single sign check against that
+// direction — depth = coords·heights is LARGER (nearer) as coords moves
+// along +heights, so the plane's front side is the nearer side exactly
+// when its normal and the view direction point the same general way.
+//
+// Perspective: applyPerspective's d = 1 - depth/F is algebraically a
+// genuine central projection with the eye at a FINITE object-space point,
+// depth F along the current view direction, looking back toward the
+// scene (derived and verified in NOTES10) — so the test needs that actual
+// point, not just its direction. `heights` forms a genuine orthonormal
+// frame with the projection basis at every control point tested, in both
+// parametrization modes, in Mode B (verified directly) — but Mode A's
+// frame, while still orthogonal, is uniformly scaled by a non-unit
+// factor, so `heights` is explicitly normalized here rather than assumed
+// already unit, to stay correct regardless of display mode.
+//
+// Does not yet include the near-degenerate backstop (a splitting plane
+// passing very close to the eye — see NOTES10's F≈5 finding) or focal-
+// plane clipping — later steps.
+function traverseFaceBsp(node, heights, F) {
+  let eye = null;
+  if (F !== Infinity) {
+    const hLen = vecLen3D(heights);
+    eye = hLen > 1e-9 ? heights.map(h => (h / hLen) * F) : [0, 0, 0];
+  }
+  function frontIsNear(plane) {
+    return eye === null ? dot3D(plane.normal, heights) > 0 : planeSignedDistance(plane, eye) > 0;
+  }
+  function walk(n, out) {
+    if (!n) return out;
+    if (!n.plane) { walk(n.back, out); out.push(...n.coplanar); return out; }
+    const near = frontIsNear(n.plane) ? n.front : n.back;
+    const far  = frontIsNear(n.plane) ? n.back  : n.front;
+    walk(far, out);
+    out.push(...n.coplanar);
+    walk(near, out);
+    return out;
+  }
+  return walk(node, []);
+}
+
+// The current focal plane as a half-space clip target — depth = F is
+// itself an affine plane in object space, so the exact same
+// clipPolygonToHalfSpace primitive the BSP split uses also clips a
+// fragment to the visible (depth < F) side of the camera, rather than
+// needing separate clipping logic. Normalizing `heights` here exactly
+// matches applyPerspective's own Mode-A/-B handling — Mode A's `depth /
+// normS` division is algebraically the same normalization, just computed
+// differently there (see NOTES10) — so this one formula is correct
+// regardless of display mode, with no mode branch needed. Returns null
+// for orthographic (F === Infinity) or a degenerate view direction,
+// meaning "nothing to clip."
+function focalPlane(heights, F) {
+  if (F === Infinity) return null;
+  const hLen = vecLen3D(heights);
+  if (hLen < 1e-9) return null;
+  return { normal: heights.map(h => -h / hLen), d: F };
+}
+
+// Clips one fragment to the visible side of the current focal plane, if
+// perspective is on — returns null if it's entirely beyond the focal
+// plane (nothing left to draw), or the same fragment untouched if
+// `plane` is null (orthographic). A fragment straddling the focal plane
+// is cut down to its visible portion instead of vanishing outright — the
+// existing per-vertex clipBehind test in drawFaces instead drops a face
+// *entirely* the moment any one vertex fails it, which this fixes as a
+// byproduct of needing the same clip primitive for the BSP split anyway
+// (see NOTES10).
+function clipFragmentToFocalPlane(fragment, plane) {
+  if (!plane) return fragment;
+  const polygon = clipPolygonToHalfSpace(fragment.polygon, plane, true);
+  return polygon.length >= 3 ? { polygon, sourceFace: fragment.sourceFace } : null;
+}
+
+// Renders every face via an object-space BSP — buildFaceBsp/buildFaceFragments
+// build it fresh from this call's own facesArr/vertsArr (not cached; see
+// their own comment for why), traverseFaceBsp does the per-frame, view-
+// dependent ordering work (cheap: one plane-vs-eye test per tree node, no
+// geometry), clipFragmentToFocalPlane clips each fragment to the current
+// focal plane (replacing the old per-vertex all-or-nothing clipBehind
+// check — a fragment straddling the focal plane now keeps its visible
+// portion instead of the whole face vanishing, see NOTES10). Supersedes
+// the old per-frame pairwise-comparison ordering (computeFaceDrawOrder
+// and its dependencies, removed entirely — see NOTES10 for the design arc).
+//
+// Two passes: first resolve every fragment actually worth drawing down to
+// real on-screen points (discarding invisible/clipped-away/degenerate
+// ones), *then* group and paint. The grouping step is what avoids a real,
+// user-found artifact on complex real-world geometry (a 24-face trefoil-
+// knot mesh — see NOTES10): a face the BSP split into several fragments
+// used to get filled as several separate ctx.fill() calls, and two
+// adjacent same-colored fills sharing an edge show a visible antialiasing
+// seam at that edge (a standard, well-known 2D-rasterizer artifact,
+// sometimes called a "crack") even though they're the same color and
+// should look like one continuous face. Consecutive same-source-face
+// entries (in the already-filtered, already-correctly-ordered list) are
+// safe to combine into one multi-subpath fill — safe *by construction*,
+// not by re-deriving overlap safety from scratch: they were already going
+// to draw back-to-back with nothing else in between, so combining them
+// changes nothing about visibility relative to anything else, only how
+// the shared internal edge rasterizes.
+function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
+  const tree = buildFaceBsp(buildFaceFragments(facesArr, vertsArr));
+  if (!tree) return;
+  const F = perspectiveOn ? perspPtoF(perspectiveP) : Infinity;
+  const ordered = traverseFaceBsp(tree, heights, F);
+  // Only actually clip when perspective is on and clipBehind is enabled —
+  // matches applyPerspective's own existing gating exactly (clipBehind
+  // off deliberately still renders the folded/mirrored behind-camera
+  // artifact, a pre-existing, intentional debugging affordance).
+  const clipPlane = (perspectiveOn && clipBehind) ? focalPlane(heights, F) : null;
+
+  const resolved = [];
+  for (const frag of ordered) {
+    const f = frag.sourceFace;
     // A selected-but-hidden face still needs an on-canvas anchor — same
     // pattern as drawVertices/drawSegments (see NOTES6, "highlighting a
     // hidden object"). Face's only highlight state is selectedFaceId.
+    // Checked per-fragment (not once per face) since a split face's
+    // fragments can only be evaluated once traversal has resolved them.
     if (!f.visible && f.id !== selectedFaceId) continue;
-    const vs = f.vertexIds.map(id => vertsArr.find(v => v.id === id));
-    if (vs.some(v => !v)) continue;
-    const pts2D = [];      // [x, y, depth] pre-perspective, for avgDepth
-    const screenPoly = []; // [x, y] post-perspective, pre-toScreen, for ordering
-    const screenPts = [];  // {x,y} post-perspective pixel coords, for the fill path
+    const clipped = clipFragmentToFocalPlane(frag, clipPlane);
+    if (!clipped) continue;
+
+    const screenPts = [];
     let bad = false;
-    for (const v of vs) {
-      const { pt, depth } = projectPoint(v.coords, vecs, heights);
-      if (isNaN(depth) || isNaN(pt.re) || isNaN(pt.im)) { bad = true; break; }
-      pts2D.push([pt.re, pt.im, depth]);
+    for (const p of clipped.polygon) {
+      const { pt, depth } = projectPoint(p, vecs, heights);
+      if (!Number.isFinite(depth) || !Number.isFinite(pt.re) || !Number.isFinite(pt.im)) { bad = true; break; }
       const a = applyPerspective(pt, depth, normS);
       if (!a.ok) { bad = true; break; }
-      screenPoly.push([a.pt.re, a.pt.im]);
       screenPts.push(toScreen(a.pt, scale));
     }
-    if (bad) continue;
-    const coeffs = faceAffineDepth(pts2D);
-    if (!coeffs) continue; // degenerate (all vertices collinear in projection)
-    items.push({
-      face: f,
-      screenPoly,
-      screenPts,
-      screenDepthFn: faceScreenDepthFn(coeffs.A, coeffs.B, coeffs.C, F),
-      avgDepth: pts2D.reduce((s, p) => s + p[2], 0) / pts2D.length,
-    });
+    if (bad || screenPts.length < 3) continue;
+    resolved.push({ face: f, screenPts });
   }
-  if (items.length === 0) return;
 
-  const order = computeFaceDrawOrder(items);
+  let i = 0;
+  while (i < resolved.length) {
+    const face = resolved[i].face;
+    let j = i + 1;
+    while (j < resolved.length && resolved[j].face === face) j++;
 
-  for (const idx of order) {
-    const { face: f, screenPts: sp } = items[idx];
     ctx.beginPath();
-    ctx.moveTo(sp[0].x, sp[0].y);
-    for (let k = 1; k < sp.length; k++) ctx.lineTo(sp[k].x, sp[k].y);
-    ctx.closePath();
+    for (let k = i; k < j; k++) {
+      const sp = resolved[k].screenPts;
+      ctx.moveTo(sp[0].x, sp[0].y);
+      for (let m = 1; m < sp.length; m++) ctx.lineTo(sp[m].x, sp[m].y);
+      ctx.closePath();
+    }
     // Selection halo: a wide translucent stroke along the boundary, drawn
     // before the fill so the fill's opaque interior covers its inward half
     // — same technique and color as drawSegments' own halo, applied to a
     // face's boundary (which is, after all, just a loop of segments).
     // Chosen over a true outward polygon offset specifically to avoid
     // needing to solve Minkowski-offsetting for an arbitrary — possibly
-    // concave, possibly self-intersecting-once-projected — polygon.
-    if (f.id === selectedFaceId) {
+    // concave, possibly self-intersecting-once-projected — polygon. NOTE:
+    // grouping fragments above fixes the *fill* seam but not this stroke —
+    // stroke() still traces every subpath's own boundary independently, so
+    // a split, selected face's halo can still visibly stroke the internal
+    // cut edge, not just the face's true outer boundary — a known,
+    // already-discussed limitation (see NOTES10), not fixed by this pass,
+    // and not new (the halo-behind-a-nearer-face issue from NOTES6 was
+    // already a separately deferred wrinkle in this same mechanism).
+    if (face.id === selectedFaceId) {
       ctx.save();
       ctx.strokeStyle = 'rgba(30,100,220,0.28)';
       ctx.lineWidth = 8;
       ctx.stroke();
       ctx.restore();
     }
-    // Ghost fill when hidden (only reachable here because f.id ===
+    // Ghost fill when hidden (only reachable here because face.id ===
     // selectedFaceId, per the gate above) — same faded-real-color
     // treatment as vertex's ghost marker and segment's ghost line.
-    ctx.fillStyle = f.visible ? themeColor(f.color) : fadedColor(f.color, 0.4);
+    ctx.fillStyle = face.visible ? themeColor(face.color) : fadedColor(face.color, 0.4);
     ctx.fill();
+
+    i = j;
   }
 }
 
