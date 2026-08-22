@@ -950,7 +950,7 @@ function isFiniteXYZ(p) {
 }
 
 // How many straight-line sub-segments the final render polyline uses per
-// adaptively-chosen interval, each evaluating the natural cubic spline (not
+// adaptively-chosen interval, each evaluating the clamped cubic spline (not
 // the raw curve) below. The adaptive tessellation still decides *where*
 // detail is needed (via curvature/angle/distance); this only decides how
 // finely the resulting genuinely-C^2 spline gets flattened into straight
@@ -959,70 +959,125 @@ function isFiniteXYZ(p) {
 // default, like every other tunable here.
 const CURVE_SPLINE_SAMPLES_PER_SEGMENT = 8;
 
-// Natural cubic spline through (t_i, y_i) pairs — matches value, first
-// derivative, AND second derivative at every interior knot (true C^2
-// continuity), with the standard "natural" boundary condition (zero second
-// derivative at both ends — appropriate for an open arc; a closed curve
-// whose two ends coincide would show a slight flattening right at the seam
-// under this convention, a known, not-yet-addressed limitation — a periodic
-// boundary condition would remove it but isn't implemented here). Solves
-// the standard tridiagonal moment system via the Thomas algorithm: n-1
-// unknowns for n+1 knots, since the two endpoint moments are fixed at 0 by
-// the boundary condition. Diagonally dominant by construction (each
-// diagonal entry 2*(h[i-1]+h[i]) strictly exceeds |h[i-1]|+|h[i]| for
-// positive interval widths), so this never needs pivoting.
-function solveNaturalCubicSpline(ts, ys) {
+// Estimates y'(ta) from a quadratic fit through three knots (ta,ya),
+// (tb,yb), (tc,yc) — written purely in terms of signed differences, so it
+// works whether ta is the smallest or largest t among the three. That's
+// what lets boundaryDerivative below call it unchanged at either end of a
+// run (nearest-knot-first), with no separate "which direction" case to get
+// the sign wrong on. O(h^2) accurate — the curvature-proportional error
+// term a plain 2-point secant carries cancels exactly — vs. the secant's
+// O(h); see this session's NOTES for the derivation.
+function quadraticDerivativeAt(ta, ya, tb, yb, tc, yc) {
+  return (
+    ya * ((ta - tb) + (ta - tc)) / ((ta - tb) * (ta - tc)) +
+    yb * (ta - tc) / ((tb - ta) * (tb - tc)) +
+    yc * (ta - tb) / ((tc - ta) * (tc - tb))
+  );
+}
+
+// Estimates dy/dt at one end of a knot run — i0/step is 0/+1 for the run's
+// first knot, n/-1 for its last — to clamp the spline's tangent there
+// instead of assuming zero curvature (see solveClampedCubicSpline below).
+// Prefers the 3-point quadraticDerivativeAt over a plain 2-point secant
+// whenever a third knot exists in that direction; the secant fallback only
+// fires for a single-interval run (exactly 2 knots total, no third knot to
+// reach for). A single-knot run (i1 out of range) returns 0 — the estimate
+// is meaningless with nothing to difference against, but also unused,
+// since solveClampedCubicSpline no-ops for that case anyway.
+function boundaryDerivative(ts, ys, i0, step) {
+  const i1 = i0 + step;
+  if (i1 < 0 || i1 >= ts.length) return 0;
+  const i2 = i1 + step;
+  if (i2 >= 0 && i2 < ts.length) {
+    return quadraticDerivativeAt(ts[i0], ys[i0], ts[i1], ys[i1], ts[i2], ys[i2]);
+  }
+  return (ys[i1] - ys[i0]) / (ts[i1] - ts[i0]);
+}
+
+// Clamped cubic spline through (t_i, y_i) pairs — matches value and second
+// derivative at every interior knot (true C^2 continuity, same as the
+// natural spline this replaces), but pins the FIRST derivative (tangent) at
+// each free end to a supplied estimate (mLo/mHi, from boundaryDerivative
+// above) instead of assuming zero curvature there. "Natural" (zero second
+// derivative at both ends) is the principled choice for unweighted discrete
+// data with no known boundary behavior, but the wrong one here — CubeParam
+// holds the real analytic x(t)/y(t)/z(t), so the true tangent is available
+// and cheap to estimate, and using it removes the visible flattening the
+// natural condition caused at a curve's free ends (most visible at a closed
+// curve's seam, but present, just less noticeable, at any open curve's
+// endpoints too). Same standard tridiagonal moment system as the natural
+// version, just with the two boundary rows replaced by the clamped-
+// derivative condition instead of "M = 0" — a full (n+1)-unknown system
+// now, not the natural spline's reduced (n-1)-unknown one, since both
+// boundary moments are determined by the derivative constraint rather than
+// fixed. Still diagonally dominant at every row, boundary rows included
+// (|h| < |2h| trivially), so this still never needs pivoting.
+function solveClampedCubicSpline(ts, ys, mLo, mHi) {
   const n = ts.length - 1;
-  const M = new Array(n + 1).fill(0);
-  if (n < 2) return M; // 0 or 1 interval: nothing interior to solve
+  if (n < 1) return new Array(ts.length).fill(0); // 0 intervals: nothing to solve
 
   const h = new Array(n);
   for (let i = 0; i < n; i++) h[i] = ts[i + 1] - ts[i];
 
-  const m = n - 1; // interior knots M[1..n-1], stored 0-based as k = i-1
-  const sub = new Array(m), diag = new Array(m), sup = new Array(m), rhs = new Array(m);
-  for (let k = 0; k < m; k++) {
-    const i = k + 1;
-    sub[k]  = h[i - 1];
-    diag[k] = 2 * (h[i - 1] + h[i]);
-    sup[k]  = h[i];
-    rhs[k]  = 6 * ((ys[i + 1] - ys[i]) / h[i] - (ys[i] - ys[i - 1]) / h[i - 1]);
+  const sub = new Array(n + 1), diag = new Array(n + 1), sup = new Array(n + 1), rhs = new Array(n + 1);
+
+  // Left boundary row: 2h0*M0 + h0*M1 = 6*[(y1-y0)/h0 - mLo].
+  sub[0] = 0; diag[0] = 2 * h[0]; sup[0] = h[0];
+  rhs[0] = 6 * ((ys[1] - ys[0]) / h[0] - mLo);
+
+  for (let i = 1; i < n; i++) {
+    sub[i]  = h[i - 1];
+    diag[i] = 2 * (h[i - 1] + h[i]);
+    sup[i]  = h[i];
+    rhs[i]  = 6 * ((ys[i + 1] - ys[i]) / h[i] - (ys[i] - ys[i - 1]) / h[i - 1]);
   }
-  for (let k = 1; k < m; k++) {
+
+  // Right boundary row: h[n-1]*M[n-1] + 2h[n-1]*M[n] = 6*[mHi - (yn-y(n-1))/h(n-1)].
+  sub[n] = h[n - 1]; diag[n] = 2 * h[n - 1]; sup[n] = 0;
+  rhs[n] = 6 * (mHi - (ys[n] - ys[n - 1]) / h[n - 1]);
+
+  // Thomas algorithm over the full (n+1)-row system (was interior-only,
+  // m = n-1 rows, under the natural boundary condition).
+  for (let k = 1; k <= n; k++) {
     const w = sub[k] / diag[k - 1];
     diag[k] -= w * sup[k - 1];
     rhs[k]  -= w * rhs[k - 1];
   }
-  const Minterior = new Array(m);
-  Minterior[m - 1] = rhs[m - 1] / diag[m - 1];
-  for (let k = m - 2; k >= 0; k--) {
-    Minterior[k] = (rhs[k] - sup[k] * Minterior[k + 1]) / diag[k];
+  const M = new Array(n + 1);
+  M[n] = rhs[n] / diag[n];
+  for (let k = n - 1; k >= 0; k--) {
+    M[k] = (rhs[k] - sup[k] * M[k + 1]) / diag[k];
   }
-  for (let k = 0; k < m; k++) M[k + 1] = Minterior[k];
   return M;
 }
 
-// Evaluates the natural-cubic-spline segment covering [tLo, tHi] at
+// Evaluates the clamped-cubic-spline segment covering [tLo, tHi] at
 // parameter t, given that segment's endpoint values/moments. Standard
-// normalized moment-form cubic spline evaluation (a+b=1 by construction):
-// reduces to plain linear interpolation when both moments are 0 (the
-// 0-or-1-interval fallback from solveNaturalCubicSpline above).
+// normalized moment-form cubic spline evaluation (a+b=1 by construction) —
+// unchanged from the natural-spline version, since the boundary condition
+// only affects how the moments were *solved for*, not how a segment is
+// evaluated from them once known.
 function evalSplineSegment(t, tLo, tHi, yLo, yHi, mLo, mHi) {
   const h = tHi - tLo;
   const a = (tHi - t) / h, b = (t - tLo) / h;
   return a * yLo + b * yHi + ((a * a * a - a) * mLo + (b * b * b - b) * mHi) * (h * h) / 6;
 }
 
-// Fits a natural cubic spline through one contiguous, all-finite run of
+// Fits a clamped cubic spline through one contiguous, all-finite run of
 // (ts[i], points[i]) knots — independently for x(t), y(t), z(t), sharing
 // the same t knots — then re-evaluates it at a denser, uniform-within-
-// each-interval grid for final rendering.
+// each-interval grid for final rendering. For a closed curve, this run's
+// two physical ends are the same point, evaluated independently at t=lo
+// and t=hi of the curve's own domain — their two locally-estimated
+// tangents necessarily converge to the same true derivative, so seam
+// continuity falls out of using ground truth at both ends, with no
+// separate closed-curve detection or handling anywhere in this function.
 function splineResampleRun(ts, points) {
   const n = ts.length - 1;
   const xs = points.map(p => p[0]), ys = points.map(p => p[1]), zs = points.map(p => p[2]);
-  const Mx = solveNaturalCubicSpline(ts, xs);
-  const My = solveNaturalCubicSpline(ts, ys);
-  const Mz = solveNaturalCubicSpline(ts, zs);
+  const Mx = solveClampedCubicSpline(ts, xs, boundaryDerivative(ts, xs, 0, 1), boundaryDerivative(ts, xs, n, -1));
+  const My = solveClampedCubicSpline(ts, ys, boundaryDerivative(ts, ys, 0, 1), boundaryDerivative(ts, ys, n, -1));
+  const Mz = solveClampedCubicSpline(ts, zs, boundaryDerivative(ts, zs, 0, 1), boundaryDerivative(ts, zs, n, -1));
 
   const out = [];
   for (let i = 0; i < n; i++) {
