@@ -3138,16 +3138,46 @@ function applyPerspective(pt, depth, normS) {
 // every triple was degenerate (all vertices collinear; shouldn't be
 // reachable given face creation already requires >= 3 vertices, but not
 // assumed here).
-function planeFromPoints(points) {
-  for (let k = 2; k < points.length; k++) {
-    const n = cross3D(vecSub3D(points[1], points[0]), vecSub3D(points[k], points[0]));
-    const len = vecLen3D(n);
-    if (len > 1e-9) {
-      const normal = [n[0] / len, n[1] / len, n[2] / len];
-      return { normal, d: -dot3D(normal, points[0]) };
-    }
+// Newell's method: a polygon's (unnormalized) normal as a sum over every
+// edge, rather than a cross product anchored at one specific vertex pair.
+// Used by both planeFromPoints (below) and polygonArea3D (its magnitude is
+// exactly twice the polygon's real area) — sharing this one computation
+// keeps "what counts as this polygon's plane/area" a single definition.
+// Chosen over the old points[0]/points[1]-anchored cross product
+// specifically for robustness: a BSP fragment that's been clipped several
+// times over routinely ends up with two vertices coincident to float
+// precision (the clip's own interpolated crossing point landing on top of
+// an existing vertex — the routine case for a fragment sharing an edge
+// with the splitter it's being clipped against, not a rare one). Anchoring
+// on a single pair meant one bad pair poisoned every candidate third point;
+// summing over every edge means one near-zero edge contributes ~nothing,
+// so the fragment's real (possibly large) area still comes through.
+function polygonNormalRaw(points) {
+  let nx = 0, ny = 0, nz = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i + 1) % points.length];
+    nx += (a[1] - b[1]) * (a[2] + b[2]);
+    ny += (a[2] - b[2]) * (a[0] + b[0]);
+    nz += (a[0] - b[0]) * (a[1] + b[1]);
   }
-  return null;
+  return [nx, ny, nz];
+}
+
+function polygonArea3D(points) {
+  const [nx, ny, nz] = polygonNormalRaw(points);
+  return 0.5 * Math.hypot(nx, ny, nz);
+}
+
+function planeFromPoints(points) {
+  const [nx, ny, nz] = polygonNormalRaw(points);
+  const len = Math.hypot(nx, ny, nz);
+  if (len <= 1e-9) return null;
+  const normal = [nx / len, ny / len, nz / len];
+  // d anchored at the centroid, not any single vertex — same "don't trust
+  // one possibly-noisy point" reasoning as the normal itself above.
+  const c = points.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0])
+    .map(v => v / points.length);
+  return { normal, d: -dot3D(normal, c) };
 }
 
 function planeSignedDistance(plane, p) {
@@ -3186,6 +3216,19 @@ function classifyPolygon(plane, points, eps = BSP_PLANE_EPS) {
   return 'coplanar';
 }
 
+// Coincidence tolerance for dropping a near-duplicate vertex right where a
+// clip produces it — an order below BSP_PLANE_EPS (deliberately: this is
+// "is this the same point," not "is this on the plane," a tighter
+// question) but well above the ~1e-16 float noise a clip's own
+// interpolated crossing point routinely lands within of an existing vertex
+// when the cut is near-tangent (see planeFromPoints' own comment above —
+// same root cause, addressed here at the source instead of downstream).
+const VERTEX_DEDUP_EPS = 1e-9;
+
+function pointsCoincide(a, b, eps = VERTEX_DEDUP_EPS) {
+  return Math.abs(a[0] - b[0]) < eps && Math.abs(a[1] - b[1]) < eps && Math.abs(a[2] - b[2]) < eps;
+}
+
 // Sutherland–Hodgman: clips a planar polygon (3D points, but coplanar so
 // the algorithm's 2D reasoning still applies edge-by-edge) to one side of
 // a half-space — the front-or-on side if keepFront, back-or-on otherwise.
@@ -3198,6 +3241,17 @@ function classifyPolygon(plane, points, eps = BSP_PLANE_EPS) {
 // a fragment against the current focal plane (fixing the existing whole-
 // face-vanishes-behind-the-camera behavior in drawFaces as a byproduct —
 // see NOTES10).
+//
+// Deduplicates as it emits (`pushUnique`, against the immediately-prior
+// point and, at the end, against the wraparound closure back to the
+// first) — a real, routine case, not a rare one: clipping a fragment that
+// shares an edge with the splitter (the common case for adjacent faces in
+// a mesh) makes the plane pass almost exactly through that edge, so the
+// interpolated crossing point this loop computes can land within float
+// noise of a vertex already emitted. Left undeduplicated, that near-
+// duplicate pair fed straight into planeFromPoints and could poison a
+// downstream node's own plane computation — see NOTES-N for the real,
+// visible mis-layering this traced to on the trefoil-knot scene.
 function clipPolygonToHalfSpace(points, plane, keepFront) {
   if (points.length === 0) return [];
   const side = p => {
@@ -3205,34 +3259,71 @@ function clipPolygonToHalfSpace(points, plane, keepFront) {
     return keepFront ? d : -d;
   };
   const out = [];
+  const pushUnique = p => { if (out.length === 0 || !pointsCoincide(out[out.length - 1], p)) out.push(p); };
   for (let i = 0; i < points.length; i++) {
     const curr = points[i], next = points[(i + 1) % points.length];
     const sCurr = side(curr), sNext = side(next);
     const currIn = sCurr >= -BSP_PLANE_EPS, nextIn = sNext >= -BSP_PLANE_EPS;
-    if (currIn) out.push(curr);
+    if (currIn) pushUnique(curr);
     if (currIn !== nextIn) {
       const t = sCurr / (sCurr - sNext);
-      out.push([
+      pushUnique([
         curr[0] + t * (next[0] - curr[0]),
         curr[1] + t * (next[1] - curr[1]),
         curr[2] + t * (next[2] - curr[2]),
       ]);
     }
   }
+  if (out.length > 1 && pointsCoincide(out[0], out[out.length - 1])) out.pop();
   return out;
+}
+
+// A polygon whose real area is negligible relative to its own spatial
+// extent — floating-point noise from a near-tangent clip (a real, non-zero
+// vertex spread that's nonetheless collapsed flat), not a genuinely thin
+// but intentional sliver. Compared against the polygon's own bounding-box
+// diagonal squared (area scales as length², so this ratio is scale-
+// invariant) rather than a flat absolute constant — a scene-wide constant
+// would silently stop working if the scene's own coordinate scale changed
+// (e.g. this app's own `s` constant), and would need re-tuning per scene;
+// this doesn't. The threshold itself (1e-9) is deliberately generous:
+// every genuinely-degenerate fragment found on the real trefoil-knot scene
+// that motivated this measured a ratio around 1e-16, seven orders of
+// magnitude below this cutoff.
+const DEGENERATE_AREA_REL_EPS = 1e-9;
+
+function isDegenerateFragment(points) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+    minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    minZ = Math.min(minZ, p[2]); maxZ = Math.max(maxZ, p[2]);
+  }
+  const diag2 = (maxX - minX) ** 2 + (maxY - minY) ** 2 + (maxZ - minZ) ** 2;
+  return polygonArea3D(points) < diag2 * DEGENERATE_AREA_REL_EPS;
 }
 
 // Splits one straddling fragment into its front and back pieces against
 // `plane` — composes two clips (Sutherland-Hodgman only ever keeps one
 // side per pass). A side collapsing to fewer than 3 points (a sliver
 // clipped down to an edge or a point, possible right at a near-tangent
-// crossing) is treated as nothing on that side, not a degenerate polygon.
+// crossing) is treated as nothing on that side, not a degenerate polygon —
+// and so is one that kept 3+ points but is degenerate by area (the other
+// shape a near-tangent clip's leftover sliver takes: a thin string running
+// along the near-shared edge rather than collapsing to a single point).
+// Dropping these outright, rather than letting them become real tree
+// nodes, is what it means for them to be harmless: a fragment with
+// negligible area renders negligible pixels regardless of where in the
+// paint order it lands, so removing it can't change the visible picture —
+// and it closes off the "a degenerate fragment gets used as a splitter and
+// planeFromPoints has nothing to work with" failure mode at its root
+// rather than papering over one symptom of it.
 function splitFragment(fragment, plane) {
   const front = clipPolygonToHalfSpace(fragment.polygon, plane, true);
   const back  = clipPolygonToHalfSpace(fragment.polygon, plane, false);
   return {
-    front: front.length >= 3 ? { polygon: front, sourceFace: fragment.sourceFace } : null,
-    back:  back.length  >= 3 ? { polygon: back,  sourceFace: fragment.sourceFace } : null,
+    front: front.length >= 3 && !isDegenerateFragment(front) ? { polygon: front, sourceFace: fragment.sourceFace } : null,
+    back:  back.length  >= 3 && !isDegenerateFragment(back)  ? { polygon: back,  sourceFace: fragment.sourceFace } : null,
   };
 }
 
