@@ -3328,13 +3328,12 @@ function splitFragment(fragment, plane) {
 }
 
 // Builds one initial fragment per face, in true 3D object-space
-// coordinates — every face regardless of visibility (a hidden-but-
-// selected face still needs to be traversable/renderable as a ghost, same
-// precedent drawFaces' existing `f.id === selectedFaceId` gate follows;
-// visibility is a render-time decision, not a tree-membership one). A
-// face with any non-finite vertex coordinate (a broken expression) is
-// skipped entirely — the post-projection path would already have
-// discarded it downstream, same as today.
+// coordinates, from whatever `facesArr` it's actually given — visibility
+// filtering is the caller's job (drawFaces passes only visible-or-selected
+// faces, see its own comment for why), not this function's. A face with
+// any non-finite vertex coordinate (a broken expression) is skipped
+// entirely — the post-projection path would already have discarded it
+// downstream, same as today.
 function buildFaceFragments(facesArr, vertsArr) {
   const fragments = [];
   for (const f of facesArr) {
@@ -3556,8 +3555,20 @@ function clipFragmentToFocalPlane(fragment, plane) {
 // to draw back-to-back with nothing else in between, so combining them
 // changes nothing about visibility relative to anything else, only how
 // the shared internal edge rasterizes.
+//
+// `facesArr` is filtered to visible-or-selected before the tree is even
+// built (`f.id === selectedFaceId` kept for the same hidden-but-selected
+// ghost-render precedent buildFaceFragments used to encode itself) — a
+// hidden face contributes nothing to what's ever painted, so classifying
+// and splitting against its plane is pure waste, not a rare edge case:
+// confirmed on a real 5-tetrahedra-compound scene where 16 hidden faces
+// were driving 247 total tree fragments (49 of them splitting the 4
+// actually-visible faces) for geometry that renders identically, and
+// far cheaper, as 4 whole, unsplit fragments once the hidden ones are
+// excluded before the build (see NOTES-N).
 function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
-  const tree = buildFaceBsp(buildFaceFragments(facesArr, vertsArr));
+  const visibleFacesArr = facesArr.filter(f => f.visible || f.id === selectedFaceId);
+  const tree = buildFaceBsp(buildFaceFragments(visibleFacesArr, vertsArr));
   if (!tree) return;
   const F = perspectiveOn ? perspPtoF(perspectiveP) : Infinity;
   const ordered = traverseFaceBsp(tree, heights, F);
@@ -3605,27 +3616,11 @@ function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
       for (let m = 1; m < sp.length; m++) ctx.lineTo(sp[m].x, sp[m].y);
       ctx.closePath();
     }
-    // Selection halo: a wide translucent stroke along the boundary, drawn
-    // before the fill so the fill's opaque interior covers its inward half
-    // — same technique and color as drawSegments' own halo, applied to a
-    // face's boundary (which is, after all, just a loop of segments).
-    // Chosen over a true outward polygon offset specifically to avoid
-    // needing to solve Minkowski-offsetting for an arbitrary — possibly
-    // concave, possibly self-intersecting-once-projected — polygon. NOTE:
-    // grouping fragments above fixes the *fill* seam but not this stroke —
-    // stroke() still traces every subpath's own boundary independently, so
-    // a split, selected face's halo can still visibly stroke the internal
-    // cut edge, not just the face's true outer boundary — a known,
-    // already-discussed limitation (see NOTES10), not fixed by this pass,
-    // and not new (the halo-behind-a-nearer-face issue from NOTES6 was
-    // already a separately deferred wrinkle in this same mechanism).
-    if (face.id === selectedFaceId) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(30,100,220,0.28)';
-      ctx.lineWidth = 8;
-      ctx.stroke();
-      ctx.restore();
-    }
+    // Selection halo used to be stroked right here, per fragment-group —
+    // moved to drawSelectedFaceHalo (see its own comment), a separate,
+    // whole-face, unconditionally-foreground pass, since tracing only
+    // whichever consecutive run of a split face's fragments landed
+    // together in paint order isn't the face's true boundary (see NOTES-N).
     // Ghost fill when hidden (only reachable here because face.id ===
     // selectedFaceId, per the gate above) — same faded-real-color
     // treatment as vertex's ghost marker and segment's ghost line.
@@ -3634,6 +3629,54 @@ function drawFaces(facesArr, vertsArr, vecs, heights, scale, normS) {
 
     i = j;
   }
+}
+
+// Selection halo — a face's own ordered `vertexIds` loop, projected
+// directly, never derived from the BSP's fragments at all. Two real fixes
+// over the old per-fragment-group stroke this replaces (used to live
+// inside drawFaces' own paint loop): (1) traces the face's true outer
+// boundary always, not whichever consecutive run of fragments happened to
+// land together in paint order — sidesteps needing to solve Minkowski-
+// offsetting a possibly-concave fragment union entirely, since the
+// original, never-split vertex loop was already sitting on the committed
+// face object the whole time; (2) called from draw() in its own pass
+// after everything else (faces, segments, curves, vertices, pointer), so
+// a selected face buried behind nearer geometry still shows its halo — a
+// selection halo communicates UI state, not scene content, the same
+// convention most editors use for a selected-object outline, so it
+// deliberately ignores true depth entirely rather than being composited
+// into it (see NOTES-N for the discussion this settled). Ghost fill for a
+// hidden-but-selected face is unaffected — that still happens per-fragment
+// inside drawFaces, at its true composited depth, which is the point of a
+// ghost (NOTES10 already verified it composites correctly under nearer
+// geometry; this pass only ever adds a stroke on top, never touches fill).
+// Bails with no stroke at all — never a partial one — if any vertex is
+// missing or fails to project; a halo tracing only part of a boundary
+// would be more confusing than none.
+function drawSelectedFaceHalo(facesArr, vertsArr, vecs, heights, scale, normS) {
+  if (selectedFaceId === null) return;
+  const face = facesArr.find(f => f.id === selectedFaceId);
+  if (!face) return;
+  const screenPts = [];
+  for (const id of face.vertexIds) {
+    const v = vertsArr.find(vv => vv.id === id);
+    if (!v) return;
+    const { pt, depth } = projectPoint(v.coords, vecs, heights);
+    if (!Number.isFinite(depth) || !Number.isFinite(pt.re) || !Number.isFinite(pt.im)) return;
+    const a = applyPerspective(pt, depth, normS);
+    if (!a.ok) return;
+    screenPts.push(toScreen(a.pt, scale));
+  }
+  if (screenPts.length < 3) return;
+  ctx.beginPath();
+  ctx.moveTo(screenPts[0].x, screenPts[0].y);
+  for (let m = 1; m < screenPts.length; m++) ctx.lineTo(screenPts[m].x, screenPts[m].y);
+  ctx.closePath();
+  ctx.save();
+  ctx.strokeStyle = 'rgba(30,100,220,0.28)';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawSegments(segs, verts, vecs, heights, scale, normS) {
@@ -3979,6 +4022,7 @@ function draw() {
   drawFacePickPreview(activeVerts, vecs, heights, display, s);
   drawVertices(activeVerts, vecs, heights, display, s);
   if (showPointer) drawControlPoint(base);
+  drawSelectedFaceHalo(activeFaces, activeVerts, vecs, heights, display, s);
 }
 
 // ─── Pointer interaction ──────────────────────────────────────────────────────
