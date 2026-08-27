@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cube Projection</title>
-  <link rel="stylesheet" href="style.css?v=56">
+  <link rel="stylesheet" href="style.css?v=57">
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -38,6 +38,8 @@
     </div>
     <div id="controls">
       <div id="controls-header">
+        <button id="btn-demo-cycle" title="Next demo" style="display:none">↻</button>
+        <button id="btn-demo" title="Demo">▶</button>
         <button id="btn-about" title="Mathematical background">ⓘ</button>
         <button id="btn-dark">☾</button>
         <button id="btn-toggle-controls" class="active">☰</button>
@@ -71,7 +73,7 @@
           </div>
           <div class="toggle-group">
             <span class="label">Anchor</span>
-            <button id="btn-u3"  class="active">z Axis</button>
+            <button id="btn-u3"  class="active">z-Axis</button>
             <button id="btn-diag">Diagonal</button>
             <button id="btn-axes" class="push-right">Show Axes</button>
           </div>
@@ -273,6 +275,6 @@
   <script src="vendor/pdfjs/pdf.min.js?v=1"></script>
   <script src="math-background-pdf-data.js?v=1"></script>
   <script src="pdf-viewer.js?v=2"></script>
-  <script src="main.js?v=127"></script>
+  <script src="main.js?v=131"></script>
 </body>
 </html>

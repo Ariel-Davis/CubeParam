@@ -1534,6 +1534,13 @@ let vColorPicker, segColorPicker, faceColorPicker, cAddColorPicker;
 //     is the single source of truth for per-type settable attributes now —
 //     faces have no add-row, but lastSetFace still governs bare face lines)
 const OBJECT_TYPES = [
+  // No `list`/`lastSet` — view settings are singleton live state (darkMode,
+  // paramMode, displayMode, controlPt, ...), not a per-instance array, so
+  // this entry exists purely for section header classification/ordering
+  // and the sortCodeText 'view' branch (see buildViewSettingsBlock) — the
+  // same minimal shape 'constants' already has (no list of its own either,
+  // before functions/curves existed).
+  { key: 'view',      title: 'VIEW SETTINGS',      style: 'eq', match: /VIEW SETTING/i },
   { key: 'constants', title: 'AUXILIARY CONSTANTS', style: 'eq', match: /CONSTANT/i },
   { key: 'vertices',  title: 'VERTICES',  style: 'dash', match: /VERT/i,
     list: () => vertices, lastSet: () => lastSetVertex },
@@ -1567,6 +1574,73 @@ const CODE_SET_RE    = /^set\s+(vertex|segment|face|curve)(?:\s*:\s*|\s+)(.+)$/;
 const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|number|color|bool)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
+
+// ─── View settings (camera/display state) ──────────────────────────────────────
+//
+// Singleton tier-2 state (SotU's "governing singleton" tier, same as
+// lastSetVertex/etc.) exposed in the code editor as a fixed block of
+// `keyword: value` lines under the VIEW SETTINGS header — one keyword per
+// live global, no user-chosen name (unlike vertex/segment/etc., there's
+// nothing to name; a bare TYPE NAME: shape doesn't apply here at all).
+// Each keyword only ever appears as the line's very first token, so it can
+// never collide with any other line kind (object creation always needs its
+// own leading keyword first, `edit`/`set` always start with those words) —
+// same "keywords only ever appear in fixed structural positions" principle
+// this grammar already relies on everywhere else.
+// Deliberately excluded from undo/redo and from the code editor's live
+// preview-while-typing mechanism, same as `set` lines — takes effect only
+// on Save or a direct interpreter-line submission (see applyViewSettings).
+const VIEW_SETTINGS_FIELDS = [
+  { token: 'darkMode',      kind: 'bool' },
+  { token: 'mode',          kind: 'enum', values: ['compact', 'polynomial'] },
+  { token: 'anchor',        kind: 'enum', values: ['zaxis', 'diagonal'] },
+  { token: 'pointer',       kind: 'point' },
+  { token: 'showPointer',   kind: 'bool' },
+  { token: 'showAxes',      kind: 'bool' },
+  { token: 'scale',         kind: 'posnumber' },
+  { token: 'perspective',   kind: 'bool' },
+  { token: 'invF',          kind: 'unit' },
+  { token: 'scaleNodes',    kind: 'bool' },
+  { token: 'scaleSegments', kind: 'bool' },
+  { token: 'clipBehind',    kind: 'bool' },
+];
+const CODE_VIEW_RE = /^(darkMode|mode|anchor|pointer|showPointer|showAxes|scale|perspective|invF|scaleNodes|scaleSegments|clipBehind)\s*:\s*(.*)$/;
+
+// Validates/parses one view-setting line's raw value text against its
+// field's fixed kind. Returns { ok:true, value } or { ok:false, errorMsg }.
+function parseViewSettingValue(token, rawText) {
+  const def = VIEW_SETTINGS_FIELDS.find(f => f.token === token);
+  if (rawText === '') return { ok: false, errorMsg: `${token} requires a value` };
+  if (def.kind === 'bool') {
+    if (rawText === 'true')  return { ok: true, value: true };
+    if (rawText === 'false') return { ok: true, value: false };
+    return { ok: false, errorMsg: `invalid ${token} value '${rawText}' (expected true or false)` };
+  }
+  if (def.kind === 'enum') {
+    if (def.values.includes(rawText)) return { ok: true, value: rawText };
+    return { ok: false, errorMsg: `invalid ${token} value '${rawText}' (expected ${def.values.join(' or ')})` };
+  }
+  if (def.kind === 'point') {
+    const parts = rawText.split(',').map(s => s.trim());
+    const re = parts.length === 2 ? parseFloat(parts[0]) : NaN;
+    const im = parts.length === 2 ? parseFloat(parts[1]) : NaN;
+    if (!Number.isFinite(re) || !Number.isFinite(im)) {
+      return { ok: false, errorMsg: `invalid pointer value '${rawText}' (expected 're, im')` };
+    }
+    return { ok: true, value: { re, im } };
+  }
+  if (def.kind === 'posnumber') {
+    const v = parseFloat(rawText);
+    if (!Number.isFinite(v) || v <= 0) return { ok: false, errorMsg: `invalid ${token} value '${rawText}' (expected a positive number)` };
+    return { ok: true, value: v };
+  }
+  if (def.kind === 'unit') {
+    const v = parseFloat(rawText);
+    if (!Number.isFinite(v) || v < 0 || v > 1) return { ok: false, errorMsg: `invalid ${token} value '${rawText}' (expected a number in [0, 1])` };
+    return { ok: true, value: v };
+  }
+  return { ok: false, errorMsg: `unrecognized ${token} value` };
+}
 
 // A face's vertex list must never contain the same vertex twice — relied
 // upon by the whole face-editing design (name-based `replace` is only
@@ -2143,6 +2217,11 @@ function parseCodeText(text) {
     face:    { color: undefined, visible: undefined, naming: undefined, counter: undefined },
     curve:   { color: undefined, visible: undefined, naming: undefined, counter: undefined },
   };
+  // View settings have no per-type structure like currentSet above (there's
+  // only ever one of each field, not one per object type) — just a flat
+  // map of whichever fields actually appeared, last occurrence wins, same
+  // order-dependent-overwrite shape as currentSet's own fields.
+  const currentView = {};
 
   for (let lineIdx = 0; lineIdx < rawLines.length; lineIdx++) {
     const raw = rawLines[lineIdx];
@@ -2171,6 +2250,28 @@ function parseCodeText(text) {
     // is by Sort rather than being treated as an error or relocated.
     if (trimmed.startsWith('#')) {
       rec.kind = 'comment';
+      lines.push(rec);
+      continue;
+    }
+
+    // "darkMode: true" / "mode: compact" / "pointer: 0.5, 0.3" / etc. — one
+    // of the 12 fixed view-setting keywords (VIEW_SETTINGS_FIELDS), always
+    // matched before edit/set/object lines since it's the simplest shape
+    // (no name, no type keyword, just a fixed token). Applied immediately
+    // (like `edit`, not deferred like `set`) — targetSection stays null,
+    // same reasoning as `edit`: nothing else ever needs to relocate this
+    // line, it gets consolidated into one canonical block and dropped (see
+    // sortCodeText) regardless of where in the file it was typed.
+    const viewMatch = trimmed.match(CODE_VIEW_RE);
+    if (viewMatch) {
+      const [, token, rawText] = viewMatch;
+      rec.kind = 'view';
+      const res = parseViewSettingValue(token, rawText.trim());
+      if (!res.ok) {
+        rec.valid = false; rec.errorMsg = res.errorMsg; lines.push(rec); continue;
+      }
+      currentView[token] = res.value;
+      rec.parsed = { token, value: res.value };
       lines.push(rec);
       continue;
     }
@@ -2749,7 +2850,7 @@ function parseCodeText(text) {
     lines.push(rec);
   }
 
-  return { lines, stagedConstants, stagedFunctions, stagedVertices, stagedSegments, stagedFaces, stagedCurves, finalSet: currentSet, nameCounters: parseNameCounters };
+  return { lines, stagedConstants, stagedFunctions, stagedVertices, stagedSegments, stagedFaces, stagedCurves, finalSet: currentSet, finalView: currentView, nameCounters: parseNameCounters };
 }
 
 function formatCoordExpr(v, i) {
@@ -2816,6 +2917,58 @@ function formatSetLine(parsed) {
   return `set ${parsed.setType}: ${formatFieldToken(parsed.field, parsed.value)}`;
 }
 
+// Reads the current live view-setting globals into the same shape a parse's
+// finalView produces — this is what a view-setting field falls back to when
+// a given parse didn't mention it (e.g. re-serializing straight from live
+// state when the code editor opens, or a hand-edited file missing a line).
+// There is no built-in-constant-style default for a camera/display setting
+// the way BUILTIN_SET_DEFAULTS supplies one for a fresh vertex — "whatever
+// it currently is live" is the only sensible fallback.
+function currentViewSettingsSnapshot() {
+  // 'pointer' always round-trips as z (the polynomial-mode/Mode-A value),
+  // regardless of which mode is actually active — dissolves two problems at
+  // once (see applyViewSettings): there's no unit-disc constraint to
+  // validate against (zToC always lands inside the open disc, for any
+  // finite z), and switching `mode` never needs to convert `pointer` at
+  // all, since z doesn't depend on which mode is displaying it. controlPt
+  // itself is only ever the *live* representation (C in compact mode, z in
+  // polynomial mode — see getProjectionState) — cToZ here is what
+  // normalizes that back to the one DSL-facing convention.
+  const z = displayMode === 'B' ? cToZ(controlPt) : controlPt;
+  return {
+    darkMode:      darkMode,
+    mode:          displayMode === 'A' ? 'polynomial' : 'compact',
+    anchor:        paramMode === 'diag' ? 'diagonal' : 'zaxis',
+    pointer:       { re: z.re, im: z.im },
+    showPointer:   showPointer,
+    showAxes:      showAxes,
+    scale:         userScale,
+    perspective:   perspectiveOn,
+    invF:          perspectiveP,
+    scaleNodes:    perspScaleNodes,
+    scaleSegments: perspScaleSegs,
+    clipBehind:    clipBehind,
+  };
+}
+
+function formatViewSettingValue(token, value) {
+  if (token === 'pointer') return `${+value.re.toFixed(6)}, ${+value.im.toFixed(6)}`;
+  if (typeof value === 'number') return String(+value.toFixed(6));
+  return String(value);
+}
+
+// Always fully populated (every one of the 12 fields), same "archive, not a
+// diff" convention as buildSetBlock — `finalView`'s fields (whatever a parse
+// actually saw) take priority, current live state fills in anything the
+// parse never mentioned.
+function buildViewSettingsBlock(finalView) {
+  const live = currentViewSettingsSnapshot();
+  return VIEW_SETTINGS_FIELDS.map(({ token }) => {
+    const value = (finalView && token in finalView) ? finalView[token] : live[token];
+    return `${token}: ${formatViewSettingValue(token, value)}`;
+  });
+}
+
 // Shared by Sort's rebuild and Save's re-canonicalization: valid recognized
 // lines are rewritten to their canonical (now fully explicit) form; every
 // other line (blank, header, invalid, unsupported, unrecognized) keeps its
@@ -2835,14 +2988,15 @@ function formatLineForOutput(rec) {
 
 function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr, functionsArr) {
   const out = [];
-  // VIEW SETTINGS and POLYTOPES are purely decorative banners — no
-  // OBJECT_TYPES entry, never classified by classifyHeaderSection, never
-  // touched by Sort's relocation logic. They have to be emitted explicitly
-  // here (rather than relying on Sort to preserve them) because this
-  // function rebuilds the textarea from scratch from live state, not from
-  // whatever text happened to be typed before.
-  out.push(makeHeaderLine('eq', 'VIEW SETTINGS'));
-  out.push('');
+  // VIEW SETTINGS is now a real section (see buildViewSettingsBlock) —
+  // always emitted from current live state, since view settings have no
+  // committed-object array of their own to read from. POLYTOPES stays a
+  // purely decorative banner — no OBJECT_TYPES entry, never classified by
+  // classifyHeaderSection, never touched by Sort's relocation logic — has
+  // to be emitted explicitly here (rather than relying on Sort to preserve
+  // it) because this function rebuilds the textarea from scratch from live
+  // state, not from whatever text happened to be typed before.
+  emitSection(out, 'eq', 'VIEW SETTINGS', buildViewSettingsBlock({}));
   emitSection(out, 'eq',   'AUXILIARY CONSTANTS', constsArr.map(formatConstLine));
   out.push(makeHeaderLine('eq', 'POLYTOPES'));
   out.push('');
@@ -2888,7 +3042,7 @@ function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr, funct
 // purely positional — which object lines follow them — so relocating one
 // would silently change what it governs) but are still reformatted in place.
 function sortCodeText(text) {
-  const { lines, finalSet } = parseCodeText(text);
+  const { lines, finalSet, finalView } = parseCodeText(text);
 
   const headerIdx = {};
   let dividerIdx = -1;
@@ -2949,6 +3103,11 @@ function sortCodeText(text) {
     // anything of its own to re-emit, unlike `set` there's no consolidated
     // block to build either. It just vanishes once absorbed.
     if (rec.kind === 'edit' && rec.valid) return;
+    // A valid view-setting line is consolidated exactly like `set` (one
+    // canonical block, built below from `finalView`) — dropped regardless
+    // of where it was typed. An invalid one falls through to homeOf(i)
+    // below, same as any other invalid line.
+    if (rec.kind === 'view' && rec.valid) return;
     if (rec.valid && SECTION_ORDER.includes(rec.targetSection)) {
       perSection[rec.targetSection].push(rec);
       return;
@@ -2970,6 +3129,12 @@ function sortCodeText(text) {
       emitSection(out, def.style, def.title, buildSetBlock('face', finalSet.face), objectLines);
     } else if (key === 'curves') {
       emitSection(out, def.style, def.title, buildSetBlock('curve', finalSet.curve), objectLines);
+    } else if (key === 'view') {
+      // objectLines here holds only INVALID view-setting lines that
+      // couldn't be homed anywhere else (valid ones were dropped above,
+      // already folded into the canonical block) — printed after it,
+      // unchanged, so the user can still see and fix them.
+      emitSection(out, def.style, def.title, buildViewSettingsBlock(finalView), objectLines);
     } else {
       emitSection(out, def.style, def.title, objectLines);
     }
@@ -4041,6 +4206,7 @@ function updateFromPointer(e) {
     if (r >= 1) pt = pt.scale(0.999 / r);
   }
   controlPt = pt;
+  syncViewSettingToEditor('pointer', false);
   draw();
 }
 
@@ -4105,14 +4271,22 @@ window.addEventListener('pointermove', e => {
 });
 
 window.addEventListener('pointerup', () => {
+  const wasDragging = dragging;
   dragging = false;
+  // The gesture's one settling point (see syncViewSettingToEditor) —
+  // updateFromPointer() only did the cheap per-frame text splice while this
+  // was in flight; now catch codeLineRecords/the gutter/error list up for
+  // real, once, rather than on every pointermove.
+  if (wasDragging) syncViewSettingToEditor('pointer', true);
   if (pointerDownData) handleCanvasClick(pointerDownData.px, pointerDownData.py, pointerDownData.pointerType);
   pointerDownData = null;
 });
 
 window.addEventListener('pointercancel', () => {
+  const wasDragging = dragging;
   dragging        = false;
   pointerDownData = null;
+  if (wasDragging) syncViewSettingToEditor('pointer', true);
 });
 
 // ─── Canvas click → vertex / segment focus and selection ─────────────────────
@@ -4740,12 +4914,14 @@ function setActive(ids, activeId) {
 document.getElementById('btn-u3').addEventListener('click', () => {
   paramMode = 'u3';
   setActive(['btn-u3', 'btn-diag'], 'btn-u3');
+  syncViewSettingToEditor('anchor', true);
   draw();
 });
 
 document.getElementById('btn-diag').addEventListener('click', () => {
   paramMode = 'diag';
   setActive(['btn-u3', 'btn-diag'], 'btn-diag');
+  syncViewSettingToEditor('anchor', true);
   draw();
 });
 
@@ -4753,6 +4929,10 @@ document.getElementById('btn-modeA').addEventListener('click', () => {
   if (displayMode === 'B') controlPt = cToZ(controlPt);
   displayMode = 'A';
   setActive(['btn-modeA', 'btn-modeB'], 'btn-modeA');
+  // No 'pointer' sync needed here — it's always z in the editor (see
+  // applyViewSettings), and the cToZ conversion above is exactly what keeps
+  // that z value the same true point; only the 'mode' line itself changed.
+  syncViewSettingToEditor('mode', true);
   draw();
 });
 
@@ -4760,6 +4940,7 @@ document.getElementById('btn-modeB').addEventListener('click', () => {
   if (displayMode === 'A') controlPt = zToC(controlPt);
   displayMode = 'B';
   setActive(['btn-modeA', 'btn-modeB'], 'btn-modeB');
+  syncViewSettingToEditor('mode', true);
   draw();
 });
 
@@ -4775,10 +4956,17 @@ function applyScale(value) {
   draw();
 }
 
-sliderScale.addEventListener('input', () => applyScale(parseFloat(sliderScale.value)));
+// 'input' fires continuously while the slider thumb is dragged -- cheap sync
+// only. 'change' fires once, when the drag actually ends (native behavior of
+// <input type=range>) -- that's the gesture's one settling point.
+sliderScale.addEventListener('input', () => {
+  applyScale(parseFloat(sliderScale.value));
+  syncViewSettingToEditor('scale', false);
+});
+sliderScale.addEventListener('change', () => syncViewSettingToEditor('scale', true));
 inputScale.addEventListener('change', () => {
   const v = parseFloat(inputScale.value);
-  if (Number.isFinite(v) && v > 0) applyScale(v);
+  if (Number.isFinite(v) && v > 0) { applyScale(v); syncViewSettingToEditor('scale', true); }
 });
 
 // ─── Axes button ──────────────────────────────────────────────────────────────
@@ -4786,12 +4974,14 @@ inputScale.addEventListener('change', () => {
 document.getElementById('btn-axes').addEventListener('click', () => {
   showAxes = !showAxes;
   document.getElementById('btn-axes').classList.toggle('active', showAxes);
+  syncViewSettingToEditor('showAxes', true);
   draw();
 });
 
 document.getElementById('btn-show-pointer').addEventListener('click', () => {
   showPointer = !showPointer;
   document.getElementById('btn-show-pointer').classList.toggle('active', showPointer);
+  syncViewSettingToEditor('showPointer', true);
   draw();
 });
 
@@ -6724,6 +6914,17 @@ function reparseAndPreview() {
   codeLineRecords = staged.lines;
   const { newVertices, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
   previewOverride = { vertices: newVertices, segments: newSegments, faces: newFaces, curves: newCurves };
+  // View settings have no equivalent of previewOverride (there's nothing to
+  // read at draw() time — the live globals themselves ARE the render
+  // parameters, unlike vertices/segments/etc which draw() can be pointed at
+  // a staged-not-committed array instead). So this applies them directly,
+  // same mechanism codeSave()/the interpreter use — genuinely live, not a
+  // parallel preview. openCodeSubmenu() snapshots the pre-open values so
+  // codeExit() (Exit, not Save) can revert this back out on close, the same
+  // way previewOverride = null discards an unsaved vertex/segment/face/
+  // curve edit; codeSave() re-snapshots on commit so a later Exit only
+  // discards changes made *after* that Save, not the whole session.
+  applyViewSettings(staged.finalView);
   refreshCodeGutterAndErrors();
   draw();
 }
@@ -6769,6 +6970,13 @@ function codeSave() {
   syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
   syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
   syncNameCounterFromParse(lastSetCurve,   AUTO_NAME_PREFIX.curve,   staged);
+  // View settings are tier-2 singleton state, same as lastSet*/naming above —
+  // applied directly, outside snapshot()'s undo capture (see applyViewSettings).
+  applyViewSettings(staged.finalView);
+  // This Save is now the new "don't discard this on Exit" baseline — a
+  // later Exit (without a further Save) should only revert changes made
+  // *after* this point, not the whole session back to when Code was opened.
+  _preCodeViewSnapshot = currentViewSettingsSnapshot();
 
   snapshot();
   vertices          = newVertices;
@@ -6806,10 +7014,16 @@ function codeSave() {
 // them shut, so closeCodeSubmenu() can restore exactly that state instead of
 // leaving them permanently hidden.
 let _preCodeSubVisibility = null;
+// The view-settings baseline to revert to on Exit (not Save) — see
+// reparseAndPreview()'s comment. Captured fresh on open, advanced on every
+// real Save, cleared on close.
+let _preCodeViewSnapshot = null;
 
 function openCodeSubmenu() {
   if (editingVertexId !== null)  cancelEdit();
   if (editingSegmentId !== null) cancelSegmentEdit();
+
+  _preCodeViewSnapshot = currentViewSettingsSnapshot();
 
   _preCodeSubVisibility = {
     aux:  document.getElementById('sub-aux').style.display  !== 'none',
@@ -6866,6 +7080,7 @@ function closeCodeSubmenu() {
     document.getElementById('btn-sub-disp').classList.toggle('active', _preCodeSubVisibility.disp);
     _preCodeSubVisibility = null;
   }
+  _preCodeViewSnapshot = null;
 
   // The add-rows should show whatever was last actually saved — whether this
   // particular exit came via Save+Exit or a plain Exit that discarded
@@ -6880,6 +7095,12 @@ function closeCodeSubmenu() {
 function codeExit() {
   submitInterpreterToFile();
   codeSort();
+  // Discard any view-setting preview from this session that was never
+  // Saved — reparseAndPreview() applies these live as you type (see its own
+  // comment), so unlike previewOverride there's nothing to just null out;
+  // it has to be actively reverted back to the last real baseline (session
+  // open, or the last Save, whichever is more recent).
+  if (_preCodeViewSnapshot) applyViewSettings(_preCodeViewSnapshot);
   closeCodeSubmenu();
 }
 
@@ -7015,6 +7236,17 @@ function submitInterpreterLine() {
     return;
   }
 
+  // A lone view-setting line gets the same cheap treatment as a lone `edit`
+  // line above — a direct field assignment, no snapshot (view settings are
+  // outside undo/redo), no id-reassigning full rebuild.
+  if (newRecs.length === 1 && newRecs[0].kind === 'view') {
+    const { token, value } = newRecs[0].parsed;
+    applyViewSettings({ [token]: value });
+    input.value = '';
+    resizeInterpreterInput();
+    return;
+  }
+
   const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
   lastSetVertex  = { ...staged.finalSet.vertex };
@@ -7029,6 +7261,10 @@ function submitInterpreterLine() {
   syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
   syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
   syncNameCounterFromParse(lastSetCurve,   AUTO_NAME_PREFIX.curve,   staged);
+  // A multi-line paste mixing a view-setting line with object/set/edit
+  // lines falls through to here (the lone-line fast path above only covers
+  // a single view line by itself) — still needs applying.
+  applyViewSettings(staged.finalView);
 
   snapshot();
   vertices          = newVertices;
@@ -7211,6 +7447,7 @@ function updatePerspectiveUI() {
 document.getElementById('btn-perspective').addEventListener('click', () => {
   perspectiveOn = !perspectiveOn;
   updatePerspectiveUI();
+  syncViewSettingToEditor('perspective', true);
   draw();
 });
 
@@ -7224,27 +7461,34 @@ function applyPerspParam(value) {
   draw();
 }
 
-sliderPersp.addEventListener('input',  () => applyPerspParam(parseFloat(sliderPersp.value)));
+sliderPersp.addEventListener('input',  () => {
+  applyPerspParam(parseFloat(sliderPersp.value));
+  syncViewSettingToEditor('invF', false);
+});
+sliderPersp.addEventListener('change', () => syncViewSettingToEditor('invF', true));
 inputPersp.addEventListener('change',  () => {
   const v = parseFloat(inputPersp.value);
-  if (!isNaN(v)) applyPerspParam(v);
+  if (!isNaN(v)) { applyPerspParam(v); syncViewSettingToEditor('invF', true); }
 });
 
 document.getElementById('btn-clip').addEventListener('click', () => {
   clipBehind = !clipBehind;
   document.getElementById('btn-clip').classList.toggle('active', clipBehind);
+  syncViewSettingToEditor('clipBehind', true);
   draw();
 });
 
 document.getElementById('btn-scale-nodes').addEventListener('click', () => {
   perspScaleNodes = !perspScaleNodes;
   document.getElementById('btn-scale-nodes').classList.toggle('active', perspScaleNodes);
+  syncViewSettingToEditor('scaleNodes', true);
   draw();
 });
 
 document.getElementById('btn-scale-segs').addEventListener('click', () => {
   perspScaleSegs = !perspScaleSegs;
   document.getElementById('btn-scale-segs').classList.toggle('active', perspScaleSegs);
+  syncViewSettingToEditor('scaleSegments', true);
   draw();
 });
 
@@ -7255,7 +7499,368 @@ document.getElementById('btn-dark').addEventListener('click', () => {
   darkMode = !darkMode;
   document.body.classList.toggle('dark-mode', darkMode);
   document.getElementById('btn-dark').classList.toggle('active', darkMode);
+  syncViewSettingToEditor('darkMode', true);
   draw();
+});
+
+// ─── View settings commit (code editor / interpreter → live state) ────────────
+//
+// The code-editor/interpreter-facing counterpart to every individual button
+// handler above — applies a parsed view-settings object (parseCodeText's
+// `finalView`, or a single field from a lone interpreter line) directly onto
+// the same live globals those handlers touch, then resyncs every affected
+// widget the same way each handler already does for its own field. Merges
+// (only touches fields actually present in `view`) rather than replaces —
+// same "only touches what's given" principle `edit` already uses — so a
+// hand-edited file missing a line never wipes that setting back to some
+// arbitrary default. Deliberately outside undo/redo and the code editor's
+// live preview-while-typing (see VIEW_SETTINGS_FIELDS comment) — no
+// snapshot() call here, matching lastSetVertex/etc.'s own tier.
+function applyViewSettings(view) {
+  if (!view) return;
+  if ('darkMode' in view) {
+    darkMode = view.darkMode;
+    document.body.classList.toggle('dark-mode', darkMode);
+    document.getElementById('btn-dark').classList.toggle('active', darkMode);
+  }
+  if ('mode' in view) {
+    const newDisplayMode = view.mode === 'polynomial' ? 'A' : 'B';
+    // 'pointer' is always z (see currentViewSettingsSnapshot), so an
+    // explicit pointer line in this same commit fully determines the new
+    // controlPt on its own (handled below) — converting here first would
+    // just be overwritten. Only a *bare* mode change, with no accompanying
+    // pointer, needs this: convert the existing controlPt the same way the
+    // Compact/Polynomial buttons do, so the drawn image doesn't jump.
+    if (newDisplayMode !== displayMode && !('pointer' in view)) {
+      controlPt = newDisplayMode === 'A' ? cToZ(controlPt) : zToC(controlPt);
+    }
+    displayMode = newDisplayMode;
+    setActive(['btn-modeA', 'btn-modeB'], displayMode === 'A' ? 'btn-modeA' : 'btn-modeB');
+  }
+  if ('anchor' in view) {
+    paramMode = view.anchor === 'diagonal' ? 'diag' : 'u3';
+    setActive(['btn-u3', 'btn-diag'], paramMode === 'diag' ? 'btn-diag' : 'btn-u3');
+  }
+  // An explicit 'pointer' always wins outright — taken as z, converted to
+  // whichever *live* representation the final `displayMode` (resolved just
+  // above) needs. No unit-disc validation needed anywhere in
+  // parseViewSettingValue either: zToC lands inside the open disc for any
+  // finite z, so an out-of-range value is structurally impossible here.
+  if ('pointer' in view) {
+    const z = new C(view.pointer.re, view.pointer.im);
+    controlPt = displayMode === 'B' ? zToC(z) : z;
+  }
+  if ('showPointer' in view) {
+    showPointer = view.showPointer;
+    document.getElementById('btn-show-pointer').classList.toggle('active', showPointer);
+  }
+  if ('showAxes' in view) {
+    showAxes = view.showAxes;
+    document.getElementById('btn-axes').classList.toggle('active', showAxes);
+  }
+  if ('scale' in view) applyScale(view.scale);
+  if ('perspective' in view) {
+    perspectiveOn = view.perspective;
+    updatePerspectiveUI();
+  }
+  if ('invF' in view) applyPerspParam(view.invF);
+  if ('scaleNodes' in view) {
+    perspScaleNodes = view.scaleNodes;
+    document.getElementById('btn-scale-nodes').classList.toggle('active', perspScaleNodes);
+  }
+  if ('scaleSegments' in view) {
+    perspScaleSegs = view.scaleSegments;
+    document.getElementById('btn-scale-segs').classList.toggle('active', perspScaleSegs);
+  }
+  if ('clipBehind' in view) {
+    clipBehind = view.clipBehind;
+    document.getElementById('btn-clip').classList.toggle('active', clipBehind);
+  }
+  draw();
+}
+
+// The reverse direction from applyViewSettings: when a control-panel widget
+// or a canvas pointer drag changes a view setting directly, keep the open
+// code editor's own text in sync too, so the two surfaces never visibly
+// disagree about the current camera/display state.
+//
+// Deliberately called only from the actual DOM event handlers below (button
+// clicks, slider events, updateFromPointer) — never from applyViewSettings/
+// applyScale/applyPerspParam themselves, even though those are shared by
+// both directions. Reason: applyViewSettings already runs *from inside*
+// reparseAndPreview() (typing in the editor), and if the shared apply-
+// functions also wrote back into the editor, every keystroke would trigger
+// a write of the exact text it was just read from — harmless in principle
+// (round-trips to the same value), but pure waste, and a needless place for
+// a future bug to hide. Keeping the write-back exclusively in the direct-
+// interaction handlers means the two directions can never cross.
+//
+// `isFinal` distinguishes a continuous gesture's every-frame ticks (a
+// canvas pointer drag, a slider mid-drag) from its one settling point (a
+// button click, a slider's own 'change' event, pointerup/pointercancel):
+// mid-gesture, this only does a cheap, targeted text splice (no reparse, no
+// gutter/error rebuild) — cheap enough to call at pointermove frequency;
+// the final tick also runs reparseAndPreview()/resetCodeLineTracking() so
+// codeLineRecords/the gutter/error list catch up for real. Uses
+// setRangeText(..., 'preserve') rather than reassigning textarea.value
+// wholesale, so a caret/selection sitting elsewhere in the file (the user
+// mid-typing something unrelated) isn't disturbed by this.
+function syncViewSettingToEditor(token, isFinal) {
+  if (!codeOpen) return;
+  const textarea = document.getElementById('code-textarea');
+  const lineText = `${token}: ${formatViewSettingValue(token, currentViewSettingsSnapshot()[token])}`;
+  const match = new RegExp(`^${token}:.*$`, 'm').exec(textarea.value);
+  // No matching line right now (the user deleted or is mid-retyping it) —
+  // don't force one back in; a live control-panel change simply isn't
+  // reflected in the text until a real line for it exists again.
+  if (!match) return;
+  textarea.setRangeText(lineText, match.index, match.index + match[0].length, 'preserve');
+  if (isFinal) {
+    reparseAndPreview();
+    resetCodeLineTracking();
+  }
+}
+
+// ─── Demo mode ──────────────────────────────────────────────────────────────
+//
+// A showcase toggle, not a manual — cycles through a handful of pre-built
+// scenes so a repo visitor sees CubeParam's capabilities without typing
+// anything. Each scene is plain DSL text, committed through the exact same
+// parseCodeText/buildCommittedArraysFromStaged/applyViewSettings pipeline
+// the code editor's own Save already uses — no separate rendering path.
+//
+// Design (settled in conversation, not guessed at):
+// - Stays fully interactive — the control panel and code editor keep
+//   working normally while a demo is showing, including opening the code
+//   editor to see exactly how a scene is built.
+// - Cycling to another scene ALWAYS discards any tinkering and reloads that
+//   scene's pristine text fresh — a gallery view should never carry
+//   baggage between exhibits.
+// - Exiting demo mode: view settings (camera/mode/pointer/etc.) always
+//   revert to whatever was live before demo mode was entered — that's
+//   never "content," just how you were looking at something. Object
+//   content (vertices/segments/faces/curves/constants/functions) only
+//   reverts if the *currently shown* scene was never actually edited;
+//   if it was, that edited content becomes the new live document instead
+//   — closer to "fork this example" than "look, don't touch."
+// - DEMO_SCENES is static, embedded source text — cycling/entering always
+//   reparses it fresh, nothing ever writes back into it, so no amount of
+//   in-session tinkering can affect what a future session's demos look
+//   like (a fresh page load always starts from this same text).
+// - Demo-mode transitions (enter/cycle/exit) each start a fresh undo/redo
+//   history — "undo" should never reach back across a scene boundary into
+//   a different scene or into the pre-demo content.
+const DEMO_SCENES = [
+  { name: 'Cube', codeText: `
+number s: 0.6
+
+vertex P0: -s -s -s color=#e53935
+vertex P1:  s -s -s color=#e53935
+vertex P2:  s  s -s color=#e53935
+vertex P3: -s  s -s color=#e53935
+vertex P4: -s -s  s color=#1e88e5
+vertex P5:  s -s  s color=#1e88e5
+vertex P6:  s  s  s color=#1e88e5
+vertex P7: -s  s  s color=#1e88e5
+
+segment S0:  P0 P1
+segment S1:  P1 P2
+segment S2:  P2 P3
+segment S3:  P3 P0
+segment S4:  P4 P5
+segment S5:  P5 P6
+segment S6:  P6 P7
+segment S7:  P7 P4
+segment S8:  P0 P4
+segment S9:  P1 P5
+segment S10: P2 P6
+segment S11: P3 P7
+
+face F0: P0 P1 P2 P3 color=#fdd835
+face F1: P4 P5 P6 P7 color=#43a047
+face F2: P0 P1 P5 P4 color=#8e24aa
+face F3: P1 P2 P6 P5 color=#00acc1
+face F4: P2 P3 P7 P6 color=#fb8c00
+face F5: P3 P0 P4 P7 color=#d81b60
+
+mode: compact
+anchor: zaxis
+pointer: 0.6, 0.4
+perspective: false
+` },
+  { name: 'Spiral', codeText: `
+number turns: 3
+number rad: 0.5
+
+function spiralZ: t -> t / (2 * \\pi * turns) - 0.5
+
+curve C0: x=rad*\\cos(t) ; y=rad*\\sin(t) ; z=spiralZ(t) ; t in [0, 2*\\pi*turns]  color=#1e88e5
+
+vertex P0: rad 0 spiralZ(0) color=#e53935
+
+mode: compact
+anchor: zaxis
+pointer: 0.3, 0.5
+showAxes: true
+scale: 1.2
+perspective: true
+invF: 0.25
+` },
+];
+
+// A scene's own text only needs to specify the view settings that actually
+// matter for its presentation (matching how every other DSL line already
+// lets omitted attributes fall back to a default) — everything else resets
+// to this fixed baseline first, so a demo never inherits stray ambient
+// state (dark mode, a leftover perspective setting, whatever) left over
+// from before it was entered. Mirrors this app's own literal startup
+// defaults (the `let` initializers near the top of the file) expressed in
+// the DSL's own field shape.
+const VIEW_SETTINGS_BUILTIN_DEFAULTS = {
+  darkMode: false, mode: 'compact', anchor: 'zaxis',
+  pointer: (() => { const z = cToZ(new C(0.5, 0.3)); return { re: z.re, im: z.im }; })(),
+  showPointer: true, showAxes: false, scale: 1, perspective: false, invF: 0,
+  scaleNodes: false, scaleSegments: false, clipBehind: true,
+};
+
+let demoMode       = false;
+let demoSceneIndex = 0;
+// What to restore on exit if the current scene wasn't tinkered with —
+// { object: a captureState()-shaped snapshot, view: a currentViewSettingsSnapshot() }.
+let _preDemoState      = null;
+// The pristine object-content text of whichever scene is currently loaded
+// (everything serializeState() emits from AUXILIARY CONSTANTS onward —
+// deliberately excludes the VIEW SETTINGS section, since camera/mode/
+// pointer changes never count as "tinkering" here) — compared against the
+// same thing at exit time to decide whether to keep or discard.
+let _demoSceneBaseline = null;
+
+function serializeObjectContent() {
+  const text = serializeState(vertices, constants, segments, faces, curves, functions);
+  return text.slice(text.indexOf('AUXILIARY CONSTANTS'));
+}
+
+function isDemoSceneTinkered() {
+  return _demoSceneBaseline !== null && serializeObjectContent() !== _demoSceneBaseline;
+}
+
+// Shared by entering demo mode and cycling — commits one scene's text as
+// the new live state, exactly like Save would for hand-typed code editor
+// content, then resets every piece of transient state that could otherwise
+// hold a stale reference across the swap (mirrors restoreState()'s own
+// reset list, since this is doing the same kind of wholesale replacement).
+function loadDemoScene(index) {
+  if (editingVertexId !== null)  cancelEdit();
+  if (editingSegmentId !== null) cancelSegmentEdit();
+
+  const scene  = DEMO_SCENES[index];
+  const staged = parseCodeText(scene.codeText);
+  const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
+
+  vertices       = newVertices;       nextVertexId   = newVertices.length;
+  constants      = newConstants;      nextConstantId = newConstants.length;
+  functions      = newFunctions;      nextFunctionId = newFunctions.length;
+  segments       = newSegments;       nextSegmentId  = newSegments.length;
+  faces          = newFaces;          nextFaceId     = newFaces.length;
+  curves         = newCurves;         nextCurveId    = newCurves.length;
+  nameCounters   = { P: 0, S: 0, F: 0, C: 0 };
+  lastSetVertex  = { ...staged.finalSet.vertex };
+  lastSetSegment = { ...staged.finalSet.segment };
+  lastSetFace    = { ...staged.finalSet.face };
+  lastSetCurve   = { ...staged.finalSet.curve };
+  applyViewSettings(VIEW_SETTINGS_BUILTIN_DEFAULTS);
+  applyViewSettings(staged.finalView);
+
+  selectedVertexIds = new Set();
+  focusedVertexId   = null;
+  selectedSegmentId = null;
+  selectedFaceId    = null;
+  faceMode          = 'off';
+  segmentMode       = 'off';
+  facePickOrder     = [];
+  clearPendingListPick();
+  clearArmedStates();
+  updateFaceButton();
+  updateSegmentButton();
+
+  // A fresh scene is a fresh document — undo should never reach backward
+  // across a scene boundary.
+  undoStack = [];
+  redoStack = [];
+  updateUndoButtons();
+
+  demoSceneIndex     = index;
+  _demoSceneBaseline = serializeObjectContent();
+
+  reEvalObjects();
+  renderConstList();
+  renderVertexList();
+  renderSegmentList();
+  renderFaceList();
+
+  // If the code editor happens to be open, refresh it to the new scene's
+  // own text — matches what opening it fresh would show.
+  if (codeOpen) {
+    document.getElementById('code-textarea').value = serializeState(vertices, constants, segments, faces, curves, functions);
+    reparseAndPreview();
+    resetCodeLineTracking();
+    _preCodeViewSnapshot = currentViewSettingsSnapshot();
+  }
+  draw();
+}
+
+function enterDemoMode() {
+  _preDemoState = { object: captureState(), view: currentViewSettingsSnapshot() };
+  demoMode = true;
+  document.getElementById('btn-demo').classList.add('active');
+  document.getElementById('btn-demo-cycle').style.display = '';
+  loadDemoScene(0);
+}
+
+function cycleDemoScene() {
+  loadDemoScene((demoSceneIndex + 1) % DEMO_SCENES.length);
+}
+
+function exitDemoMode() {
+  if (editingVertexId !== null)  cancelEdit();
+  if (editingSegmentId !== null) cancelSegmentEdit();
+
+  const keepCurrentContent = isDemoSceneTinkered();
+  demoMode = false;
+  document.getElementById('btn-demo').classList.remove('active');
+  document.getElementById('btn-demo-cycle').style.display = 'none';
+
+  if (!keepCurrentContent && _preDemoState) {
+    restoreState(_preDemoState.object);
+    applyViewSettings(_preDemoState.view);
+  } else {
+    // Keep whatever's currently live (the tinkered scene) as the new
+    // document — view settings still revert, per the settled design.
+    if (_preDemoState) applyViewSettings(_preDemoState.view);
+  }
+  // Same reasoning as loadDemoScene: a demo-mode session's history (kept or
+  // discarded) shouldn't be reachable via undo once you're back to normal.
+  undoStack = [];
+  redoStack = [];
+  updateUndoButtons();
+
+  _preDemoState      = null;
+  _demoSceneBaseline = null;
+
+  if (codeOpen) {
+    document.getElementById('code-textarea').value = serializeState(vertices, constants, segments, faces, curves, functions);
+    reparseAndPreview();
+    resetCodeLineTracking();
+    _preCodeViewSnapshot = currentViewSettingsSnapshot();
+  }
+  draw();
+}
+
+document.getElementById('btn-demo').addEventListener('click', () => {
+  if (demoMode) exitDemoMode(); else enterDemoMode();
+});
+document.getElementById('btn-demo-cycle').addEventListener('click', () => {
+  if (demoMode) cycleDemoScene();
 });
 
 // ─── Mathematical-background overlay ───────────────────────────────────────────

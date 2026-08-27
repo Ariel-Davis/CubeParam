@@ -89,7 +89,9 @@ body.dark-mode #logic-keyboard {
 
 #btn-toggle-controls,
 #btn-dark,
-#btn-about {
+#btn-about,
+#btn-demo,
+#btn-demo-cycle {
   padding: 5px 10px;
   font-size: 15px;
   line-height: 1;
