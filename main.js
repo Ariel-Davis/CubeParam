@@ -7651,60 +7651,516 @@ function syncViewSettingToEditor(token, isFinal) {
 //   history — "undo" should never reach back across a scene boundary into
 //   a different scene or into the pre-demo content.
 const DEMO_SCENES = [
-  { name: 'Cube', codeText: `
-number s: 0.6
+  { name: 'Rhombic Dodecahedron', codeText: `
+#======== VIEW SETTINGS ========
 
-vertex P0: -s -s -s color=#e53935
-vertex P1:  s -s -s color=#e53935
-vertex P2:  s  s -s color=#e53935
-vertex P3: -s  s -s color=#e53935
-vertex P4: -s -s  s color=#1e88e5
-vertex P5:  s -s  s color=#1e88e5
-vertex P6:  s  s  s color=#1e88e5
-vertex P7: -s  s  s color=#1e88e5
-
-segment S0:  P0 P1
-segment S1:  P1 P2
-segment S2:  P2 P3
-segment S3:  P3 P0
-segment S4:  P4 P5
-segment S5:  P5 P6
-segment S6:  P6 P7
-segment S7:  P7 P4
-segment S8:  P0 P4
-segment S9:  P1 P5
-segment S10: P2 P6
-segment S11: P3 P7
-
-face F0: P0 P1 P2 P3 color=#fdd835
-face F1: P4 P5 P6 P7 color=#43a047
-face F2: P0 P1 P5 P4 color=#8e24aa
-face F3: P1 P2 P6 P5 color=#00acc1
-face F4: P2 P3 P7 P6 color=#fb8c00
-face F5: P3 P0 P4 P7 color=#d81b60
-
-mode: compact
+darkMode: false
+mode: polynomial
 anchor: zaxis
-pointer: 0.6, 0.4
-perspective: false
-` },
-  { name: 'Spiral', codeText: `
-number turns: 3
-number rad: 0.5
-
-function spiralZ: t -> t / (2 * \\pi * turns) - 0.5
-
-curve C0: x=rad*\\cos(t) ; y=rad*\\sin(t) ; z=spiralZ(t) ; t in [0, 2*\\pi*turns]  color=#1e88e5
-
-vertex P0: rad 0 spiralZ(0) color=#e53935
-
-mode: compact
-anchor: zaxis
-pointer: 0.3, 0.5
+pointer: -0.205208, 0.87862
+showPointer: true
 showAxes: true
-scale: 1.2
+scale: 1
+perspective: false
+invF: 0.292
+scaleNodes: false
+scaleSegments: false
+clipBehind: true
+
+#======== AUXILIARY CONSTANTS ========
+
+number s: 1/2
+number sw: 2
+
+#======== POLYTOPES ========
+
+#-------- VERTICES --------
+
+set vertex: color=#4d4d4d
+set vertex: r=5
+set vertex: visible=true
+set vertex: label=true
+set vertex: naming=P
+
+vertex P0: x=s  y=s  z=s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P1: x=s  y=s  z=-s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P2: x=s  y=-s  z=s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P3: x=s  y=-s  z=-s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P4: x=-s  y=s  z=s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P5: x=-s  y=s  z=-s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P6: x=-s  y=-s  z=s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P7: x=-s  y=-s  z=-s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P8: x=2*s  y=0  z=0  color=#4d4d4d  r=5  visible=true  label=true
+vertex P9: x=-2*s  y=0  z=0  color=#4d4d4d  r=5  visible=true  label=true
+vertex P10: x=0  y=2*s  z=0  color=#4d4d4d  r=5  visible=true  label=true
+vertex P11: x=0  y=-2*s  z=0  color=#4d4d4d  r=5  visible=true  label=true
+vertex P12: x=0  y=0  z=2*s  color=#4d4d4d  r=5  visible=true  label=true
+vertex P13: x=0  y=0  z=-2*s  color=#4d4d4d  r=5  visible=true  label=true
+
+#-------- SEGMENTS --------
+
+set segment: color=#4d4d4d
+set segment: w=1.5
+set segment: visible=true
+set segment: naming=S
+
+segment S0:  P8  P1  color=#4d4d4d  w=sw  visible=true
+segment S1:  P1  P13  color=#4d4d4d  w=sw  visible=true
+segment S2:  P13  P5  color=#4d4d4d  w=sw  visible=true
+segment S3:  P5  P9  color=#4d4d4d  w=sw  visible=true
+segment S4:  P9  P6  color=#4d4d4d  w=sw  visible=true
+segment S5:  P6  P12  color=#4d4d4d  w=sw  visible=true
+segment S6:  P12  P2  color=#4d4d4d  w=sw  visible=true
+segment S7:  P2  P8  color=#4d4d4d  w=sw  visible=true
+segment S8:  P8  P0  color=#4d4d4d  w=sw  visible=true
+segment S9:  P0  P12  color=#4d4d4d  w=sw  visible=true
+segment S10:  P9  P7  color=#4d4d4d  w=sw  visible=true
+segment S11:  P7  P13  color=#4d4d4d  w=sw  visible=true
+segment S12:  P5  P10  color=#4d4d4d  w=sw  visible=true
+segment S13:  P10  P1  color=#4d4d4d  w=sw  visible=true
+segment S14:  P10  P0  color=#4d4d4d  w=sw  visible=true
+segment S15:  P12  P4  color=#4d4d4d  w=sw  visible=true
+segment S16:  P4  P10  color=#4d4d4d  w=sw  visible=true
+segment S17:  P4  P9  color=#4d4d4d  w=sw  visible=true
+segment S18:  P11  P6  color=#4d4d4d  w=sw  visible=true
+segment S19:  P11  P7  color=#4d4d4d  w=sw  visible=true
+segment S20:  P11  P2  color=#4d4d4d  w=sw  visible=true
+segment S21:  P11  P3  color=#4d4d4d  w=sw  visible=true
+segment S22:  P3  P8  color=#4d4d4d  w=sw  visible=true
+segment S23:  P3  P13  color=#4d4d4d  w=sw  visible=true
+
+#-------- FACES --------
+
+set face: color=#4d4d4d
+set face: visible=true
+set face: naming=F
+
+#======== AUXILIARY FUNCTIONS ========
+
+#-------- CURVES --------
+
+set curve: color=#4d4d4d
+set curve: visible=true
+set curve: naming=C
+
+#----------------------------------------
+` },
+  { name: 'Compound of 5 Tetrahedra', codeText: `
+#======== VIEW SETTINGS ========
+
+darkMode: false
+mode: compact
+anchor: zaxis
+pointer: 0, 0
+showPointer: true
+showAxes: false
+scale: 1
+perspective: false
+invF: 0
+scaleNodes: false
+scaleSegments: false
+clipBehind: true
+
+#======== AUXILIARY CONSTANTS ========
+
+number phi: (1+\\sqrt(5))/2
+number s: 1/4
+color d1: #808080
+color c1: #b62228
+color c2: #ed6739
+color c3: #fabc50
+color c4: #0092be
+color c5: #721930
+bool vlab: false
+bool vvis: false
+bool svis: false
+bool fvis1: true
+bool fvis2: true
+bool fvis3: true
+bool fvis4: true
+bool fvis5: true
+
+#======== POLYTOPES ========
+
+#-------- VERTICES --------
+
+set vertex: color=#ff8000
+set vertex: r=5
+set vertex: visible=true
+set vertex: label=false
+set vertex: naming=P
+
+vertex P0: x=s*(phi+1)  y=s  z=0  color=d1  r=5  visible=vvis  label=vlab
+vertex P1: x=s*(phi+1)  y=-s  z=0  color=d1  r=5  visible=vvis  label=vlab
+vertex P2: x=-s*(phi+1)  y=s  z=0  color=d1  r=5  visible=vvis  label=vlab
+vertex P3: x=-s*(phi+1)  y=-s  z=0  color=d1  r=5  visible=vvis  label=vlab
+vertex P4: x=0  y=s*(phi+1)  z=s  color=d1  r=5  visible=vvis  label=vlab
+vertex P5: x=0  y=s*(phi+1)  z=-s  color=d1  r=5  visible=vvis  label=vlab
+vertex P6: x=0  y=-s*(phi+1)  z=s  color=d1  r=5  visible=vvis  label=vlab
+vertex P7: x=0  y=-s*(phi+1)  z=-s  color=d1  r=5  visible=vvis  label=vlab
+vertex P8: x=s  y=0  z=s*(phi+1)  color=d1  r=5  visible=vvis  label=vlab
+vertex P9: x=-s  y=0  z=s*(phi+1)  color=d1  r=5  visible=vvis  label=vlab
+vertex P10: x=s  y=0  z=-s*(phi+1)  color=d1  r=5  visible=vvis  label=vlab
+vertex P11: x=-s  y=0  z=-s*(phi+1)  color=d1  r=5  visible=vvis  label=vlab
+vertex P12: x=s*phi  y=s*phi  z=s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P13: x=s*phi  y=s*phi  z=-s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P14: x=s*phi  y=-s*phi  z=s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P15: x=s*phi  y=-s*phi  z=-s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P16: x=-s*phi  y=s*phi  z=s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P17: x=-s*phi  y=s*phi  z=-s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P18: x=-s*phi  y=-s*phi  z=s*phi  color=d1  r=5  visible=vvis  label=vlab
+vertex P19: x=-s*phi  y=-s*phi  z=-s*phi  color=d1  r=5  visible=vvis  label=vlab
+
+#-------- SEGMENTS --------
+
+set segment: color=#4d4d4d
+set segment: w=1.5
+set segment: visible=true
+set segment: naming=S
+
+#-------- FACES --------
+
+set face: color=c5
+set face: visible=true
+set face: naming=F
+
+face F0: P0  P6  P11  color=c1  visible=fvis1
+face F1: P0  P6  P16  color=c1  visible=fvis1
+face F2: P0  P16  P11  color=c1  visible=fvis1
+face F3: P16  P6  P11  color=c1  visible=fvis1
+face F4: P1  P5  P9  color=c2  visible=fvis2
+face F5: P1  P5  P19  color=c2  visible=fvis2
+face F6: P1  P9  P19  color=c2  visible=fvis2
+face F7: P5  P9  P19  color=c2  visible=fvis2
+face F8: P2  P7  P8  color=c3  visible=fvis3
+face F9: P2  P7  P13  color=c3  visible=fvis3
+face F10: P2  P8  P13  color=c3  visible=fvis3
+face F11: P7  P8  P13  color=c3  visible=fvis3
+face F12: P3  P4  P10  color=c4  visible=fvis4
+face F13: P3  P4  P14  color=c4  visible=fvis4
+face F14: P3  P10  P14  color=c4  visible=fvis4
+face F15: P4  P10  P14  color=c4  visible=fvis4
+face F16: P12  P15  P17  color=c5  visible=fvis5
+face F17: P12  P15  P18  color=c5  visible=fvis5
+face F18: P12  P17  P18  color=c5  visible=fvis5
+face F19: P15  P17  P18  color=c5  visible=fvis5
+
+#======== AUXILIARY FUNCTIONS ========
+
+#-------- CURVES --------
+
+set curve: color=#4d4d4d
+set curve: visible=true
+set curve: naming=C
+
+#----------------------------------------
+` },
+  { name: 'Trefoil Knot', codeText: `
+#======== VIEW SETTINGS ========
+
+darkMode: false
+mode: compact
+anchor: diagonal
+pointer: -0.184898, 0.207175
+showPointer: true
+showAxes: false
+scale: 0.75
 perspective: true
-invF: 0.25
+invF: 0.292
+scaleNodes: false
+scaleSegments: false
+clipBehind: true
+
+#======== AUXILIARY CONSTANTS ========
+
+number a: 3/2
+number b: 5/2
+number c: 1/4
+number s: 1/2
+bool outvlab: false
+bool outvvis: false
+bool corevlab: false
+bool corevvis: false
+bool outslab: false
+bool outsvis: false
+bool coresvis: false
+color c1: #b62228
+color c2: #ed6739
+color c3: #fabc50
+color c4: #0092be
+color c5: #721930
+
+#-------- VERTICES --------
+
+set vertex: color=#4d4d4d
+set vertex: r=5
+set vertex: visible=outvvis
+set vertex: label=outvlab
+set vertex: naming=P
+
+vertex P0: x=2/3  y=-1/3  z=-1/3-a  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P1: x=2/3  y=-1/3  z=-1/3+b  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P2: x=-1/3-a  y=-1/3  z=-1/3+b  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P3: x=-1/3-a  y=2/3  z=-1/3+b  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P4: x=-1/3-a  y=2/3  z=-1/3  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P5: x=-1/3+b  y=2/3  z=-1/3  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P6: x=-1/3+b  y=-1/3-a  z=-1/3  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P7: x=-1/3+b  y=-1/3-a  z=2/3  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P8: x=-1/3  y=-1/3-a  z=2/3  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P9: x=-1/3  y=-1/3+b  z=2/3  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P10: x=-1/3  y=-1/3+b  z=-1/3-a  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P11: x=2/3  y=-1/3+b  z=-1/3-a  color=#4d4d4d  r=5  visible=corevvis  label=corevlab
+vertex P12: x=s*(2/3+c)  y=s*(-1/3+c)  z=s*(-1/3-a+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P13: x=s*(2/3-c)  y=s*(-1/3+c)  z=s*(-1/3-a+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P14: x=s*(2/3+c)  y=s*(-1/3-c)  z=s*(-1/3-a-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P15: x=s*(2/3-c)  y=s*(-1/3-c)  z=s*(-1/3-a-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P16: x=s*(2/3+c)  y=s*(-1/3+c)  z=s*(-1/3+b+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P17: x=s*(2/3+c)  y=s*(-1/3-c)  z=s*(-1/3+b+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P18: x=s*(2/3-c)  y=s*(-1/3+c)  z=s*(-1/3+b-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P19: x=s*(2/3-c)  y=s*(-1/3-c)  z=s*(-1/3+b-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P20: x=s*(-1/3-a+c)  y=s*(-1/3+c)  z=s*(-1/3+b+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P21: x=s*(-1/3-a+c)  y=s*(-1/3+c)  z=s*(-1/3+b-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P22: x=s*(-1/3-a-c)  y=s*(-1/3-c)  z=s*(-1/3+b+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P23: x=s*(-1/3-a-c)  y=s*(-1/3-c)  z=s*(-1/3+b-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P24: x=s*(-1/3-a+c)  y=s*(2/3+c)  z=s*(-1/3+b+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P25: x=s*(-1/3-a-c)  y=s*(2/3+c)  z=s*(-1/3+b+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P26: x=s*(-1/3-a+c)  y=s*(2/3-c)  z=s*(-1/3+b-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P27: x=s*(-1/3-a-c)  y=s*(2/3-c)  z=s*(-1/3+b-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P28: x=s*(-1/3-a+c)  y=s*(2/3+c)  z=s*(-1/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P29: x=s*(-1/3-a+c)  y=s*(2/3-c)  z=s*(-1/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P30: x=s*(-1/3-a-c)  y=s*(2/3+c)  z=s*(-1/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P31: x=s*(-1/3-a-c)  y=s*(2/3-c)  z=s*(-1/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P32: x=s*(-1/3+b+c)  y=s*(2/3+c)  z=s*(-1/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P33: x=s*(-1/3+b+c)  y=s*(2/3+c)  z=s*(-1/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P34: x=s*(-1/3+b-c)  y=s*(2/3-c)  z=s*(-1/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P35: x=s*(-1/3+b-c)  y=s*(2/3-c)  z=s*(-1/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P36: x=s*(-1/3+b+c)  y=s*(-1/3-a+c)  z=s*(-1/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P37: x=s*(-1/3+b-c)  y=s*(-1/3-a+c)  z=s*(-1/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P38: x=s*(-1/3+b+c)  y=s*(-1/3-a-c)  z=s*(-1/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P39: x=s*(-1/3+b-c)  y=s*(-1/3-a-c)  z=s*(-1/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P40: x=s*(-1/3+b+c)  y=s*(-1/3-a+c)  z=s*(2/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P41: x=s*(-1/3+b+c)  y=s*(-1/3-a-c)  z=s*(2/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P42: x=s*(-1/3+b-c)  y=s*(-1/3-a+c)  z=s*(2/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P43: x=s*(-1/3+b-c)  y=s*(-1/3-a-c)  z=s*(2/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P44: x=s*(-1/3+c)  y=s*(-1/3-a+c)  z=s*(2/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P45: x=s*(-1/3+c)  y=s*(-1/3-a+c)  z=s*(2/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P46: x=s*(-1/3-c)  y=s*(-1/3-a-c)  z=s*(2/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P47: x=s*(-1/3-c)  y=s*(-1/3-a-c)  z=s*(2/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P48: x=s*(-1/3+c)  y=s*(-1/3+b+c)  z=s*(2/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P49: x=s*(-1/3-c)  y=s*(-1/3+b+c)  z=s*(2/3+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P50: x=s*(-1/3+c)  y=s*(-1/3+b-c)  z=s*(2/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P51: x=s*(-1/3-c)  y=s*(-1/3+b-c)  z=s*(2/3-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P52: x=s*(-1/3+c)  y=s*(-1/3+b+c)  z=s*(-1/3-a+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P53: x=s*(-1/3+c)  y=s*(-1/3+b-c)  z=s*(-1/3-a+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P54: x=s*(-1/3-c)  y=s*(-1/3+b+c)  z=s*(-1/3-a-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P55: x=s*(-1/3-c)  y=s*(-1/3+b-c)  z=s*(-1/3-a-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P56: x=s*(2/3+c)  y=s*(-1/3+b+c)  z=s*(-1/3-a+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P57: x=s*(2/3+c)  y=s*(-1/3+b+c)  z=s*(-1/3-a-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P58: x=s*(2/3-c)  y=s*(-1/3+b-c)  z=s*(-1/3-a+c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+vertex P59: x=s*(2/3-c)  y=s*(-1/3+b-c)  z=s*(-1/3-a-c)  color=#4d4d4d  r=5  visible=outvvis  label=outvlab
+
+#-------- SEGMENTS --------
+
+set segment: color=#4d4d4d
+set segment: w=1.5
+set segment: visible=true
+set segment: naming=S
+
+segment S0:  P0  P1  color=#4d4d4d  w=1.5  visible=coresvis
+segment S1:  P1  P2  color=#4d4d4d  w=1.5  visible=coresvis
+segment S2:  P2  P3  color=#4d4d4d  w=1.5  visible=coresvis
+segment S3:  P3  P4  color=#4d4d4d  w=1.5  visible=coresvis
+segment S4:  P4  P5  color=#4d4d4d  w=1.5  visible=coresvis
+segment S5:  P5  P6  color=#4d4d4d  w=1.5  visible=coresvis
+segment S6:  P6  P7  color=#4d4d4d  w=1.5  visible=coresvis
+segment S7:  P7  P8  color=#4d4d4d  w=1.5  visible=coresvis
+segment S8:  P8  P9  color=#4d4d4d  w=1.5  visible=coresvis
+segment S9:  P9  P10  color=#4d4d4d  w=1.5  visible=coresvis
+segment S10:  P10  P11  color=#4d4d4d  w=1.5  visible=coresvis
+segment S11:  P11  P0  color=#4d4d4d  w=1.5  visible=coresvis
+segment S12:  P25  P30  color=#4d4d4d  w=1.5  visible=outsvis
+segment S13:  P30  P33  color=#4d4d4d  w=1.5  visible=outsvis
+segment S14:  P33  P38  color=#4d4d4d  w=1.5  visible=outsvis
+segment S15:  P38  P41  color=#4d4d4d  w=1.5  visible=outsvis
+segment S16:  P41  P46  color=#4d4d4d  w=1.5  visible=outsvis
+segment S17:  P46  P49  color=#4d4d4d  w=1.5  visible=outsvis
+segment S18:  P49  P54  color=#4d4d4d  w=1.5  visible=outsvis
+segment S19:  P54  P57  color=#4d4d4d  w=1.5  visible=outsvis
+segment S20:  P57  P14  color=#4d4d4d  w=1.5  visible=outsvis
+segment S21:  P14  P17  color=#4d4d4d  w=1.5  visible=outsvis
+segment S22:  P17  P22  color=#4d4d4d  w=1.5  visible=outsvis
+segment S23:  P22  P25  color=#4d4d4d  w=1.5  visible=outsvis
+segment S24:  P27  P31  color=#4d4d4d  w=1.5  visible=outsvis
+segment S25:  P31  P35  color=#4d4d4d  w=1.5  visible=outsvis
+segment S26:  P35  P39  color=#4d4d4d  w=1.5  visible=outsvis
+segment S27:  P39  P43  color=#4d4d4d  w=1.5  visible=outsvis
+segment S28:  P43  P47  color=#4d4d4d  w=1.5  visible=outsvis
+segment S29:  P47  P51  color=#4d4d4d  w=1.5  visible=outsvis
+segment S30:  P51  P55  color=#4d4d4d  w=1.5  visible=outsvis
+segment S31:  P55  P59  color=#4d4d4d  w=1.5  visible=outsvis
+segment S32:  P59  P15  color=#4d4d4d  w=1.5  visible=outsvis
+segment S33:  P15  P19  color=#4d4d4d  w=1.5  visible=outsvis
+segment S34:  P19  P23  color=#4d4d4d  w=1.5  visible=outsvis
+segment S35:  P23  P27  color=#4d4d4d  w=1.5  visible=outsvis
+segment S36:  P26  P29  color=#4d4d4d  w=1.5  visible=outsvis
+segment S37:  P29  P34  color=#4d4d4d  w=1.5  visible=outsvis
+segment S38:  P34  P37  color=#4d4d4d  w=1.5  visible=outsvis
+segment S39:  P37  P42  color=#4d4d4d  w=1.5  visible=outsvis
+segment S40:  P42  P45  color=#4d4d4d  w=1.5  visible=outsvis
+segment S41:  P45  P50  color=#4d4d4d  w=1.5  visible=outsvis
+segment S42:  P50  P53  color=#4d4d4d  w=1.5  visible=outsvis
+segment S43:  P53  P58  color=#4d4d4d  w=1.5  visible=outsvis
+segment S44:  P58  P13  color=#4d4d4d  w=1.5  visible=outsvis
+segment S45:  P13  P18  color=#4d4d4d  w=1.5  visible=outsvis
+segment S46:  P18  P21  color=#4d4d4d  w=1.5  visible=outsvis
+segment S47:  P21  P26  color=#4d4d4d  w=1.5  visible=outsvis
+segment S48:  P24  P28  color=#4d4d4d  w=1.5  visible=outsvis
+segment S49:  P28  P32  color=#4d4d4d  w=1.5  visible=outsvis
+segment S50:  P32  P36  color=#4d4d4d  w=1.5  visible=outsvis
+segment S51:  P36  P40  color=#4d4d4d  w=1.5  visible=outsvis
+segment S52:  P40  P44  color=#4d4d4d  w=1.5  visible=outsvis
+segment S53:  P44  P48  color=#4d4d4d  w=1.5  visible=outsvis
+segment S54:  P48  P52  color=#4d4d4d  w=1.5  visible=outsvis
+segment S55:  P52  P56  color=#4d4d4d  w=1.5  visible=outsvis
+segment S56:  P56  P12  color=#4d4d4d  w=1.5  visible=outsvis
+segment S57:  P12  P16  color=#4d4d4d  w=1.5  visible=outsvis
+segment S58:  P16  P20  color=#4d4d4d  w=1.5  visible=outsvis
+segment S59:  P20  P24  color=#4d4d4d  w=1.5  visible=outsvis
+segment S60:  P23  P22  color=#4d4d4d  w=1.5  visible=outsvis
+segment S61:  P21  P20  color=#4d4d4d  w=1.5  visible=outsvis
+segment S62:  P24  P25  color=#4d4d4d  w=1.5  visible=outsvis
+segment S63:  P27  P26  color=#4d4d4d  w=1.5  visible=outsvis
+segment S64:  P28  P29  color=#4d4d4d  w=1.5  visible=outsvis
+segment S65:  P31  P30  color=#4d4d4d  w=1.5  visible=outsvis
+segment S66:  P33  P32  color=#4d4d4d  w=1.5  visible=outsvis
+segment S67:  P35  P34  color=#4d4d4d  w=1.5  visible=outsvis
+segment S68:  P39  P38  color=#4d4d4d  w=1.5  visible=outsvis
+segment S69:  P37  P36  color=#4d4d4d  w=1.5  visible=outsvis
+segment S70:  P43  P42  color=#4d4d4d  w=1.5  visible=outsvis
+segment S71:  P40  P41  color=#4d4d4d  w=1.5  visible=outsvis
+segment S72:  P47  P46  color=#4d4d4d  w=1.5  visible=outsvis
+segment S73:  P45  P44  color=#4d4d4d  w=1.5  visible=outsvis
+segment S74:  P51  P50  color=#4d4d4d  w=1.5  visible=outsvis
+segment S75:  P49  P48  color=#4d4d4d  w=1.5  visible=outsvis
+segment S76:  P53  P52  color=#4d4d4d  w=1.5  visible=outsvis
+segment S77:  P55  P54  color=#4d4d4d  w=1.5  visible=outsvis
+segment S78:  P56  P57  color=#4d4d4d  w=1.5  visible=outsvis
+segment S79:  P59  P58  color=#4d4d4d  w=1.5  visible=outsvis
+segment S80:  P12  P13  color=#4d4d4d  w=1.5  visible=outsvis
+segment S81:  P15  P14  color=#4d4d4d  w=1.5  visible=outsvis
+segment S82:  P18  P19  color=#4d4d4d  w=1.5  visible=outsvis
+segment S83:  P16  P17  color=#4d4d4d  w=1.5  visible=outsvis
+
+#-------- FACES --------
+
+set face: color=#4d4d4d
+set face: visible=true
+set face: naming=F
+
+face F0: P51  P55  P59  P58  P53  P50  color=c2  visible=true
+face F1: P58  P13  P18  P19  P15  P59  color=c5  visible=true
+face F2: P19  P23  P27  P26  P21  P18  color=c2  visible=true
+face F3: P27  P31  P35  P34  P29  P26  color=c5  visible=true
+face F4: P34  P37  P42  P43  P39  P35  color=c2  visible=true
+face F5: P43  P47  P51  P50  P45  P42  color=c5  visible=true
+face F6: P49  P54  P57  P56  P52  P48  color=c5  visible=true
+face F7: P56  P12  P16  P17  P14  P57  color=c2  visible=true
+face F8: P17  P22  P25  P24  P20  P16  color=c5  visible=true
+face F9: P25  P30  P33  P32  P28  P24  color=c2  visible=true
+face F10: P40  P36  P32  P33  P38  P41  color=c5  visible=true
+face F11: P41  P46  P49  P48  P44  P40  color=c2  visible=true
+face F12: P22  P25  P30  P31  P27  P23  color=c3  visible=true
+face F13: P31  P35  P39  P38  P33  P30  color=c1  visible=true
+face F14: P39  P43  P47  P46  P41  P38  color=c3  visible=true
+face F15: P47  P46  P49  P54  P55  P51  color=c1  visible=true
+face F16: P55  P59  P15  P14  P57  P54  color=c3  visible=true
+face F17: P15  P19  P23  P22  P17  P14  color=c1  visible=true
+face F18: P52  P48  P44  P45  P50  P53  color=c3  visible=true
+face F19: P52  P53  P58  P13  P12  P56  color=c1  visible=true
+face F20: P12  P13  P18  P21  P20  P16  color=c3  visible=true
+face F21: P21  P26  P29  P28  P24  P20  color=c1  visible=true
+face F22: P28  P29  P34  P37  P36  P32  color=c3  visible=true
+face F23: P37  P42  P45  P44  P40  P36  color=c1  visible=true
+
+#======== AUXILIARY FUNCTIONS ========
+
+#-------- CURVES --------
+
+set curve: color=#4d4d4d
+set curve: visible=true
+set curve: naming=C
+
+#----------------------------------------
+` },
+  { name: 'Loxodrome Spherical Spiral Ribbon', codeText: `
+#======== VIEW SETTINGS ========
+
+darkMode: false
+mode: compact
+anchor: zaxis
+pointer: 0.35339, 0.35448
+showPointer: true
+showAxes: false
+scale: 1
+perspective: false
+invF: 0
+scaleNodes: false
+scaleSegments: false
+clipBehind: true
+
+#======== AUXILIARY CONSTANTS ========
+
+number k: 8
+number s: 1
+number eps: 0.15
+
+#======== POLYTOPES ========
+
+#-------- VERTICES --------
+
+set vertex: color=#4d4d4d
+set vertex: r=5
+set vertex: visible=true
+set vertex: label=true
+set vertex: naming=P
+
+#-------- SEGMENTS --------
+
+set segment: color=#4d4d4d
+set segment: w=1.5
+set segment: visible=true
+set segment: naming=S
+
+#-------- FACES --------
+
+set face: color=#4d4d4d
+set face: visible=true
+set face: naming=F
+
+#======== AUXILIARY FUNCTIONS ========
+
+function sech: t -> 2/(\\e^t+\\e^(-t))
+function fz: t -> (\\e^t-\\e^(-t))/(\\e^t+\\e^(-t))
+function fx: u, s -> sech(u)*\\cos(k*u+s*eps)
+function fy: u, s -> sech(u)*\\sin(k*u+s*eps)
+
+#-------- CURVES --------
+
+set curve: color=#4d4d4d
+set curve: visible=true
+set curve: naming=C
+
+curve C0: x=s*fx(t,0) ; y=s*fy(t,0) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C1: x=s*fx(t,1) ; y=s*fy(t,1) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C2: x=s*fx(t,2) ; y=s*fy(t,2) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C3: x=s*fx(t,3) ; y=s*fy(t,3) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C4: x=s*fx(t,4) ; y=s*fy(t,4) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C5: x=s*fx(t,5) ; y=s*fy(t,5) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C6: x=s*fx(t,6) ; y=s*fy(t,6) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C7: x=s*fx(t,7) ; y=s*fy(t,7) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+curve C8: x=s*fx(t,8) ; y=s*fy(t,8) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d  visible=true
+
+#----------------------------------------
 ` },
 ];
 
@@ -7814,6 +8270,8 @@ function loadDemoScene(index) {
   updateUndoButtons();
 
   demoSceneIndex = index;
+  document.getElementById('btn-demo').title = `Demo: ${DEMO_SCENES[index].name}`;
+  document.getElementById('btn-demo-cycle').title = `Next: ${DEMO_SCENES[(index + 1) % DEMO_SCENES.length].name}`;
 
   reEvalObjects();
   renderConstList();
@@ -7855,6 +8313,7 @@ function exitDemoMode() {
 
   demoMode = false;
   document.getElementById('btn-demo').classList.remove('active');
+  document.getElementById('btn-demo').title = 'Demo';
   document.getElementById('btn-demo-cycle').style.display = 'none';
 
   // Always the user's own document and view — demo-scene tinkering lives
