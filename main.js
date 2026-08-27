@@ -7711,86 +7711,109 @@ invF: 0.25
 // A scene's own text only needs to specify the view settings that actually
 // matter for its presentation (matching how every other DSL line already
 // lets omitted attributes fall back to a default) — everything else resets
-// to this fixed baseline first, so a demo never inherits stray ambient
-// state (dark mode, a leftover perspective setting, whatever) left over
+// to this fixed baseline first, so a *fresh* view of a demo never inherits
+// stray ambient state (a leftover perspective setting, whatever) left over
 // from before it was entered. Mirrors this app's own literal startup
 // defaults (the `let` initializers near the top of the file) expressed in
-// the DSL's own field shape.
+// the DSL's own field shape. darkMode is deliberately absent — see
+// stripDarkMode below.
 const VIEW_SETTINGS_BUILTIN_DEFAULTS = {
-  darkMode: false, mode: 'compact', anchor: 'zaxis',
+  mode: 'compact', anchor: 'zaxis',
   pointer: (() => { const z = cToZ(new C(0.5, 0.3)); return { re: z.re, im: z.im }; })(),
   showPointer: true, showAxes: false, scale: 1, perspective: false, invF: 0,
   scaleNodes: false, scaleSegments: false, clipBehind: true,
 };
 
+// Dark mode is a personal UI preference, not part of any scene's or
+// document's own content — a demo-mode transition should never flip it,
+// in either direction (a visitor exploring in the dark shouldn't get a
+// sudden bright flash just from cycling a demo). Every view-settings object
+// applied by demo-mode code below is run through this first.
+function stripDarkMode(view) {
+  if (!view || !('darkMode' in view)) return view;
+  const { darkMode, ...rest } = view;
+  return rest;
+}
+
 let demoMode       = false;
 let demoSceneIndex = 0;
-// What to restore on exit if the current scene wasn't tinkered with —
-// { object: a captureState()-shaped snapshot, view: a currentViewSettingsSnapshot() }.
-let _preDemoState      = null;
-// The pristine object-content text of whichever scene is currently loaded
-// (everything serializeState() emits from AUXILIARY CONSTANTS onward —
-// deliberately excludes the VIEW SETTINGS section, since camera/mode/
-// pointer changes never count as "tinkering" here) — compared against the
-// same thing at exit time to decide whether to keep or discard.
-let _demoSceneBaseline = null;
+// What "exit demo mode" always returns to — the user's own document and
+// view, captured the moment demo mode was entered. Demo-scene tinkering
+// never touches this; see demoSceneLiveState below for where tinkering
+// actually persists instead.
+let _preDemoState = null;
+// One slot per DEMO_SCENES entry, null until that scene has been shown at
+// least once this session (tab). Populated/updated every time the user
+// navigates AWAY from a scene (cycling, or exiting demo mode) via
+// saveCurrentSceneState() — so returning to it later in the SAME session
+// (cycling back, or turning demo mode off and back on) shows exactly what
+// was left there, not the pristine template. Plain in-memory state, never
+// written to any storage: a page reload or a new tab starts every slot
+// `null` again, so no amount of in-session tinkering can affect what a
+// *future* session's demos look like — each `let` here is naturally
+// scoped to this one script execution already, nothing extra needed to
+// guarantee that.
+let demoSceneLiveState = DEMO_SCENES.map(() => null);
 
-function serializeObjectContent() {
-  const text = serializeState(vertices, constants, segments, faces, curves, functions);
-  return text.slice(text.indexOf('AUXILIARY CONSTANTS'));
+function saveCurrentSceneState() {
+  demoSceneLiveState[demoSceneIndex] = { object: captureState(), view: currentViewSettingsSnapshot() };
 }
 
-function isDemoSceneTinkered() {
-  return _demoSceneBaseline !== null && serializeObjectContent() !== _demoSceneBaseline;
-}
-
-// Shared by entering demo mode and cycling — commits one scene's text as
-// the new live state, exactly like Save would for hand-typed code editor
-// content, then resets every piece of transient state that could otherwise
-// hold a stale reference across the swap (mirrors restoreState()'s own
-// reset list, since this is doing the same kind of wholesale replacement).
+// Shared by entering demo mode and cycling — either resumes a scene exactly
+// where this session last left it (demoSceneLiveState has a slot for it) or
+// commits its pristine template text fresh, exactly like Save would for
+// hand-typed code editor content. Either way, every piece of transient
+// state that could otherwise hold a stale reference across the swap gets
+// reset (mirrors restoreState()'s own reset list, since this is doing the
+// same kind of wholesale replacement).
 function loadDemoScene(index) {
   if (editingVertexId !== null)  cancelEdit();
   if (editingSegmentId !== null) cancelSegmentEdit();
 
-  const scene  = DEMO_SCENES[index];
-  const staged = parseCodeText(scene.codeText);
-  const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
+  const saved = demoSceneLiveState[index];
+  if (saved) {
+    restoreState(saved.object);
+    applyViewSettings(stripDarkMode(saved.view));
+  } else {
+    const scene  = DEMO_SCENES[index];
+    const staged = parseCodeText(scene.codeText);
+    const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
-  vertices       = newVertices;       nextVertexId   = newVertices.length;
-  constants      = newConstants;      nextConstantId = newConstants.length;
-  functions      = newFunctions;      nextFunctionId = newFunctions.length;
-  segments       = newSegments;       nextSegmentId  = newSegments.length;
-  faces          = newFaces;          nextFaceId     = newFaces.length;
-  curves         = newCurves;         nextCurveId    = newCurves.length;
-  nameCounters   = { P: 0, S: 0, F: 0, C: 0 };
-  lastSetVertex  = { ...staged.finalSet.vertex };
-  lastSetSegment = { ...staged.finalSet.segment };
-  lastSetFace    = { ...staged.finalSet.face };
-  lastSetCurve   = { ...staged.finalSet.curve };
-  applyViewSettings(VIEW_SETTINGS_BUILTIN_DEFAULTS);
-  applyViewSettings(staged.finalView);
+    vertices       = newVertices;       nextVertexId   = newVertices.length;
+    constants      = newConstants;      nextConstantId = newConstants.length;
+    functions      = newFunctions;      nextFunctionId = newFunctions.length;
+    segments       = newSegments;       nextSegmentId  = newSegments.length;
+    faces          = newFaces;          nextFaceId     = newFaces.length;
+    curves         = newCurves;         nextCurveId    = newCurves.length;
+    nameCounters   = { P: 0, S: 0, F: 0, C: 0 };
+    lastSetVertex  = { ...staged.finalSet.vertex };
+    lastSetSegment = { ...staged.finalSet.segment };
+    lastSetFace    = { ...staged.finalSet.face };
+    lastSetCurve   = { ...staged.finalSet.curve };
+    applyViewSettings(stripDarkMode(VIEW_SETTINGS_BUILTIN_DEFAULTS));
+    applyViewSettings(stripDarkMode(staged.finalView));
 
-  selectedVertexIds = new Set();
-  focusedVertexId   = null;
-  selectedSegmentId = null;
-  selectedFaceId    = null;
-  faceMode          = 'off';
-  segmentMode       = 'off';
-  facePickOrder     = [];
-  clearPendingListPick();
-  clearArmedStates();
-  updateFaceButton();
-  updateSegmentButton();
+    selectedVertexIds = new Set();
+    focusedVertexId   = null;
+    selectedSegmentId = null;
+    selectedFaceId    = null;
+    faceMode          = 'off';
+    segmentMode       = 'off';
+    facePickOrder     = [];
+    clearPendingListPick();
+    clearArmedStates();
+    updateFaceButton();
+    updateSegmentButton();
+  }
 
-  // A fresh scene is a fresh document — undo should never reach backward
-  // across a scene boundary.
+  // Deliberately not preserved across a scene switch even when resuming a
+  // saved slot — undo should never reach backward across a scene boundary
+  // into a different scene or into whatever came before it.
   undoStack = [];
   redoStack = [];
   updateUndoButtons();
 
-  demoSceneIndex     = index;
-  _demoSceneBaseline = serializeObjectContent();
+  demoSceneIndex = index;
 
   reEvalObjects();
   renderConstList();
@@ -7814,10 +7837,13 @@ function enterDemoMode() {
   demoMode = true;
   document.getElementById('btn-demo').classList.add('active');
   document.getElementById('btn-demo-cycle').style.display = '';
-  loadDemoScene(0);
+  // Resumes wherever demoSceneIndex already points (0 on a fresh session,
+  // or wherever it was left if demo mode was toggled off and back on).
+  loadDemoScene(demoSceneIndex);
 }
 
 function cycleDemoScene() {
+  saveCurrentSceneState();
   loadDemoScene((demoSceneIndex + 1) % DEMO_SCENES.length);
 }
 
@@ -7825,27 +7851,24 @@ function exitDemoMode() {
   if (editingVertexId !== null)  cancelEdit();
   if (editingSegmentId !== null) cancelSegmentEdit();
 
-  const keepCurrentContent = isDemoSceneTinkered();
+  saveCurrentSceneState();
+
   demoMode = false;
   document.getElementById('btn-demo').classList.remove('active');
   document.getElementById('btn-demo-cycle').style.display = 'none';
 
-  if (!keepCurrentContent && _preDemoState) {
-    restoreState(_preDemoState.object);
-    applyViewSettings(_preDemoState.view);
-  } else {
-    // Keep whatever's currently live (the tinkered scene) as the new
-    // document — view settings still revert, per the settled design.
-    if (_preDemoState) applyViewSettings(_preDemoState.view);
-  }
-  // Same reasoning as loadDemoScene: a demo-mode session's history (kept or
-  // discarded) shouldn't be reachable via undo once you're back to normal.
+  // Always the user's own document and view — demo-scene tinkering lives
+  // on in demoSceneLiveState (just saved above), never here.
+  restoreState(_preDemoState.object);
+  applyViewSettings(stripDarkMode(_preDemoState.view));
+
+  // Same reasoning as loadDemoScene: a demo-mode session's undo history
+  // shouldn't be reachable once you're back to your own document.
   undoStack = [];
   redoStack = [];
   updateUndoButtons();
 
-  _preDemoState      = null;
-  _demoSceneBaseline = null;
+  _preDemoState = null;
 
   if (codeOpen) {
     document.getElementById('code-textarea').value = serializeState(vertices, constants, segments, faces, curves, functions);
