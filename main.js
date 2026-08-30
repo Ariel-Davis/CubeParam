@@ -1004,6 +1004,184 @@ function findGuardTotalityError(ast, envs) {
   return null;
 }
 
+// Phase 6 — kind-generic ("template") function parameters. A function
+// parameter's role is fixed by *syntactic position*, the same
+// disambiguation-by-position principle this whole grammar already leans
+// on: appearing anywhere an operator structurally requires a specific
+// kind (an arithmetic/builtin/'in' operand, a comparison operand, a
+// boolop/not operand, a guard condition) locks that parameter to that
+// kind, no declaration needed — exactly how a literal already gets its
+// kind from its own syntax. A parameter with *no* such occurrence
+// anywhere is left generic: its concrete kind isn't fixed at definition,
+// it's substituted fresh from each call's actual arguments instead (see
+// inferExprKind below, which does the real per-call verification). Two
+// *different* fixed-kind requirements for the same parameter (used as a
+// number somewhere, a bool somewhere else) can never be satisfied by any
+// single call — a genuine definition-time error, independent of how the
+// function is ever called, checked once at registration exactly like
+// guard totality already is.
+function findFunctionParamKindConflict(fn) {
+  const paramSet = new Set(fn.params);
+  let conflict = null;
+  const fixedKind = {};
+  function note(name, kind) {
+    if (conflict || !paramSet.has(name)) return;
+    if (!(name in fixedKind)) fixedKind[name] = kind;
+    else if (fixedKind[name] !== kind) conflict = { name, kinds: [fixedKind[name], kind] };
+  }
+  function walk(node, ctxKind) {
+    if (!node || conflict) return;
+    if (node.type === 'id') { if (ctxKind) note(node.name, ctxKind); return; }
+    switch (node.type) {
+      case 'neg': case 'builtin': walk(node.arg, 'number'); return;
+      case 'binop': walk(node.left, 'number'); walk(node.right, 'number'); return;
+      case 'not': walk(node.arg, 'boolean'); return;
+      case 'boolop': walk(node.left, 'boolean'); walk(node.right, 'boolean'); return;
+      case 'cmp': walk(node.left, 'number'); walk(node.right, 'number'); return;
+      case 'in': walk(node.numArg, 'number'); return;
+      case 'call': node.args.forEach(a => walk(a, null)); return;
+      case 'guard':
+        node.terms.forEach(t => { if (t.cond) walk(t.cond, 'boolean'); walk(t.payload, null); });
+        return;
+      default: return; // num, lit, colorlit — leaves, nothing to fix
+    }
+  }
+  walk(fn.bodyAst, null);
+  return conflict;
+}
+
+// The actual novel piece Phase 6 needs: a structural, per-call
+// kind-consistency check that walks *every* branch of *every* guard, not
+// just the one that would fire for particular values — necessary because
+// ordinary evaluation only ever touches the branch that fires, so a kind
+// mismatch hiding in an untaken branch (calling
+// `f: x,y,z -> b1{x},!b1{b2{y},!b2{z}}` with x a number but y/z colors)
+// would otherwise go completely undetected whenever b1 happens to be
+// true. `kindCtx` substitutes one concrete kind for every name currently
+// in scope that isn't a global (a function's own parameters, for this one
+// call/verification) — {} at the true top level of an ordinary DSL
+// expression, where every identifier is either a global constant or
+// another function call. Returns { kind } (kind is
+// 'number'|'boolean'|'color'|null — null meaning "references something
+// unresolved," a *different*, already-handled error class, not this
+// checker's problem) or { error }.
+//
+// Deliberately not scoped to "only calls to a function with a generic
+// parameter" — this walks into *every* call it finds, including a fully
+// non-generic ("closed") one, and — as a natural consequence of the same
+// branch-unification a generic parameter's payload occurrences need
+// anyway — also catches a guard whose branches disagree in kind even with
+// no function involved at all (e.g. `visible: b{true},!b{5}`, currently
+// unchecked at every kind before this). A related, previously-uncaught
+// gap this same mechanism closes for free, not separately designed.
+// Not cached — mirrors this project's own established BSP precedent (see
+// the face-rendering section) of trading a caching optimization for
+// guaranteed correctness once the underlying computation is cheap enough
+// not to matter: re-run fresh every time the containing expression is
+// (re)validated, negligible at this app's scale (function bodies a few
+// nodes deep, "a handful to a few dozen hand-authored objects" per the
+// architecture notes). Well-founded despite recursing into nested calls —
+// a self- or mutually-recursive function can never reach functionEnv in
+// the first place (topoSortDependencies evicts any such cycle before this
+// ever runs), so there is no infinite-recursion risk here.
+function inferExprKind(node, kindCtx, envs) {
+  switch (node.type) {
+    case 'num': return { kind: 'number' };
+    case 'lit': return { kind: 'boolean' };
+    case 'colorlit': return { kind: 'color' };
+    case 'id': {
+      if (node.name in kindCtx) return { kind: kindCtx[node.name] };
+      if (node.name in envs.numericEnv) return { kind: 'number' };
+      if (envs.boolEnv && node.name in envs.boolEnv) return { kind: 'boolean' };
+      if (envs.colorEnv && node.name in envs.colorEnv) return { kind: 'color' };
+      return { kind: null }; // unresolved — ordinary NaN path handles this
+    }
+    case 'neg': {
+      const a = inferExprKind(node.arg, kindCtx, envs);
+      if (a.error) return a;
+      if (a.kind !== null && a.kind !== 'number') return { error: 'unary minus requires a number' };
+      return { kind: 'number' };
+    }
+    case 'binop': {
+      const l = inferExprKind(node.left, kindCtx, envs); if (l.error) return l;
+      const r = inferExprKind(node.right, kindCtx, envs); if (r.error) return r;
+      if ((l.kind !== null && l.kind !== 'number') || (r.kind !== null && r.kind !== 'number'))
+        return { error: `'${node.op}' requires numbers` };
+      return { kind: 'number' };
+    }
+    case 'builtin': {
+      const a = inferExprKind(node.arg, kindCtx, envs);
+      if (a.error) return a;
+      if (a.kind !== null && a.kind !== 'number') return { error: `\\${node.name} requires a number` };
+      return { kind: 'number' };
+    }
+    case 'not': {
+      const a = inferExprKind(node.arg, kindCtx, envs);
+      if (a.error) return a;
+      if (a.kind !== null && a.kind !== 'boolean') return { error: '! requires a bool' };
+      return { kind: 'boolean' };
+    }
+    case 'boolop': {
+      const l = inferExprKind(node.left, kindCtx, envs); if (l.error) return l;
+      const r = inferExprKind(node.right, kindCtx, envs); if (r.error) return r;
+      if ((l.kind !== null && l.kind !== 'boolean') || (r.kind !== null && r.kind !== 'boolean'))
+        return { error: `'${node.op}' requires bools` };
+      return { kind: 'boolean' };
+    }
+    case 'cmp': {
+      const l = inferExprKind(node.left, kindCtx, envs); if (l.error) return l;
+      const r = inferExprKind(node.right, kindCtx, envs); if (r.error) return r;
+      if ((l.kind !== null && l.kind !== 'number') || (r.kind !== null && r.kind !== 'number'))
+        return { error: 'comparison requires numbers' };
+      return { kind: 'boolean' };
+    }
+    case 'in': {
+      const a = inferExprKind(node.numArg, kindCtx, envs);
+      if (a.error) return a;
+      if (a.kind !== null && a.kind !== 'number') return { error: "'in' requires a number" };
+      return { kind: 'boolean' };
+    }
+    case 'call': {
+      const fn = envs.functionEnv?.[node.name];
+      if (!fn || node.args.length !== fn.params.length) return { kind: null }; // unresolved call — ordinary NaN path
+      const argKinds = [];
+      for (const a of node.args) {
+        const r = inferExprKind(a, kindCtx, envs);
+        if (r.error) return r;
+        argKinds.push(r.kind);
+      }
+      // An argument whose own kind couldn't be pinned down (null) can't
+      // usefully substitute into the callee — skip checking that callee
+      // for this occurrence, same "not this checker's problem" deferral
+      // as an unresolved 'id'.
+      if (argKinds.some(k => k === null)) return { kind: null };
+      const calleeCtx = {};
+      fn.params.forEach((p, i) => { calleeCtx[p] = argKinds[i]; });
+      const bodyRes = inferExprKind(fn.bodyAst, calleeCtx, envs);
+      if (bodyRes.error) return { error: `in call to '${node.name}': ${bodyRes.error}` };
+      return { kind: bodyRes.kind };
+    }
+    case 'guard': {
+      let unified = null;
+      for (const t of node.terms) {
+        if (t.cond) {
+          const c = inferExprKind(t.cond, kindCtx, envs);
+          if (c.error) return c;
+          if (c.kind !== null && c.kind !== 'boolean') return { error: 'guard condition must be a bool' };
+        }
+        const p = inferExprKind(t.payload, kindCtx, envs);
+        if (p.error) return p;
+        if (p.kind !== null) {
+          if (unified === null) unified = p.kind;
+          else if (unified !== p.kind) return { error: `guard branches produce different kinds ('${unified}' vs '${p.kind}')` };
+        }
+      }
+      return { kind: unified };
+    }
+    default: return { kind: null };
+  }
+}
+
 // Evaluates an expression string in an environment of named constants,
 // bools, and (optionally) user-defined functions. Thin wrapper over
 // parse+eval — functionEnv/boolEnv both default to empty, so every
@@ -1038,6 +1216,11 @@ function evalGuardedExpr(exprText, envs) {
   if (!parsed.ok) return { ok: false, errorMsg: 'invalid expression' };
   const totalityErr = findGuardTotalityError(parsed.ast, envs);
   if (totalityErr) return { ok: false, errorMsg: totalityErr };
+  // Phase 6: verify kind-consistency across every guard branch/generic
+  // function call this expression reaches, structurally (not just the
+  // branch that would fire right now) — see inferExprKind's own comment.
+  const kindErr = inferExprKind(parsed.ast, {}, envs).error;
+  if (kindErr) return { ok: false, errorMsg: kindErr };
   return { ok: true, value: evalAst(parsed.ast, envs) };
 }
 
@@ -2960,6 +3143,8 @@ function resolveConstantsAndFunctions(rawLines) {
       const tryEval = (ast) => {
         const totalityErr = findGuardTotalityError(ast, { numericEnv, boolEnv, functionEnv });
         if (totalityErr) return { ok: false, err: totalityErr };
+        const kindErr = inferExprKind(ast, {}, { numericEnv, boolEnv, functionEnv }).error;
+        if (kindErr) return { ok: false, err: kindErr };
         const value = evalAst(ast, { numericEnv, boolEnv, functionEnv });
         if (item.keyword === 'number') {
           if (!Number.isFinite(value)) return { ok: false, err: 'invalid expression' };
@@ -2984,6 +3169,20 @@ function resolveConstantsAndFunctions(rawLines) {
     } else {
       const totalityErr = findGuardTotalityError(item.ast, { numericEnv, boolEnv, functionEnv });
       if (totalityErr) { parseErrors.set(name, totalityErr); continue; }
+      // Phase 6: a parameter used as more than one fixed kind (e.g. both a
+      // number and a bool operand somewhere in the body) can never be
+      // satisfied by any call — reject the definition itself, once, rather
+      // than deferring to whichever call site happens to trip over it
+      // first (findFunctionParamKindConflict's own comment has the full
+      // reasoning). Independent of the per-call check inferExprKind does
+      // at every actual call site below (evalGuardedExpr/tryEval) — this
+      // one exists purely for a clean, call-independent error message.
+      const conflict = findFunctionParamKindConflict({ params: item.params, bodyAst: item.ast });
+      if (conflict) {
+        const label = k => (k === 'boolean' ? 'bool' : k);
+        parseErrors.set(name, `parameter '${conflict.name}' is used as both a ${label(conflict.kinds[0])} and a ${label(conflict.kinds[1])}`);
+        continue;
+      }
       functionEnv[name] = { params: item.params, bodyAst: item.ast };
       resultByName.set(name, { ok: true, keyword: 'function', name, params: item.params, bodyExpr: item.bodyExpr, bodyAst: item.ast });
     }
