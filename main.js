@@ -3760,7 +3760,35 @@ function parseCodeText(text) {
     if (keyword === 'face') {
       rec.kind = 'face';
       rec.targetSection = 'faces';
-      const tok = tokenizeAttrs(rest, ['color', 'visible']);
+
+      // Whole-line guard, same mechanism/granularity as vertex above (see
+      // its own comment) — the guard applies to the *entire* payload (the
+      // whole vertex list plus attrs), never a single list entry; a face's
+      // vertex-list guard granularity was an explicit open question until
+      // this line was actually reached (NOTES13's own note), resolved here
+      // by extending the exact same "atomic or whole, never a pair" rule
+      // vertex already established, not inventing a separate finer-grained
+      // per-entry mechanism.
+      let effectiveRest = rest;
+      const guarded = splitGuardedObjectLine(rest);
+      if (guarded) {
+        if (!guarded.ok) { rec.valid = false; rec.errorMsg = guarded.error; lines.push(rec); continue; }
+        let matched = null;
+        for (const term of guarded.terms) {
+          if (term.isOtherwise) { matched = term; break; }
+          const condAst = parseExprAst(term.condText);
+          if (condAst.ok && evalAst(condAst.ast, { numericEnv, boolEnv, functionEnv }) === true) { matched = term; break; }
+        }
+        if (!matched) {
+          rec.valid = true;
+          rec.parsed = null;
+          lines.push(rec);
+          continue;
+        }
+        effectiveRest = matched.payloadText;
+      }
+
+      const tok = tokenizeAttrs(effectiveRest, ['color', 'visible']);
       if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
       if (tok.positional.length < 3) {
         rec.valid = false; rec.errorMsg = `expected at least 3 vertex names, found ${tok.positional.length}`; lines.push(rec); continue;
@@ -3803,6 +3831,28 @@ function parseCodeText(text) {
       rec.kind = 'curve';
       rec.targetSection = 'curves';
 
+      // Whole-line guard, same mechanism as vertex/face above — applies to
+      // the entire payload (all four `;`-separated clauses at once, plus
+      // trailing attrs), never a single clause.
+      let effectiveRest = rest;
+      const guarded = splitGuardedObjectLine(rest);
+      if (guarded) {
+        if (!guarded.ok) { rec.valid = false; rec.errorMsg = guarded.error; lines.push(rec); continue; }
+        let matched = null;
+        for (const term of guarded.terms) {
+          if (term.isOtherwise) { matched = term; break; }
+          const condAst = parseExprAst(term.condText);
+          if (condAst.ok && evalAst(condAst.ast, { numericEnv, boolEnv, functionEnv }) === true) { matched = term; break; }
+        }
+        if (!matched) {
+          rec.valid = true;
+          rec.parsed = null;
+          lines.push(rec);
+          continue;
+        }
+        effectiveRest = matched.payloadText;
+      }
+
       // Semicolons are the clause separator here, not whitespace inside
       // tokenizeAttrs (which has no idea `;` exists at all) — this DSL's
       // only prior semicolon precedent (face's `edit` verb) strips them to
@@ -3810,7 +3860,7 @@ function parseCodeText(text) {
       // different grammatical shape per position (x=/y=/z=/domain), so
       // splitting on `;` up front and parsing each piece by position is
       // more direct than trying to force everything through one call.
-      const clauses = rest.split(';').map(s => s.trim()).filter(s => s !== '');
+      const clauses = effectiveRest.split(';').map(s => s.trim()).filter(s => s !== '');
       if (clauses.length !== 4) {
         rec.valid = false;
         rec.errorMsg = `expected 4 clauses (x=... ; y=... ; z=... ; PARAM in [a,b]), found ${clauses.length}`;
@@ -3907,7 +3957,30 @@ function parseCodeText(text) {
     // namespace (see isNameTakenIn's segList param).
     rec.kind = 'segment';
     rec.targetSection = 'segments';
-    const tok = tokenizeAttrs(rest, ['color', 'width', 'visible']);
+
+    // Whole-line guard, same mechanism as vertex/face/curve above.
+    let effectiveRest = rest;
+    {
+      const guarded = splitGuardedObjectLine(rest);
+      if (guarded) {
+        if (!guarded.ok) { rec.valid = false; rec.errorMsg = guarded.error; lines.push(rec); continue; }
+        let matched = null;
+        for (const term of guarded.terms) {
+          if (term.isOtherwise) { matched = term; break; }
+          const condAst = parseExprAst(term.condText);
+          if (condAst.ok && evalAst(condAst.ast, { numericEnv, boolEnv, functionEnv }) === true) { matched = term; break; }
+        }
+        if (!matched) {
+          rec.valid = true;
+          rec.parsed = null;
+          lines.push(rec);
+          continue;
+        }
+        effectiveRest = matched.payloadText;
+      }
+    }
+
+    const tok = tokenizeAttrs(effectiveRest, ['color', 'width', 'visible']);
     if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
     if (tok.positional.length !== 2) {
       rec.valid = false; rec.errorMsg = `expected 2 vertex names, found ${tok.positional.length}`; lines.push(rec); continue;
