@@ -382,7 +382,13 @@ function fromScreen(px, py, scale) {
 // (see topoSortDependencies below) needs to know *which names* an
 // expression references without evaluating it at all.
 //
-// Grammar: numbers, +  -  *  /  ^, unary minus, parentheses,
+// Grammar (numeric and boolean unified into one grammar/evaluator, not two
+// separate ones — every value-expression position in this app already
+// bottlenecks through this one parser, so extending it directly makes
+// every new construct usable anywhere a value-expression already can be,
+// for free, rather than needing bespoke bridging logic at every call
+// site):
+//          numbers, +  -  *  /  ^, unary minus, parentheses,
 //          \pi  \e  \sin(x)  \cos(x)  \tan(x)  \sqrt(x)  \abs(x) (builtins,
 //          always backslash-prefixed, fixed arity — 0 for \pi/\e, 1 for the
 //          rest, never user-overridable),
@@ -390,16 +396,49 @@ function fromScreen(px, py, scale) {
 //          NAME(arg [, arg ...]) — a call to a user-defined function
 //          (bare, never backslash-prefixed — the backslash is what keeps
 //          "the fixed builtin vocabulary" and "the open user namespace"
-//          from ever colliding syntactically).
+//          from ever colliding syntactically);
+//          true / false (bool literals — CODE_IDENT_RE already reserves
+//          both words, so there's no identifier-collision risk recognizing
+//          them here), !  &  | (not/and/or, in that precedence order —
+//          tightest to loosest — matching Python's own not/and/or
+//          convention, not C's ! && ||), == != < <= > >= (comparisons,
+//          binding tighter than !/&/| but looser than arithmetic, so
+//          `!a==b` reads as `!(a==b)` and `a+1==b*2` reads as
+//          `(a+1)==(b*2)`, again matching Python; non-chaining — `a<b<c`
+//          is not supported, avoiding an ambiguous reading). == and !=
+//          are tolerance-based (see CMP_EPSILON below), not bit-exact —
+//          deliberate, not a compromise: proving two arbitrary expressions
+//          symbolically equal is undecidable in general for a language
+//          that includes +, ×, exp, sin, integers and π (Richardson's
+//          theorem), so bit-exact equality would incorrectly reject
+//          expressions that are mathematically identical but reached via
+//          independent floating-point paths (e.g. 2*\sqrt(5) vs \sqrt(20),
+//          or \cos(x)^2+\sin(x)^2 vs 1) — tolerance comparison is the
+//          standard, correct tool for exactly this situation, not a
+//          fallback. < <= > >= stay ordinary IEEE comparisons, deliberately
+//          not fuzzed — equality tests a measure-zero target, which is
+//          uniquely fragile under rounding; a half-line test isn't, except
+//          exactly at a boundary, which is an inherent edge case for real
+//          numbers regardless of representation.
 
 // Parses `src` into an AST or returns { ok:false } on a syntax error —
 // separated from evaluation because collectAstRefs (below) needs a parsed
 // AST but no environment at all, and evalAst needs the AST but no
-// re-parsing. Node shapes: {type:'num',value}, {type:'id',name},
-// {type:'neg',arg}, {type:'binop',op,left,right},
+// re-parsing. Node shapes: {type:'num',value} (always number-producing),
+// {type:'lit',value} (a bool literal, always bool-producing — kept
+// distinct from 'num' so a node's own type already says which kind it
+// produces, no separate tag needed), {type:'id',name} (kind determined at
+// eval time by whichever env actually has the name — a name belongs to
+// exactly one kind, enforced elsewhere), {type:'neg',arg},
+// {type:'binop',op,left,right} (+ - * / ^, always number-producing),
 // {type:'builtin',name,arg} (one of sin/cos/tan/sqrt/abs — pi/e are
 // resolved immediately to a 'num' node, they're literals, not calls),
-// {type:'call',name,args} (a user function call).
+// {type:'call',name,args} (a user function call — kind determined by
+// whatever the callee's body itself produces, naturally polymorphic),
+// {type:'not',arg} / {type:'boolop',op,left,right} (op: '&'|'|', always
+// bool-producing), {type:'cmp',op,left,right} (op one of the six
+// comparisons, always bool-producing, left/right are ordinary arithmetic
+// sub-expressions, not booleans).
 function parseExprAst(src) {
   let pos = 0;
   const s = (src ?? '').trim();
@@ -407,8 +446,126 @@ function parseExprAst(src) {
 
   function skipWS() { while (pos < s.length && /\s/.test(s[pos])) pos++; }
   function peek()   { return s[pos]; }
+  function startsWith(tok) { return s.slice(pos, pos + tok.length) === tok; }
 
-  function parseExpr() { return parseAddSub(); }
+  // Guarded/case expression: `cond{payload},cond{payload},...` — a
+  // formal case-select, not arithmetic, usable anywhere a plain
+  // value-expression already can be (constant values, vertex coordinates,
+  // any ATTR_DEFS-driven attribute) since it's parsed at the very top of
+  // this same grammar, above parseOr. Nestable — a payload can itself be
+  // another guarded expression, recursively. `otherwise{payload}` (a
+  // reserved keyword, only legal in a condition position) or a bare
+  // trailing value with no condition/braces (equivalent shorthand,
+  // unambiguous since every other term is `cond{payload}`-shaped) marks
+  // the catch-all — either must be the last term. Node shape:
+  // {type:'guard', terms:[{cond, payload, isOtherwise}, ...]} — cond is
+  // null when isOtherwise is true.
+  //
+  // Deliberately tries an ordinary value expression first and only
+  // commits to guard-parsing if a `{` actually follows it — `{` isn't
+  // recognized anywhere else in this grammar, so this never backtracks
+  // and every existing plain expression (no `{` anywhere) parses exactly
+  // as before, unwrapped, with zero AST-shape change.
+  function matchOtherwiseKeyword() {
+    skipWS();
+    if (!startsWith('otherwise')) return false;
+    const after = s[pos + 'otherwise'.length];
+    if (after !== undefined && /[a-zA-Z0-9_]/.test(after)) return false; // e.g. an identifier merely starting with "otherwise"
+    pos += 'otherwise'.length;
+    return true;
+  }
+
+  function parseExpr() {
+    const terms = [];
+    while (true) {
+      skipWS();
+      let cond = null, isOtherwise = false;
+      if (matchOtherwiseKeyword()) {
+        isOtherwise = true;
+      } else {
+        const parsedVal = parseOr();
+        skipWS();
+        if (peek() !== '{') {
+          if (terms.length === 0) return parsedVal; // not guard-shaped at all — plain expression
+          // Bare trailing value — shorthand for otherwise{...}. Must be
+          // the last term; a trailing comma or anything else after it is
+          // simply unparsed leftover content, caught by parseExprAst's own
+          // "extra content at end" check, same as any other malformed line.
+          terms.push({ cond: null, payload: parsedVal, isOtherwise: true });
+          return { type: 'guard', terms };
+        }
+        cond = parsedVal;
+      }
+      skipWS();
+      if (peek() !== '{') { failed = true; return { type: 'guard', terms }; }
+      pos++;
+      const payload = parseExpr(); // nestable — a payload may itself be a guarded expression
+      skipWS();
+      if (peek() === '}') pos++; else failed = true;
+      terms.push({ cond, payload, isOtherwise });
+      if (isOtherwise) return { type: 'guard', terms }; // otherwise/bare-value must be last
+      skipWS();
+      if (peek() === ',') { pos++; continue; }
+      return { type: 'guard', terms };
+    }
+  }
+
+  function parseOr() {
+    let v = parseAnd(); skipWS();
+    while (pos < s.length && peek() === '|') {
+      pos++; skipWS();
+      v = { type: 'boolop', op: '|', left: v, right: parseAnd() };
+      skipWS();
+    }
+    return v;
+  }
+
+  function parseAnd() {
+    let v = parseNot(); skipWS();
+    while (pos < s.length && peek() === '&') {
+      pos++; skipWS();
+      v = { type: 'boolop', op: '&', left: v, right: parseNot() };
+      skipWS();
+    }
+    return v;
+  }
+
+  function parseNot() {
+    skipWS();
+    if (pos < s.length && peek() === '!') { pos++; skipWS(); return { type: 'not', arg: parseNot() }; }
+    return parseComparison();
+  }
+
+  // At most one comparison per this level — deliberately non-chaining
+  // (`a<b<c` isn't legal here), and falls straight through to a bare
+  // arithmetic result when no comparison operator follows, so this level
+  // is transparent for every existing purely-arithmetic expression.
+  function parseComparison() {
+    const left = parseAddSub();
+    skipWS();
+    // 'in' membership test against a set literal (`a in {1,2,3}`) — reuses
+    // parseSetExprAstAt, a *different* top-level parser/closure, entered
+    // mid-expression and resumed from exactly where it stops (see that
+    // function's own comment for why this needs an explicit position
+    // rather than just calling parseSetExprAst on a substring).
+    if (/^in(?![a-zA-Z0-9_])/.test(s.slice(pos))) {
+      pos += 2; skipWS();
+      const setRes = parseSetExprAstAt(s, pos);
+      if (!setRes.ok) { failed = true; return left; }
+      pos = setRes.endPos;
+      return { type: 'in', numArg: left, setAst: setRes.ast };
+    }
+    let op = null;
+    if (startsWith('==')) op = '==';
+    else if (startsWith('!=')) op = '!=';
+    else if (startsWith('<=')) op = '<=';
+    else if (startsWith('>=')) op = '>=';
+    else if (peek() === '<') op = '<';
+    else if (peek() === '>') op = '>';
+    if (!op) return left;
+    pos += op.length; skipWS();
+    return { type: 'cmp', op, left, right: parseAddSub() };
+  }
 
   function parseAddSub() {
     let v = parseMulDiv(); skipWS();
@@ -492,6 +649,18 @@ function parseExprAst(src) {
       failed = true; return { type: 'num', value: NaN };
     }
 
+    // Color literal — a new atom kind, added so a guard's payload can be
+    // written inline (`b{#ff0000},otherwise{#00ff00}`) the same way a
+    // plain color= attribute already is, rather than only ever a
+    // reference to a pre-declared color constant. '#' is never used
+    // elsewhere in expression text (comments are stripped before any
+    // text reaches parseExprAst at all), so this is unambiguous.
+    if (peek() === '#') {
+      const m = /^#[0-9a-fA-F]{6}/.exec(s.slice(pos));
+      if (m) { pos += m[0].length; return { type: 'colorlit', value: m[0] }; }
+      failed = true; return { type: 'num', value: NaN };
+    }
+
     if (peek() === '\\') {
       pos++;
       let name = '';
@@ -507,6 +676,11 @@ function parseExprAst(src) {
     if (/[a-zA-Z_]/.test(peek())) {
       let name = '';
       while (pos < s.length && /[a-zA-Z0-9_]/.test(s[pos])) name += s[pos++];
+      // true/false are reserved everywhere a name can appear (CODE_IDENT_RE),
+      // so recognizing them as literals here can never shadow or collide
+      // with a real identifier.
+      if (name === 'true')  return { type: 'lit', value: true };
+      if (name === 'false') return { type: 'lit', value: false };
       const save = pos;
       skipWS();
       if (peek() === '(') return { type: 'call', name, args: parseArgList() };
@@ -524,20 +698,67 @@ function parseExprAst(src) {
   return failed ? { ok: false } : { ok: true, ast };
 }
 
-// Evaluates a parsed AST. ctx = { numericEnv, functionEnv }. A function
-// call binds its params into a *fresh copy* of the caller's numericEnv
-// (never mutates the caller's), so recursion through several distinct
-// functions naturally nests correctly — recursion back into the *same*
-// function can't happen at all, since a genuine self-reference is a
-// self-loop in the dependency graph and gets rejected as a cycle before
-// any function is ever registered (see topoSortDependencies).
+// Tolerance for == and != — see parseExprAst's own comment for why this is
+// deliberate, not a compromise. Combined relative+absolute form (matches
+// numpy.isclose / Python's math.isclose): tight enough to correctly reject
+// values that actually differ, loose enough (many orders of magnitude
+// above ordinary double-precision rounding noise, ~1e-15/1e-16) to accept
+// expressions that are mathematically identical but reached via
+// independent floating-point paths. Not yet exposed as a user-facing
+// setting — revisit if a real case ever needs a different tolerance.
+const CMP_EPSILON = 1e-9;
+function numsClose(a, b) {
+  return Math.abs(a - b) <= CMP_EPSILON * Math.max(Math.abs(a), Math.abs(b), 1);
+}
+
+// Evaluates a parsed AST. ctx = { numericEnv, boolEnv, functionEnv } — one
+// evaluator for both kinds (not two separate ones), each node's *type*
+// already says which kind it produces (see parseExprAst's own node-shape
+// comment), so evaluation never needs an externally-supplied "which kind
+// am I expecting" hint — a caller expecting a number checks
+// `Number.isFinite` on the result, a caller expecting a bool checks
+// `typeof result === 'boolean'` (see resolveNumAttr/resolveBoolAttr
+// below), exactly the same way a caller already has to check `!parsed.ok`
+// for a syntax error. Every arithmetic/boolean operator explicitly guards
+// its operands' actual runtime kind and returns NaN on a mismatch (e.g. a
+// bool referenced inside `+`, or a number referenced inside `&`) rather
+// than letting JS silently coerce (`true + true` would otherwise silently
+// become `2`) — this is what makes a type mistake fail loudly (as NaN,
+// surfacing as "invalid expression" downstream, the same path every other
+// unmet reference already takes) instead of silently producing a
+// plausible-looking wrong answer.
+//
+// A function call binds its params into *fresh copies* of the caller's
+// numericEnv/boolEnv (never mutates the caller's) — each parameter is
+// explicitly cleared from *both* before being set in whichever one
+// actually matches its evaluated argument's kind, so a parameter can never
+// resolve against a stale outer value of the wrong kind even if its name
+// happens to collide with an outer constant of the other kind (a genuine
+// possibility — parameter names aren't checked against the shared
+// constant/vertex/etc. namespace, shadowing is the whole point). Recursion
+// through several distinct functions naturally nests correctly this way;
+// recursion back into the *same* function can't happen at all, since a
+// genuine self-reference is a self-loop in the dependency graph and gets
+// rejected as a cycle before any function is ever registered (see
+// topoSortDependencies).
 function evalAst(ast, ctx) {
   switch (ast.type) {
     case 'num': return ast.value;
-    case 'id':  return (ast.name in ctx.numericEnv) ? ctx.numericEnv[ast.name] : NaN;
-    case 'neg': return -evalAst(ast.arg, ctx);
+    case 'lit': return ast.value;
+    case 'colorlit': return ast.value;
+    case 'id': {
+      if (ast.name in ctx.numericEnv) return ctx.numericEnv[ast.name];
+      if (ctx.boolEnv && ast.name in ctx.boolEnv) return ctx.boolEnv[ast.name];
+      if (ctx.colorEnv && ast.name in ctx.colorEnv) return ctx.colorEnv[ast.name];
+      return NaN;
+    }
+    case 'neg': {
+      const v = evalAst(ast.arg, ctx);
+      return typeof v === 'number' ? -v : NaN;
+    }
     case 'binop': {
       const l = evalAst(ast.left, ctx), r = evalAst(ast.right, ctx);
+      if (typeof l !== 'number' || typeof r !== 'number') return NaN;
       if (ast.op === '+') return l + r;
       if (ast.op === '-') return l - r;
       if (ast.op === '*') return l * r;
@@ -547,6 +768,7 @@ function evalAst(ast, ctx) {
     }
     case 'builtin': {
       const v = evalAst(ast.arg, ctx);
+      if (typeof v !== 'number') return NaN;
       if (ast.name === 'sin')  return Math.sin(v);
       if (ast.name === 'cos')  return Math.cos(v);
       if (ast.name === 'tan')  return Math.tan(v);
@@ -554,13 +776,66 @@ function evalAst(ast, ctx) {
       if (ast.name === 'abs')  return Math.abs(v);
       return NaN;
     }
+    case 'not': {
+      const v = evalAst(ast.arg, ctx);
+      return typeof v === 'boolean' ? !v : NaN;
+    }
+    case 'boolop': {
+      const l = evalAst(ast.left, ctx), r = evalAst(ast.right, ctx);
+      if (typeof l !== 'boolean' || typeof r !== 'boolean') return NaN;
+      return ast.op === '&' ? (l && r) : (l || r);
+    }
+    case 'cmp': {
+      const l = evalAst(ast.left, ctx), r = evalAst(ast.right, ctx);
+      if (typeof l !== 'number' || typeof r !== 'number' || !Number.isFinite(l) || !Number.isFinite(r)) return NaN;
+      if (ast.op === '==') return numsClose(l, r);
+      if (ast.op === '!=') return !numsClose(l, r);
+      if (ast.op === '<')  return l < r;
+      if (ast.op === '<=') return l <= r;
+      if (ast.op === '>')  return l > r;
+      if (ast.op === '>=') return l >= r;
+      return NaN;
+    }
+    case 'in': {
+      const v = evalAst(ast.numArg, ctx);
+      if (typeof v !== 'number' || !Number.isFinite(v)) return NaN;
+      return evalSetAst(ast.setAst).has(v);
+    }
     case 'call': {
       const fn = ctx.functionEnv?.[ast.name];
       if (!fn || ast.args.length !== fn.params.length) return NaN;
       const argVals = ast.args.map(a => evalAst(a, ctx));
       const localNumericEnv = { ...ctx.numericEnv };
-      fn.params.forEach((p, i) => { localNumericEnv[p] = argVals[i]; });
-      return evalAst(fn.bodyAst, { numericEnv: localNumericEnv, functionEnv: ctx.functionEnv });
+      const localBoolEnv    = { ...ctx.boolEnv };
+      const localColorEnv   = { ...ctx.colorEnv };
+      fn.params.forEach((p, i) => {
+        delete localNumericEnv[p];
+        delete localBoolEnv[p];
+        delete localColorEnv[p];
+        if (typeof argVals[i] === 'number') localNumericEnv[p] = argVals[i];
+        else if (typeof argVals[i] === 'boolean') localBoolEnv[p] = argVals[i];
+        else if (typeof argVals[i] === 'string') localColorEnv[p] = argVals[i];
+        // else: argVals[i] is NaN (an invalid argument) — leave the param
+        // unresolved in all three, so any reference to it inside the body
+        // fails as an ordinary unmet reference rather than reading a stale
+        // outer value of the wrong kind.
+      });
+      return evalAst(fn.bodyAst, { numericEnv: localNumericEnv, boolEnv: localBoolEnv, colorEnv: localColorEnv, functionEnv: ctx.functionEnv });
+    }
+    case 'guard': {
+      // First match wins, left to right — a formal case-select, not
+      // literal arithmetic (see parseExprAst's own comment). Whatever
+      // kind the matched payload produces is what this whole node
+      // produces — inherently kind-polymorphic, same as 'id'/'call'.
+      // "No branch matched" can only reach here for a guard the parse-time
+      // totality checker (findGuardTotalityError) didn't get a chance to
+      // validate — NaN is the correct, already-established "invalid"
+      // signal for that case, not a crash.
+      for (const term of ast.terms) {
+        if (term.isOtherwise) return evalAst(term.payload, ctx);
+        if (evalAst(term.cond, ctx) === true) return evalAst(term.payload, ctx);
+      }
+      return NaN;
     }
     default: return NaN;
   }
@@ -574,7 +849,11 @@ function evalAst(ast, ctx) {
 // bound parameter already shadows a same-named constant within its body.
 // Builtins never contribute an edge (they're not part of the user
 // namespace at all, backslash-prefixed specifically so they can never be
-// confused with one).
+// confused with one). Grammar-agnostic by construction — a node type it
+// doesn't recognize (e.g. 'num'/'lit', which never reference anything)
+// just falls through with no ref added, so this needed no changes for the
+// numeric/bool unification beyond adding cases for the new node types that
+// *can* reference something.
 function collectAstRefs(ast, localNames) {
   const refs = new Set();
   function walk(node) {
@@ -587,36 +866,194 @@ function collectAstRefs(ast, localNames) {
         if (!localNames.has(node.name)) refs.add(node.name);
         node.args.forEach(walk);
         return;
-      case 'neg':    walk(node.arg); return;
-      case 'binop':  walk(node.left); walk(node.right); return;
+      case 'neg':     walk(node.arg); return;
+      case 'binop':   walk(node.left); walk(node.right); return;
       case 'builtin': walk(node.arg); return;
+      case 'not':     walk(node.arg); return;
+      case 'boolop':  walk(node.left); walk(node.right); return;
+      case 'cmp':     walk(node.left); walk(node.right); return;
+      case 'in':      walk(node.numArg); return; // setAst never references a name — set members are plain integer literals
+      case 'guard':
+        node.terms.forEach(t => { if (t.cond) walk(t.cond); walk(t.payload); });
+        return;
     }
   }
   walk(ast);
   return refs;
 }
 
-// Evaluates a math expression string in an environment of named constants
-// and (optionally) user-defined functions. Thin wrapper over parse+eval —
-// functionEnv defaults to empty, so every pre-existing 2-argument call site
-// keeps working unchanged (a function call there just resolves to NaN via
-// the normal "unknown identifier" path, same as any other unmet reference,
-// rather than erroring differently).
-// Returns NaN on parse error or domain error (div-by-zero, sqrt of negative,
-// unknown identifier/function, wrong argument count).
-function evalExpr(src, numericEnv, functionEnv = {}) {
+// Finds every 'guard' node anywhere in an AST (top-level or nested inside
+// ordinary arithmetic/boolean structure, or inside another guard's own
+// terms) — used to validate each one's exhaustiveness independently. Each
+// guard is checked purely against its *own* local conditions, never an
+// enclosing guard's — this is what lets nesting "just work": a nested
+// guard only has to cover the subspace it was reached in, and checking it
+// in isolation, ignoring how it got there, is exactly correct for that
+// (see NOTES13's nesting discussion).
+function findAllGuardNodes(ast) {
+  const found = [];
+  function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'guard') {
+      found.push(node);
+      node.terms.forEach(t => { if (t.cond) walk(t.cond); walk(t.payload); });
+      return;
+    }
+    switch (node.type) {
+      case 'neg': case 'not':   walk(node.arg); return;
+      case 'binop': case 'boolop': case 'cmp': walk(node.left); walk(node.right); return;
+      case 'builtin': walk(node.arg); return;
+      case 'call': node.args.forEach(walk); return;
+      case 'in': walk(node.numArg); return; // setAst never contains a guard — set members are plain integer literals
+      default: return; // num, lit, id, colorlit — leaves, nothing to recurse into
+    }
+  }
+  walk(ast);
+  return found;
+}
+
+// A bare, non-negative integer cap on how many free bool variables a
+// single guard's exhaustiveness proof will attempt to enumerate
+// (2^EXHAUSTIVENESS_CHECK_CAP combinations, worst case) — past this, the
+// check is refused rather than attempted, same "reject at the boundary
+// rather than let an unbounded computation run" instinct as this
+// project's other safety caps (the `counter=` safe-integer bound, the BSP
+// pivot-search sample cap). A guard this wide should have an explicit
+// `otherwise` clause anyway.
+const EXHAUSTIVENESS_CHECK_CAP = 20;
+
+// Verifies one guard node always produces a value, for every reachable
+// combination of the bool variables its own conditions reference — lazy
+// semantics (first match wins) still require *some* match; exclusivity is
+// deliberately not checked (see NOTES13 — otherwise stops making sense
+// under a strict/exclusivity-checked model). Returns an error string, or
+// null if the guard is provably total.
+//
+// Deliberately scoped, not fully general — a guard is only checked if
+// every name its conditions reference is a genuine bool-kind constant (no
+// walk into a *derived* bool's own definition — see below); anything else
+// (a number referenced via a comparison with no declared domain — that
+// needs Phase 5's domain-restricted declarations to even have a finite
+// space to enumerate — or a local function parameter, not yet supported)
+// requires an explicit `otherwise` instead of an automatic proof.
+//
+// Treating every directly-referenced bool name as independently free,
+// rather than walking into a *derived* bool's own definition to find its
+// true independent roots, is a deliberate simplification, not an
+// oversight: it can only ever test a *superset* of the states actually
+// reachable (an impossible combination, where two referenced bools are
+// secretly correlated through a shared derivation, just adds an extra
+// constraint to satisfy) — which can make this check reject a guard that
+// a fuller analysis would have accepted, but can never make it accept one
+// that a fuller analysis would have rejected. Sound, not maximally
+// precise; revisit only if a real case actually needs the precision.
+function checkGuardExhaustive(guardNode, envs) {
+  const { numericEnv, boolEnv, functionEnv } = envs;
+  if (guardNode.terms.some(t => t.isOtherwise)) return null;
+
+  const refs = new Set();
+  for (const t of guardNode.terms) {
+    if (t.cond) collectAstRefs(t.cond, new Set()).forEach(r => refs.add(r));
+  }
+
+  const evalCtx = (bEnv) => ({ numericEnv, boolEnv: bEnv, functionEnv });
+
+  if (refs.size === 0) {
+    for (const t of guardNode.terms) {
+      if (evalAst(t.cond, evalCtx(boolEnv)) === true) return null;
+    }
+    return 'guard is not exhaustive (no branch matches, and no `otherwise` clause)';
+  }
+
+  const freeVars = [];
+  for (const name of refs) {
+    if (name in boolEnv) { freeVars.push(name); continue; }
+    if (name in numericEnv) {
+      return `guard cannot be proven exhaustive — condition references a number ('${name}') with no declared domain to enumerate; add an \`otherwise\` clause`;
+    }
+    return `guard cannot be proven exhaustive — '${name}' isn't a known bool constant (a function parameter's own conditions can't yet be proven exhaustive automatically); add an \`otherwise\` clause`;
+  }
+
+  if (freeVars.length > EXHAUSTIVENESS_CHECK_CAP) {
+    return `guard references too many variables (${freeVars.length}) to verify exhaustiveness automatically — add an \`otherwise\` clause`;
+  }
+
+  const total = 1 << freeVars.length;
+  for (let mask = 0; mask < total; mask++) {
+    const hypBoolEnv = { ...boolEnv };
+    freeVars.forEach((name, i) => { hypBoolEnv[name] = !!(mask & (1 << i)); });
+    const matched = guardNode.terms.some(t => evalAst(t.cond, evalCtx(hypBoolEnv)) === true);
+    if (!matched) {
+      const assignment = freeVars.map((name, i) => `${name}=${!!(mask & (1 << i))}`).join(', ');
+      return `guard is not exhaustive — no branch matches when ${assignment}`;
+    }
+  }
+  return null;
+}
+
+// Validates every guard anywhere in an AST, returning the first problem
+// found (or null). Called at parse time, not at every ordinary
+// evaluation — this is deliberately a one-time, up-front check (see
+// EXHAUSTIVENESS_CHECK_CAP's own reasoning for why it needs to stay
+// bounded), not something re-run on every render.
+function findGuardTotalityError(ast, envs) {
+  for (const g of findAllGuardNodes(ast)) {
+    const err = checkGuardExhaustive(g, envs);
+    if (err) return err;
+  }
+  return null;
+}
+
+// Evaluates an expression string in an environment of named constants,
+// bools, and (optionally) user-defined functions. Thin wrapper over
+// parse+eval — functionEnv/boolEnv both default to empty, so every
+// pre-existing call site keeps working unchanged (a bool/function
+// reference there just resolves to NaN via the normal "unknown
+// identifier" path, same as any other unmet reference).
+// Returns NaN (number contexts) on a parse error, a domain error
+// (div-by-zero, sqrt of negative, unknown identifier/function, wrong
+// argument count), or a kind mismatch (e.g. a bool value where the caller
+// wanted a number) — or a genuine `false` result is possible too now for
+// a bool-context caller, so a bool-expecting caller must check
+// `typeof result === 'boolean'`, never treat any non-NaN result as success
+// the way a number-only caller safely could before.
+function evalExpr(src, numericEnv, functionEnv = {}, boolEnv = {}) {
   const parsed = parseExprAst(src);
   if (!parsed.ok) return NaN;
-  return evalAst(parsed.ast, { numericEnv, functionEnv });
+  return evalAst(parsed.ast, { numericEnv, functionEnv, boolEnv });
+}
+
+// Parses, validates any guard's exhaustiveness, and evaluates — one call,
+// with a *specific* error message on failure (a syntax error, a
+// non-exhaustive guard, or — same convention as evalExpr elsewhere — a
+// generic "invalid expression" for anything else, since NaN's own
+// "kind mismatch or unmet reference" ambiguity doesn't carry a more
+// specific reason). This is what resolveNumAttr/resolveBoolAttr actually
+// call now (not plain evalExpr), which is what gives guard totality
+// checking its broad, "usable anywhere a value-expression already can be"
+// coverage — every attribute both of those already resolve inherits it
+// for free. `envs` is `{numericEnv, functionEnv, boolEnv}`.
+function evalGuardedExpr(exprText, envs) {
+  const parsed = parseExprAst(exprText);
+  if (!parsed.ok) return { ok: false, errorMsg: 'invalid expression' };
+  const totalityErr = findGuardTotalityError(parsed.ast, envs);
+  if (totalityErr) return { ok: false, errorMsg: totalityErr };
+  return { ok: true, value: evalAst(parsed.ast, envs) };
 }
 
 // Topologically sorts a set of named items that can reference each other —
-// number-kind constants and functions, the only two kinds able to
-// participate in cross-references at all (color/bool constants can only
-// ever reference an earlier same-kind constant, an independent, far
-// simpler track this graph doesn't need to touch — see the "Named object
-// resolution" section of parseCodeText). `items` is a Map<name, {ast,
-// localNames}>. Uses depth-first search with a 3-state visit marker
+// number-kind and bool-kind constants, plus functions, share this one
+// graph, so any of the three can reference either of the others in any
+// order (a bool comparing two numbers, a number gated by a bool via a
+// future guard, a function of either kind). Color is the one kind NOT
+// part of this graph — no expression grammar at all, so no reason to pay
+// for forward-reference support; it stays on its own simpler, earlier-
+// only-reference track (see the "Named object resolution" section of
+// parseCodeText). `items` is a Map<name, {ast, localNames}>, grammar- and
+// kind-agnostic — this function only ever looks at `ast`/`localNames`,
+// never at whatever `kind`/`keyword` tag a caller stashes on the same
+// entry for its own post-processing. Uses depth-first search with a
+// 3-state visit marker
 // (unvisited/visiting/done) to detect a cycle *and* name one concrete
 // path through it, not just report "a cycle exists somewhere" — e.g.
 // `number a: b`, `function b: -> a` (a 0-arg function, legal per the
@@ -664,23 +1101,49 @@ function topoSortDependencies(items) {
 // (re-resolving everything whenever `constants` changes) — one source of
 // truth for "what does this expression mean," mirroring evalExpr's role as
 // the sole numeric resolver.
-function resolveColorAttr(exprText, colorEnv) {
+// The two fast paths (bare hex literal, bare identifier lookup) stay
+// exactly as they always were — cheap, and cover the overwhelming common
+// case with no parsing at all. Anything else now falls through to the
+// real grammar (numericEnv/functionEnv/boolEnv default to {} so every
+// pre-existing 2-arg call site keeps working unchanged, same convention
+// resolveBoolAttr already has) — this is what makes a guarded color
+// payload (`b{#ff0000},otherwise{#00ff00}`) work, via the new `colorlit`
+// atom and colorEnv now threaded through evalAst. Color constants
+// deliberately stay outside the number/bool/function dependency graph
+// (see buildEnvs/resolveConstantsAndFunctions) — a guarded color
+// expression referencing another color constant still needs that
+// constant to be *earlier*, exactly like a plain (non-guarded) color
+// reference already required; guards don't relax that.
+function resolveColorAttr(exprText, colorEnv, numericEnv = {}, functionEnv = {}, boolEnv = {}) {
   if (CODE_COLOR_RE.test(exprText)) return { ok: true, value: exprText };
   if (CODE_IDENT_RE.test(exprText) && exprText in colorEnv) return { ok: true, value: colorEnv[exprText] };
-  return { ok: false };
+  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv, colorEnv });
+  if (!res.ok) return { ok: false, errorMsg: res.errorMsg };
+  return (typeof res.value === 'string' && CODE_COLOR_RE.test(res.value)) ? { ok: true, value: res.value } : { ok: false };
 }
-function resolveNumAttr(exprText, numericEnv, functionEnv = {}) {
-  const v = evalExpr(exprText, numericEnv, functionEnv);
-  // isFinite, not just isNaN — evalExpr can overflow to Infinity (a literal
-  // like 1e400, or arithmetic like 1e200*1e200) without ever producing NaN,
-  // and every caller here downstream only meant "a real, usable number."
-  return Number.isFinite(v) ? { ok: true, value: v } : { ok: false };
+// isFinite, not just isNaN — evaluation can overflow to Infinity (a
+// literal like 1e400, or arithmetic like 1e200*1e200) without ever
+// producing NaN, and every caller here downstream only meant "a real,
+// usable number." Routes through evalGuardedExpr (not plain evalExpr) so
+// a guarded expression's exhaustiveness gets validated here too, with a
+// specific error message threaded through when that's the actual failure
+// — every other rejection reason still falls back to the caller's own
+// generic message, unchanged.
+function resolveNumAttr(exprText, numericEnv, functionEnv = {}, boolEnv = {}) {
+  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv });
+  if (!res.ok) return { ok: false, errorMsg: res.errorMsg };
+  return Number.isFinite(res.value) ? { ok: true, value: res.value } : { ok: false };
 }
-function resolveBoolAttr(exprText, boolEnv) {
-  if (exprText === 'true')  return { ok: true, value: true };
-  if (exprText === 'false') return { ok: true, value: false };
-  if (CODE_IDENT_RE.test(exprText) && exprText in boolEnv) return { ok: true, value: boolEnv[exprText] };
-  return { ok: false };
+// Routes through the real, unified grammar (!/&/|, comparisons, bool
+// constants/functions, guards) instead of the old literal-or-identifier-
+// only check — numericEnv/functionEnv default to {} so every pre-existing
+// 2-arg call site keeps working unchanged (it just can't resolve a
+// numeric comparison inside a bool expression from that spot, same
+// "unmet reference" fallback evalExpr already has everywhere else).
+function resolveBoolAttr(exprText, boolEnv, numericEnv = {}, functionEnv = {}) {
+  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv });
+  if (!res.ok) return { ok: false, errorMsg: res.errorMsg };
+  return typeof res.value === 'boolean' ? { ok: true, value: res.value } : { ok: false };
 }
 
 // One dispatch point for "does this expression fit this *locked* const
@@ -690,9 +1153,9 @@ function resolveBoolAttr(exprText, boolEnv) {
 // answer is identical everywhere a constant's kind can no longer change
 // but its value can.
 function resolveConstByKind(kind, exprText, envs) {
-  return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv) :
-         kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv) :
-                               resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv);
+  return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
+         kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv) :
+                               resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv);
 }
 
 // Resolves one object's full attribute set (per ATTR_DEFS[type]) against
@@ -710,14 +1173,20 @@ function resolveGoverningAttrs(type, explicitAttrs, governingText, envs) {
   for (const def of ATTR_DEFS[type]) {
     const exprText = explicitAttrs[def.token] ?? governingText[def.token] ?? BUILTIN_SET_DEFAULTS[type][def.token];
     const res =
-      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv) :
-      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv) :
-                               resolveBoolAttr(exprText, envs.boolEnv);
+      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
+                               resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv);
     if (!res.ok) {
-      const errorMsg =
+      // res.errorMsg is only ever set for a guard-specific failure
+      // (non-exhaustive, or a syntax error) — resolveNumAttr/
+      // resolveBoolAttr's own doing; everything else (kind mismatch,
+      // unmet reference, unknown color) still falls back to this
+      // function's own generic per-field message, unchanged.
+      const errorMsg = res.errorMsg ?? (
         def.kind === 'color'  ? `unknown color '${exprText}'` :
         def.kind === 'number' ? `invalid ${def.label} expression '${exprText}'` :
-                                 `invalid ${def.token} value '${exprText}'`;
+                                 `invalid ${def.token} value '${exprText}'`
+      );
       return { ok: false, errorMsg };
     }
     fields[def.expr] = exprText;
@@ -739,14 +1208,20 @@ function resolveEditFields(type, explicitAttrs, envs) {
     if (!(def.token in explicitAttrs)) continue;
     const exprText = explicitAttrs[def.token];
     const res =
-      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv) :
-      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv) :
-                               resolveBoolAttr(exprText, envs.boolEnv);
+      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
+                               resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv);
     if (!res.ok) {
-      const errorMsg =
+      // res.errorMsg is only ever set for a guard-specific failure
+      // (non-exhaustive, or a syntax error) — resolveNumAttr/
+      // resolveBoolAttr's own doing; everything else (kind mismatch,
+      // unmet reference, unknown color) still falls back to this
+      // function's own generic per-field message, unchanged.
+      const errorMsg = res.errorMsg ?? (
         def.kind === 'color'  ? `unknown color '${exprText}'` :
         def.kind === 'number' ? `invalid ${def.label} expression '${exprText}'` :
-                                 `invalid ${def.token} value '${exprText}'`;
+                                 `invalid ${def.token} value '${exprText}'`
+      );
       return { ok: false, errorMsg };
     }
     fields[def.expr] = exprText;
@@ -780,9 +1255,22 @@ function buildEnvs() {
 
   const items = new Map(); // name -> { ast, localNames, kind, ref, params? }
   for (const c of constants) {
-    if (c.kind !== 'number') continue;
-    const parsed = parseExprAst(c.expr.trim());
-    if (parsed.ok) items.set(c.name, { ast: parsed.ast, localNames: new Set(), kind: 'number', ref: c });
+    if (c.kind === 'number') {
+      const parsed = parseExprAst(c.expr.trim());
+      if (parsed.ok) items.set(c.name, { ast: parsed.ast, localNames: new Set(), kind: 'number', ref: c });
+    } else if (c.kind === 'boolean') {
+      // Bool shares number/function's any-order dependency graph instead
+      // of a separate earlier-in-file-only walk. Now routes through the
+      // real, unified parseExprAst/evalAst (!/&/|, comparisons, bool
+      // functions), not a bool-only stopgap — a bool constant's own
+      // expression can therefore reference number constants too (via a
+      // comparison), which is exactly why this needed to be the same
+      // graph as number/function in the first place, not a separate one.
+      // Color stays outside this graph: no expression grammar, no reason
+      // to need forward-reference.
+      const parsed = parseExprAst(c.expr.trim());
+      if (parsed.ok) items.set(c.name, { ast: parsed.ast, localNames: new Set(), kind: 'boolean', ref: c });
+    }
   }
   for (const fn of functions) {
     const parsed = parseExprAst(fn.bodyExpr);
@@ -798,9 +1286,20 @@ function buildEnvs() {
       for (const name of topo.order) {
         const item = workingItems.get(name);
         if (item.kind === 'number') {
-          const value = evalAst(item.ast, { numericEnv, functionEnv });
-          item.ref.value = Number.isFinite(value) ? value : undefined;
-          if (Number.isFinite(value)) numericEnv[name] = value;
+          const value = evalAst(item.ast, { numericEnv, boolEnv, functionEnv });
+          // This is the site most likely to get missed, and the one the
+          // whole enforcement effort is really for: a domain violation can
+          // appear purely from an *upstream* dependency changing, with no
+          // edit ever touching this constant's own line — buildEnvs()
+          // re-derives every value on every render pass, so this is where
+          // that has to be caught, not just at the moment of a direct edit.
+          const domainOk = !item.ref.domain || item.ref.domain.has(value);
+          item.ref.value = (Number.isFinite(value) && domainOk) ? value : undefined;
+          if (Number.isFinite(value) && domainOk) numericEnv[name] = value;
+        } else if (item.kind === 'boolean') {
+          const value = evalAst(item.ast, { numericEnv, boolEnv, functionEnv });
+          item.ref.value = (typeof value === 'boolean') ? value : undefined;
+          if (typeof value === 'boolean') boolEnv[name] = value;
         } else {
           functionEnv[name] = { params: item.params, bodyAst: item.ast };
         }
@@ -810,22 +1309,18 @@ function buildEnvs() {
     workingItems = new Map(workingItems);
     for (const name of new Set(topo.cycle)) {
       const item = workingItems.get(name);
-      if (item.kind === 'number') item.ref.value = undefined;
+      if (item.kind === 'number' || item.kind === 'boolean') item.ref.value = undefined;
       workingItems.delete(name);
     }
   }
 
   for (const c of constants) {
-    if (c.kind === 'number') {
+    if (c.kind === 'number' || c.kind === 'boolean') {
       if (!items.has(c.name)) c.value = undefined; // failed to even parse
-    } else if (c.kind === 'color') {
-      const res = resolveColorAttr(c.expr.trim(), colorEnv);
+    } else {
+      const res = resolveColorAttr(c.expr.trim(), colorEnv, numericEnv, functionEnv, boolEnv);
       c.value = res.ok ? res.value : undefined;
       if (res.ok) colorEnv[c.name] = c.value;
-    } else {
-      const res = resolveBoolAttr(c.expr.trim(), boolEnv);
-      c.value = res.ok ? res.value : undefined;
-      if (res.ok) boolEnv[c.name] = c.value;
     }
   }
 
@@ -1231,25 +1726,25 @@ function reEvalObjects() {
   for (const v of vertices) {
     for (let i = 0; i < 3; i++) {
       const expr = v.exprs?.[i];
-      if (expr) v.coords[i] = evalExpr(expr, numericEnv, functionEnv);
+      if (expr) v.coords[i] = evalExpr(expr, numericEnv, functionEnv, boolEnv);
     }
-    if (v.colorExpr)   { const r = resolveColorAttr(v.colorExpr, colorEnv);  if (r.ok) v.color     = r.value; }
-    if (v.radiusExpr)  { const r = resolveNumAttr(v.radiusExpr, numericEnv, functionEnv); if (r.ok) v.radius    = r.value; }
-    if (v.visibleExpr) { const r = resolveBoolAttr(v.visibleExpr, boolEnv);  if (r.ok) v.visible   = r.value; }
-    if (v.labelExpr)   { const r = resolveBoolAttr(v.labelExpr, boolEnv);    if (r.ok) v.showLabel = r.value; }
+    if (v.colorExpr)   { const r = resolveColorAttr(v.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv);  if (r.ok) v.color     = r.value; }
+    if (v.radiusExpr)  { const r = resolveNumAttr(v.radiusExpr, numericEnv, functionEnv, boolEnv); if (r.ok) v.radius    = r.value; }
+    if (v.visibleExpr) { const r = resolveBoolAttr(v.visibleExpr, boolEnv, numericEnv, functionEnv);  if (r.ok) v.visible   = r.value; }
+    if (v.labelExpr)   { const r = resolveBoolAttr(v.labelExpr, boolEnv, numericEnv, functionEnv);    if (r.ok) v.showLabel = r.value; }
   }
   for (const s of segments) {
-    if (s.colorExpr)   { const r = resolveColorAttr(s.colorExpr, colorEnv);  if (r.ok) s.color     = r.value; }
-    if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv, functionEnv);  if (r.ok) s.lineWidth = r.value; }
-    if (s.visibleExpr) { const r = resolveBoolAttr(s.visibleExpr, boolEnv);  if (r.ok) s.visible   = r.value; }
+    if (s.colorExpr)   { const r = resolveColorAttr(s.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv);  if (r.ok) s.color     = r.value; }
+    if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv, functionEnv, boolEnv);  if (r.ok) s.lineWidth = r.value; }
+    if (s.visibleExpr) { const r = resolveBoolAttr(s.visibleExpr, boolEnv, numericEnv, functionEnv);  if (r.ok) s.visible   = r.value; }
   }
   for (const fc of faces) {
-    if (fc.colorExpr)   { const r = resolveColorAttr(fc.colorExpr, colorEnv); if (r.ok) fc.color   = r.value; }
-    if (fc.visibleExpr) { const r = resolveBoolAttr(fc.visibleExpr, boolEnv); if (r.ok) fc.visible  = r.value; }
+    if (fc.colorExpr)   { const r = resolveColorAttr(fc.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv); if (r.ok) fc.color   = r.value; }
+    if (fc.visibleExpr) { const r = resolveBoolAttr(fc.visibleExpr, boolEnv, numericEnv, functionEnv); if (r.ok) fc.visible  = r.value; }
   }
   for (const cv of curves) {
-    if (cv.colorExpr)   { const r = resolveColorAttr(cv.colorExpr, colorEnv); if (r.ok) cv.color   = r.value; }
-    if (cv.visibleExpr) { const r = resolveBoolAttr(cv.visibleExpr, boolEnv); if (r.ok) cv.visible  = r.value; }
+    if (cv.colorExpr)   { const r = resolveColorAttr(cv.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv); if (r.ok) cv.color   = r.value; }
+    if (cv.visibleExpr) { const r = resolveBoolAttr(cv.visibleExpr, boolEnv, numericEnv, functionEnv); if (r.ok) cv.visible  = r.value; }
     // Domain bounds are expressions too (may reference constants) — re-
     // resolve every interval before re-tessellating, same relationship
     // vertex's exprs->coords has to reEvalObjects. Only commits (and
@@ -1258,8 +1753,8 @@ function reEvalObjects() {
     // silently dropping to a partial union.
     let intervalsOk = true;
     const resolvedIntervals = cv.domainIntervals.map(iv => {
-      const lo = evalExpr(iv.loExpr, numericEnv, functionEnv);
-      const hi = evalExpr(iv.hiExpr, numericEnv, functionEnv);
+      const lo = evalExpr(iv.loExpr, numericEnv, functionEnv, boolEnv);
+      const hi = evalExpr(iv.hiExpr, numericEnv, functionEnv, boolEnv);
       if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo >= hi) intervalsOk = false;
       return { ...iv, lo, hi };
     });
@@ -1566,6 +2061,136 @@ const SECTION_ORDER = OBJECT_TYPES.map(d => d.key);
 const CODE_HEADER_EQ_RE   = /^#=+\s*(.*?)\s*=+$/;
 const CODE_HEADER_DASH_RE = /^#-+\s*(.*?)\s*-+$/;
 const CODE_OBJECT_RE = /^(number|color|bool|domain|vertex|segment|face|function|slider|curve)\b\s*([^:]*):(.*)$/;
+
+// Peels an optional trailing ` in {SetExpr}` domain-restriction clause off
+// a `number` line's raw pre-colon text — `CODE_OBJECT_RE`'s own name
+// group captures everything up to the colon as one blob, so this has to
+// happen before the plain-identifier check, mirroring how curve's own
+// `PARAM in [lo,hi]` domain clause is a distinct trailing piece rather
+// than folded into the identifier. `in` only ever appears here as this
+// keyword — a real name can never itself contain a space, so a single
+// whole-word scan is unambiguous regardless of what a name preceding or
+// following it happens to look like (verified directly: a name ending in
+// "in", like "bin", or containing it, like "wintotal", never mis-splits,
+// since \w*'s own greediness already stops at the real word boundary and
+// only backtracks when the match actually requires it).
+function splitNameAndDomainClause(nameRaw) {
+  const trimmed = nameRaw.trim();
+  const m = /^(\w*)\s*\bin\b\s+(\S[\s\S]*)$/.exec(trimmed);
+  if (m && (m[1] === '' || CODE_IDENT_RE.test(m[1]))) {
+    return { name: m[1], domainText: m[2].trim() };
+  }
+  return { name: trimmed, domainText: null };
+}
+
+// Set-literal grammar — deliberately scoped to domain-restricted numeric
+// declarations (`number NAME in {SetExpr}: value`) and the inline
+// membership condition it enables (`a in {SetExpr}`, wired into
+// parseExprAst's own parseComparison); not a general-purpose value usable
+// anywhere a number can go, same scoping a curve's own `[lo,hi]` domain
+// clause already has.
+//   SetExpr := SetTerm ('U' SetTerm)*          -- bare capital U, exactly
+//                                                  matching curve domain
+//                                                  unions' own convention
+//   SetTerm := '{' Int (',' Int)* '}'  |  '\range' '(' Int ',' Int ')'
+// `\range(a,b)` is Python's own half-open convention: {a, a+1, ..., b-1},
+// exclusive upper bound. Deliberately backslash-prefixed, and not merely
+// for stylistic consistency with `\sin`/`\sqrt` — unprefixed, `range(a,b)`
+// would be lexically identical to a user calling their own function named
+// `range` (bare `name(args)` is already the call grammar).
+//
+// Deliberate simplification, not a design commitment: set members and
+// \range's endpoints are plain integer literals only, not full
+// expressions/constant references — this keeps this parser fully
+// self-contained (no environment, no re-entrant dependency on
+// parseExprAst's own numeric layer). Extend later if a real case needs a
+// constant reference inside a set literal.
+//
+// parseSetExprAstAt(s, startPos) is the re-entrant core, taking an
+// explicit position rather than owning its own string — this is what
+// lets parseComparison (a *different* closure, parsing a *different*
+// grammar) call into this mid-expression and resume from wherever it left
+// off, without the two parsers needing to share any internal state beyond
+// the string and a position. parseSetExprAst(src) is the standalone
+// top-level entry (domain declarations), requiring the whole string
+// consumed.
+function parseSetExprAstAt(s, startPos) {
+  let pos = startPos;
+  let failed = false;
+  const skipWS = () => { while (pos < s.length && /\s/.test(s[pos])) pos++; };
+  const peek = () => s[pos];
+  const startsWith = (tok) => s.slice(pos, pos + tok.length) === tok;
+
+  function parseIntLit() {
+    skipWS();
+    const m = /^-?\d+/.exec(s.slice(pos));
+    if (!m) { failed = true; return NaN; }
+    pos += m[0].length;
+    return parseInt(m[0], 10);
+  }
+
+  function parseTerm() {
+    skipWS();
+    if (peek() === '{') {
+      pos++; skipWS();
+      const values = [];
+      if (peek() !== '}') {
+        values.push(parseIntLit()); skipWS();
+        while (peek() === ',') { pos++; skipWS(); values.push(parseIntLit()); skipWS(); }
+      }
+      if (peek() === '}') pos++; else failed = true;
+      return { type: 'setlist', values };
+    }
+    if (startsWith('\\range')) {
+      pos += '\\range'.length; skipWS();
+      if (peek() !== '(') { failed = true; return { type: 'setlist', values: [] }; }
+      pos++; skipWS();
+      const lo = parseIntLit(); skipWS();
+      if (peek() !== ',') { failed = true; return { type: 'setrange', lo, hi: lo }; }
+      pos++; skipWS();
+      const hi = parseIntLit(); skipWS();
+      if (peek() === ')') pos++; else failed = true;
+      return { type: 'setrange', lo, hi };
+    }
+    failed = true;
+    return { type: 'setlist', values: [] };
+  }
+
+  skipWS();
+  const terms = [parseTerm()];
+  skipWS();
+  while (!failed && /^U(?![a-zA-Z0-9_])/.test(s.slice(pos))) {
+    pos += 1; skipWS();
+    terms.push(parseTerm());
+    skipWS();
+  }
+  return failed
+    ? { ok: false, endPos: pos }
+    : { ok: true, ast: { type: 'setunion', terms }, endPos: pos };
+}
+function parseSetExprAst(src) {
+  const s = (src ?? '').trim();
+  const r = parseSetExprAstAt(s, 0);
+  if (!r.ok || r.endPos !== s.length) return { ok: false };
+  return { ok: true, ast: r.ast };
+}
+
+// Flattens a parsed set AST into a concrete Set<number> — no environment
+// needed, since set members are plain integer literals (see
+// parseSetExprAstAt above). `\range(lo,hi)` is exclusive on `hi` (Python's
+// own convention); `lo >= hi` is simply an empty range, same as Python's
+// `range()`, not an error.
+function evalSetAst(ast) {
+  const out = new Set();
+  for (const term of ast.terms) {
+    if (term.type === 'setlist') {
+      for (const v of term.values) out.add(v);
+    } else {
+      for (let v = term.lo; v < term.hi; v++) out.add(v);
+    }
+  }
+  return out;
+}
 // Canonical form is colon-uniform (`set vertex: color=X`), matching every
 // other line kind — but the colon is optional on read: `set vertex
 // color=X` (the original, pre-decision shape) still parses, silently
@@ -1956,6 +2581,105 @@ function buildSetBlock(type, finalValues) {
   });
 }
 
+// Text-level (not AST-level) guard-structure splitter for object-creation
+// lines (vertex today; segment/face/curve deferred) — where a branch's
+// payload isn't a simple scalar value expression but this object type's
+// own whole creation sub-grammar (positional/named coordinates plus
+// trailing attributes, for vertex), which tokenizeAttrs's plain
+// whitespace-splitting can't safely coexist with directly (a guard
+// payload's own internal spaces, e.g. `{0 1 2}`, would otherwise get
+// chopped into separate positional tokens *before* any guard parsing ever
+// ran — a real gap found and confirmed during the previous phase, not
+// hypothetical). Reused by handing each branch's raw payload text back to
+// the caller's own existing per-type parsing logic, rather than teaching
+// this splitter every object type's grammar — deliberately separate from
+// parseExprAst's own (AST-based) guard parsing, which resolves a payload
+// via recursive evaluation, not raw text; object-creation payloads need
+// the opposite, so a little structural duplication of the comma/
+// otherwise/brace-matching logic here is clearer than forcing one
+// mechanism to serve two very different payload shapes.
+//
+// Returns null if `rest` isn't guard-shaped at the top level at all (the
+// ordinary, far more common case — caller falls through to its existing,
+// completely unchanged parsing path). Otherwise `{ ok:true, terms:
+// [{condText, payloadText, isOtherwise}] }` (condText/payloadText still
+// raw, unparsed strings — the caller parses payloadText with its own
+// per-type logic, and condText via parseExprAst/evalAst exactly like any
+// other boolean condition) or `{ ok:false, error }` for a line that IS
+// guard-shaped but malformed.
+function splitGuardedObjectLine(rest) {
+  const s = rest;
+  let pos = 0;
+  const skipWS = () => { while (pos < s.length && /\s/.test(s[pos])) pos++; };
+  const matchOtherwise = () => {
+    skipWS();
+    if (s.slice(pos, pos + 'otherwise'.length) !== 'otherwise') return false;
+    const after = s[pos + 'otherwise'.length];
+    if (after !== undefined && /[a-zA-Z0-9_]/.test(after)) return false;
+    pos += 'otherwise'.length;
+    return true;
+  };
+  const findNextTopLevelBrace = (from) => {
+    let depth = 0;
+    for (let i = from; i < s.length; i++) {
+      if (s[i] === '{') { if (depth === 0) return i; depth++; }
+      else if (s[i] === '}') depth--;
+    }
+    return -1;
+  };
+  const readCond = () => {
+    const braceIdx = findNextTopLevelBrace(pos);
+    if (braceIdx === -1) return { ok: false };
+    const condText = s.slice(pos, braceIdx).trim();
+    if (!parseExprAst(condText).ok) return { ok: false };
+    pos = braceIdx;
+    return { ok: true, condText };
+  };
+
+  skipWS();
+  let isOtherwise = matchOtherwise();
+  let condText = null;
+  if (!isOtherwise) {
+    const r = readCond();
+    if (!r.ok) return null; // not guard-shaped at all — normal parsing takes over
+    condText = r.condText;
+  }
+
+  const terms = [];
+  while (true) {
+    skipWS();
+    if (s[pos] !== '{') return { ok: false, error: "expected '{' after condition in guarded line" };
+    pos++;
+    const payloadStart = pos;
+    let depth = 1;
+    while (pos < s.length && depth > 0) {
+      if (s[pos] === '{') depth++;
+      else if (s[pos] === '}') depth--;
+      if (depth > 0) pos++;
+    }
+    if (depth !== 0) return { ok: false, error: 'unterminated { in guarded line' };
+    const payloadText = s.slice(payloadStart, pos);
+    pos++; // consume '}'
+    terms.push({ condText, payloadText, isOtherwise });
+    if (isOtherwise) break;
+    skipWS();
+    if (s[pos] !== ',') break;
+    pos++;
+    skipWS();
+    isOtherwise = matchOtherwise();
+    if (!isOtherwise) {
+      const r = readCond();
+      if (!r.ok) return { ok: false, error: 'expected another guarded term after ,' };
+      condText = r.condText;
+    } else {
+      condText = null;
+    }
+  }
+  skipWS();
+  if (pos !== s.length) return { ok: false, error: 'unexpected content after guarded line' };
+  return { ok: true, terms };
+}
+
 // Splits the text after a colon into positional tokens and recognized
 // attribute tokens (classified by shape, not position). `allowedAttrs` is
 // the subset of {color, r, width, visible, label, x, y, z} legal for this
@@ -2019,15 +2743,15 @@ function tokenizeAttrs(rest, allowedAttrs) {
 
 // Pre-scans the raw text once, before parseCodeText's main per-line walk,
 // to fully resolve every number/color/bool/function line — this is what
-// lets a number constant and a function reference each other in *any*
-// order (see topoSortDependencies), rather than the strict "only an
-// earlier constant" rule alone. Color/bool constants are NOT part of the
-// dependency graph here — they can only ever reference an earlier
-// same-kind constant (colors/bools never go through evalExpr's numeric
-// grammar at all), an independent, far simpler track still resolved in
-// true file order; only their NAME gets assigned here (so the one shared
-// blank-name counter across number/color/bool stays correct — see below),
-// their VALUE is still resolved inline in the main walk, unchanged.
+// lets a number or bool constant and a function reference each other in
+// *any* order (see topoSortDependencies), rather than the strict "only an
+// earlier constant" rule alone. Color constants are the one kind NOT part
+// of the dependency graph here — no expression grammar at all (a color is
+// always a literal or an earlier-same-kind lookup), so there's no forward-
+// reference to support and no reason to pay for it; only its NAME gets
+// assigned here (so the one shared blank-name counter across number/
+// color/bool stays correct — see below), its VALUE is still resolved
+// inline in the main walk, unchanged.
 //
 // Collision-checking here only covers *this* combined set (numbers,
 // colors, bools, functions all share one namespace, same as every other
@@ -2040,13 +2764,15 @@ function tokenizeAttrs(rest, allowedAttrs) {
 // whichever line the main walk reaches second, not necessarily the one
 // that would have reported it under the old single-pass design.
 //
-// Returns { byLineIdx: Map<number, result>, numericEnv, functionEnv }.
+// Returns { byLineIdx: Map<number, result>, numericEnv, boolEnv, functionEnv }.
 // A `result` is either { ok:false, errorMsg } or one of:
-//   { ok:true, keyword:'number'|'color'|'bool', name, rest }
+//   { ok:true, keyword:'color', name, rest }
+//   { ok:true, keyword:'number'|'bool', name, value }
 //   { ok:true, keyword:'function', name, params, bodyExpr, bodyAst, value }
-// (value only meaningful for number; rest is the raw, not-yet-resolved
-// expression text for color/bool, resolved inline in the main walk same
-// as always).
+// (rest is the raw, not-yet-resolved expression text — only color still
+// carries this, resolved inline in the main walk same as always; number/
+// bool/function are already fully resolved here, `value` meaningful for
+// number and bool).
 function resolveConstantsAndFunctions(rawLines) {
   const candidates = []; // { lineIdx, keyword, name, rest, error }
   const seenNames  = new Set();
@@ -2060,7 +2786,25 @@ function resolveConstantsAndFunctions(rawLines) {
     if (!m) continue;
     const [, keyword, nameRaw, restRaw] = m;
     if (keyword !== 'number' && keyword !== 'color' && keyword !== 'bool' && keyword !== 'function') continue;
-    const nameTyped = nameRaw.trim();
+    // A `number` name may carry a trailing ` in {SetExpr}` domain-
+    // restriction clause — peeled off *before* the identifier-shape check
+    // below, same reason curve's own `PARAM in [lo,hi]` domain clause is
+    // handled as a distinct trailing piece rather than folded into the
+    // name itself. Only `number` supports this — color/bool/function
+    // names are never split this way.
+    let domain = null, domainError = null;
+    let nameTyped;
+    if (keyword === 'number') {
+      const split = splitNameAndDomainClause(nameRaw);
+      nameTyped = split.name;
+      if (split.domainText !== null) {
+        const setParsed = parseSetExprAst(split.domainText);
+        if (!setParsed.ok) domainError = `invalid domain '${split.domainText}'`;
+        else domain = evalSetAst(setParsed.ast);
+      }
+    } else {
+      nameTyped = nameRaw.trim();
+    }
     const rest = restRaw.trim();
     let name = nameTyped;
     let error = null;
@@ -2075,11 +2819,45 @@ function resolveConstantsAndFunctions(rawLines) {
     }
     if (!error && name !== '') {
       if (!CODE_IDENT_RE.test(name)) error = `invalid ${keyword} name '${name}'`;
-      else if (name === 'true' || name === 'false') error = `'${name}' is reserved and cannot be used as a name`;
+      else if (name === 'true' || name === 'false' || name === 'otherwise') error = `'${name}' is reserved and cannot be used as a name`;
       else if (seenNames.has(name)) error = `name '${name}' already used`;
     }
+    if (!error && domainError) error = domainError;
     if (!error) seenNames.add(name);
-    candidates.push({ lineIdx: i, keyword, name, rest, error });
+    candidates.push({ lineIdx: i, keyword, name, rest, error, domain });
+  }
+
+  // `edit number|color|bool NAME: value` is how a name's expression gets
+  // *replaced*, not a separate temporal event — "new"/"edit" together
+  // assemble one final symbolic model, which is what everything downstream
+  // (the dependency graph, color's own earlier-only walk) should resolve
+  // from, regardless of where in the file the edit line physically sits
+  // relative to anything that references NAME. So before any of that
+  // resolution runs, find each name's *final* expression: its own creation
+  // text, unless a valid `edit` targets it, in which case the edit's text
+  // wins (the last one, by line order, if it's edited more than once).
+  // "Valid" mirrors exactly what the main walk's own `edit` branch already
+  // requires (unchanged there, not duplicated — this only needs to know
+  // which edits are legitimate enough to fold in here): a same-name,
+  // same-kind, error-free creation candidate that appears *earlier* in the
+  // file. An edit whose target doesn't qualify — unknown name, wrong kind,
+  // or (the case this exists to keep impossible) targeting something not
+  // yet defined — is simply left unmerged here; the main walk's existing
+  // check rejects that exact line on its own, same as always.
+  const mergedExpr = new Map(); // name -> the final expr text to resolve
+  for (let i = 0; i < rawLines.length; i++) {
+    const trimmed = rawLines[i].trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const em = trimmed.match(CODE_EDIT_RE);
+    if (!em) continue;
+    const [, editType, editNameRaw, editRest] = em;
+    if (editType !== 'number' && editType !== 'color' && editType !== 'bool') continue;
+    const targetName = editNameRaw.trim();
+    const newExpr = editRest.trim();
+    if (newExpr === '') continue; // blank value — invalid, main walk reports it, nothing to merge
+    const target = candidates.find(c => !c.error && c.keyword === editType && c.name === targetName && c.lineIdx < i);
+    if (!target) continue;
+    mergedExpr.set(targetName, newExpr);
   }
 
   // Parse every syntactically-named number/function body into an AST (a
@@ -2088,12 +2866,44 @@ function resolveConstantsAndFunctions(rawLines) {
   const items       = new Map(); // name -> { ast, localNames, keyword, params?, bodyExpr? }
   const parseErrors = new Map(); // name -> error message
   for (const c of candidates) {
-    if (c.error || (c.keyword !== 'number' && c.keyword !== 'function')) continue;
-    if (c.keyword === 'number') {
-      const parsed = parseExprAst(c.rest);
-      if (!parsed.ok) { parseErrors.set(c.name, 'invalid expression'); continue; }
-      items.set(c.name, { ast: parsed.ast, localNames: new Set(), keyword: 'number' });
+    if (c.error || (c.keyword !== 'number' && c.keyword !== 'function' && c.keyword !== 'bool')) continue;
+    if (c.keyword === 'number' || c.keyword === 'bool') {
+      // A creation line's own validity must never depend on whether some
+      // *edit* targeting it happens to be well-formed — an edit's own
+      // validity is entirely the edit line's own concern (checked
+      // independently, in parseCodeText's main walk). So: if this name
+      // has an edit merged in, keep the *original* (pre-edit) AST as a
+      // fallback too — if the merged version fails to parse, silently
+      // fall back to the original for graph/creation-line purposes,
+      // exactly as if the bad edit had never been merged. (A merged
+      // value that parses fine but fails validation *at evaluation time*
+      // — wrong kind, or a domain violation — gets the same fallback
+      // treatment further below, in the topo-order evaluation loop,
+      // since that failure mode can only be detected there.) This closes
+      // a real bug found via Phase 5's own domain-enforcement testing: a
+      // syntactically- or semantically-bad edit value was corrupting the
+      // *creation* line into "invalid expression"/"unknown NAME" for any
+      // later reference, not just failing its own edit line as intended.
+      const hasMerge = mergedExpr.has(c.name);
+      const merged = parseExprAst(mergedExpr.get(c.name) ?? c.rest);
+      let chosen = merged, usedFallback = false;
+      if (!merged.ok && hasMerge) {
+        const original = parseExprAst(c.rest);
+        if (original.ok) { chosen = original; usedFallback = true; }
+      }
+      if (!chosen.ok) {
+        parseErrors.set(c.name, c.keyword === 'number' ? 'invalid expression' : 'invalid bool value');
+        continue;
+      }
+      const originalAst = (hasMerge && !usedFallback) ? (parseExprAst(c.rest).ok ? parseExprAst(c.rest).ast : null) : null;
+      items.set(c.name, {
+        ast: chosen.ast, localNames: new Set(), keyword: c.keyword,
+        domain: c.keyword === 'number' ? c.domain : undefined,
+        originalAst, // only set when the merged parse *succeeded* but might still fail at eval time
+      });
     } else {
+      // Functions aren't editable (CODE_EDIT_RE has no `function` arm), so
+      // mergedExpr never has an entry for one — c.rest is always final.
       const arrowIdx = c.rest.indexOf('->');
       if (arrowIdx === -1) { parseErrors.set(c.name, "expected 'PARAM[, PARAM...] -> expr'"); continue; }
       const paramsPart = c.rest.slice(0, arrowIdx).trim();
@@ -2128,16 +2938,52 @@ function resolveConstantsAndFunctions(rawLines) {
   }
 
   const numericEnv  = {};
+  const boolEnv     = {};
   const functionEnv = {};
   const resultByName = new Map();
   for (const name of order) {
     const item = items.get(name);
-    if (item.keyword === 'number') {
-      const value = evalAst(item.ast, { numericEnv, functionEnv });
-      if (!Number.isFinite(value)) { parseErrors.set(name, 'invalid expression'); continue; }
-      numericEnv[name] = value;
-      resultByName.set(name, { ok: true, keyword: 'number', name, value });
+    if (item.keyword === 'number' || item.keyword === 'bool') {
+      // Validates one candidate AST (guard exhaustiveness, then
+      // evaluation, then — for number — the declared domain, locked
+      // forever once a number is created since no code path ever mutates
+      // item.domain/the committed constant's own .domain after this).
+      // Tried first against the *merged* (edit-folded) AST; if that
+      // fails for *any* reason and this name has an edit merged in,
+      // retried against item.originalAst (the pre-edit definition) —
+      // an edit's own validity is entirely that edit line's own concern,
+      // checked independently in parseCodeText's main walk, and must
+      // never be able to drag the creation line down with it (a real bug
+      // found via Phase 5's domain-enforcement testing, not hypothetical
+      // — even a syntactically-garbage edit value used to corrupt the
+      // creation line into "invalid expression" for any later reference).
+      const tryEval = (ast) => {
+        const totalityErr = findGuardTotalityError(ast, { numericEnv, boolEnv, functionEnv });
+        if (totalityErr) return { ok: false, err: totalityErr };
+        const value = evalAst(ast, { numericEnv, boolEnv, functionEnv });
+        if (item.keyword === 'number') {
+          if (!Number.isFinite(value)) return { ok: false, err: 'invalid expression' };
+          if (item.domain && !item.domain.has(value)) {
+            return { ok: false, err: `${value} is outside ${name}'s declared domain` };
+          }
+        } else if (typeof value !== 'boolean') {
+          return { ok: false, err: 'invalid bool value' };
+        }
+        return { ok: true, value };
+      };
+      let res = tryEval(item.ast);
+      if (!res.ok && item.originalAst) res = tryEval(item.originalAst);
+      if (!res.ok) { parseErrors.set(name, res.err); continue; }
+      if (item.keyword === 'number') {
+        numericEnv[name] = res.value;
+        resultByName.set(name, { ok: true, keyword: 'number', name, value: res.value, domain: item.domain });
+      } else {
+        boolEnv[name] = res.value;
+        resultByName.set(name, { ok: true, keyword: 'bool', name, value: res.value });
+      }
     } else {
+      const totalityErr = findGuardTotalityError(item.ast, { numericEnv, boolEnv, functionEnv });
+      if (totalityErr) { parseErrors.set(name, totalityErr); continue; }
       functionEnv[name] = { params: item.params, bodyAst: item.ast };
       resultByName.set(name, { ok: true, keyword: 'function', name, params: item.params, bodyExpr: item.bodyExpr, bodyAst: item.ast });
     }
@@ -2146,15 +2992,20 @@ function resolveConstantsAndFunctions(rawLines) {
   const byLineIdx = new Map();
   for (const c of candidates) {
     if (c.error) { byLineIdx.set(c.lineIdx, { ok: false, errorMsg: c.error }); continue; }
-    if (c.keyword === 'color' || c.keyword === 'bool') {
-      byLineIdx.set(c.lineIdx, { ok: true, keyword: c.keyword, name: c.name, rest: c.rest });
+    if (c.keyword === 'color') {
+      // Still resolved inline, in file order, by parseCodeText's own walk
+      // below (color keeps its earlier-only-reference rule, unchanged) —
+      // but `rest` here is the *final*, edit-merged text, exactly like
+      // number/bool above, so a same-parse edit is reflected regardless of
+      // where in the file it sits relative to this creation line.
+      byLineIdx.set(c.lineIdx, { ok: true, keyword: c.keyword, name: c.name, rest: mergedExpr.get(c.name) ?? c.rest });
       continue;
     }
     if (parseErrors.has(c.name)) { byLineIdx.set(c.lineIdx, { ok: false, errorMsg: parseErrors.get(c.name) }); continue; }
     byLineIdx.set(c.lineIdx, resultByName.get(c.name));
   }
 
-  return { byLineIdx, numericEnv, functionEnv };
+  return { byLineIdx, numericEnv, boolEnv, functionEnv };
 }
 
 function parseCodeText(text) {
@@ -2166,18 +3017,22 @@ function parseCodeText(text) {
   const stagedSegments   = [];
   const stagedFaces      = [];
   const stagedCurves     = [];
-  // Number-kind constants and functions are fully resolved *before* this
-  // walk even starts — see resolveConstantsAndFunctions — since either can
-  // now reference the other in any order, not just "an earlier one." So
-  // numericEnv/functionEnv start out already complete here, never mutated
-  // again below; colorEnv/boolEnv are the opposite — still built
-  // incrementally in this same left-to-right walk, exactly as before (a
-  // color/bool constant can only ever reference an earlier same-kind one).
+  // Number- and bool-kind constants, plus functions, are fully resolved
+  // *before* this walk even starts — see resolveConstantsAndFunctions —
+  // since any of the three can now reference each other in any order, not
+  // just "an earlier one." So numericEnv/boolEnv/functionEnv all start out
+  // already complete here (an `edit number`/`edit bool` line reached later
+  // in this walk still mutates its entry in place, same as always — this
+  // is about initial resolution order, not about the envs becoming
+  // read-only). colorEnv is the one exception, still built incrementally
+  // from scratch in this same left-to-right walk (a color constant can
+  // only ever reference an earlier color constant — no expression grammar
+  // to need forward-reference for).
   const constFns          = resolveConstantsAndFunctions(rawLines);
   const numericEnv        = constFns.numericEnv;
   const functionEnv       = constFns.functionEnv;
+  const boolEnv           = constFns.boolEnv;
   const colorEnv          = {};
-  const boolEnv           = {};
   const vertexByName    = new Map(); // name -> staged vertex, built incrementally
   const segmentByName   = new Map(); // name -> staged segment, built incrementally (edit target lookup)
   const faceByName      = new Map(); // name -> staged face, built incrementally (edit target lookup)
@@ -2331,6 +3186,14 @@ function parseCodeText(text) {
                                          `invalid expression '${newExpr}'`;
           lines.push(rec); continue;
         }
+        // A declared domain is locked forever (edit can never change it,
+        // since nothing here ever touches target.domain) but every write
+        // to the *value* — this one included — still has to respect it.
+        if (target.domain && !target.domain.has(res.value)) {
+          rec.valid = false;
+          rec.errorMsg = `${res.value} is outside '${targetName}'s declared domain`;
+          lines.push(rec); continue;
+        }
         target.expr = newExpr;
         target.value = res.value;
         if (target.kind === 'color') colorEnv[target.name] = res.value;
@@ -2416,9 +3279,12 @@ function parseCodeText(text) {
           for (const axis of ['x', 'y', 'z']) {
             if (!(axis in tok.attrs)) continue;
             const exprText = tok.attrs[axis];
-            const val = evalExpr(exprText, numericEnv, functionEnv);
-            if (!Number.isFinite(val)) { coordErr = `invalid ${axis} expression '${exprText}'`; break; }
-            coordEdits[axis] = { expr: exprText, value: val };
+            const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv });
+            if (!res.ok || !Number.isFinite(res.value)) {
+              coordErr = res.errorMsg ?? `invalid ${axis} expression '${exprText}'`;
+              break;
+            }
+            coordEdits[axis] = { expr: exprText, value: res.value };
           }
           if (coordErr) { rec.valid = false; rec.errorMsg = coordErr; lines.push(rec); continue; }
         }
@@ -2498,11 +3364,11 @@ function parseCodeText(text) {
       // anything ever collides with the frozen name — confirmed by an actual
       // hang during stress testing, not a theoretical concern.
       const resolveResult =
-        field === 'color'   ? resolveColorAttr(rawText, colorEnv) :
-        (field === 'r' || field === 'width') ? resolveNumAttr(rawText, numericEnv) :
+        field === 'color'   ? resolveColorAttr(rawText, colorEnv, numericEnv, functionEnv, boolEnv) :
+        (field === 'r' || field === 'width') ? resolveNumAttr(rawText, numericEnv, functionEnv, boolEnv) :
         field === 'naming'  ? { ok: CODE_IDENT_RE.test(rawText) } :
         field === 'counter' ? { ok: /^\d+$/.test(rawText) && Number.isSafeInteger(parseInt(rawText, 10)) } :
-        resolveBoolAttr(rawText, boolEnv);
+        resolveBoolAttr(rawText, boolEnv, numericEnv, functionEnv);
       if (!resolveResult.ok) {
         rec.valid = false;
         rec.errorMsg = `invalid ${field} value '${rawText}'`;
@@ -2553,39 +3419,38 @@ function parseCodeText(text) {
       continue;
     }
 
-    // number/color/bool/function are all fully resolved already, up front,
-    // by resolveConstantsAndFunctions — this just looks up that result and
-    // stages it. See that function's own comment for why: number and
-    // function can reference each other in any order, so resolving them
-    // one line at a time in this walk (as color/bool below still do) can't
-    // work anymore.
-    if (keyword === 'number' || keyword === 'function') {
-      rec.kind = keyword === 'number' ? 'const' : 'function';
-      rec.targetSection = keyword === 'number' ? 'constants' : 'functions';
+    // number/bool/function are all fully resolved already, up front, by
+    // resolveConstantsAndFunctions — this just looks up that result and
+    // stages it. See that function's own comment for why: any of the
+    // three can reference each other in any order, so resolving them one
+    // line at a time in this walk (as color below still does) can't work.
+    if (keyword === 'number' || keyword === 'bool' || keyword === 'function') {
+      rec.kind = keyword === 'function' ? 'function' : 'const';
+      rec.targetSection = keyword === 'function' ? 'functions' : 'constants';
       const res = constFns.byLineIdx.get(lineIdx);
       if (!res.ok) { rec.valid = false; rec.errorMsg = res.errorMsg; lines.push(rec); continue; }
       if (isNameTakenIn(res.name, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
         rec.valid = false; rec.errorMsg = `name '${res.name}' already used`; lines.push(rec); continue;
       }
-      if (keyword === 'number') {
-        const obj = { name: res.name, expr: rest, value: res.value, kind: 'number' };
-        stagedConstants.push(obj);
-        constByName.set(res.name, obj);
-        rec.parsed = obj;
-      } else {
+      if (keyword === 'function') {
         const obj = { name: res.name, params: res.params, bodyExpr: res.bodyExpr, bodyAst: res.bodyAst };
         stagedFunctions.push(obj);
         functionByName.set(res.name, obj);
+        rec.parsed = obj;
+      } else {
+        const kind = keyword === 'bool' ? 'boolean' : 'number';
+        const obj = { name: res.name, expr: rest, value: res.value, kind, domain: res.domain ?? null };
+        stagedConstants.push(obj);
+        constByName.set(res.name, obj);
         rec.parsed = obj;
       }
       lines.push(rec);
       continue;
     }
 
-    if (keyword === 'color' || keyword === 'bool') {
+    if (keyword === 'color') {
       rec.kind = 'const';
       rec.targetSection = 'constants';
-      const kind = keyword === 'bool' ? 'boolean' : keyword;
       const res = constFns.byLineIdx.get(lineIdx);
       if (!res.ok) { rec.valid = false; rec.errorMsg = res.errorMsg; lines.push(rec); continue; }
       const finalName = res.name;
@@ -2593,17 +3458,16 @@ function parseCodeText(text) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
 
-      const valRes = resolveConstByKind(kind, res.rest, { numericEnv, colorEnv, boolEnv, functionEnv });
+      const valRes = resolveConstByKind('color', res.rest, { numericEnv, colorEnv, boolEnv, functionEnv });
       if (!valRes.ok) {
         rec.valid = false;
-        rec.errorMsg = kind === 'color' ? `unknown color '${res.rest}'` : `invalid bool value '${res.rest}'`;
+        rec.errorMsg = `unknown color '${res.rest}'`;
         lines.push(rec); continue;
       }
       const value = valRes.value;
 
-      const obj = { name: finalName, expr: res.rest, value, kind };
-      if (kind === 'color') colorEnv[finalName] = value;
-      else boolEnv[finalName] = value;
+      const obj = { name: finalName, expr: res.rest, value, kind: 'color' };
+      colorEnv[finalName] = value;
       stagedConstants.push(obj);
       constByName.set(finalName, obj);
       rec.parsed = obj;
@@ -2614,7 +3478,35 @@ function parseCodeText(text) {
     if (keyword === 'vertex') {
       rec.kind = 'vertex';
       rec.targetSection = 'vertices';
-      const tok = tokenizeAttrs(rest, ['color', 'r', 'visible', 'label', 'x', 'y', 'z']);
+
+      // Whole-line guard: `vertex NAME: cond{x y z},otherwise{...}` (or a
+      // guarded named form) — the one place the *relaxed* totality rule
+      // applies (see splitGuardedObjectLine's own comment): if no branch
+      // matches and there's no otherwise, the vertex simply isn't
+      // created at all, not an error. Deliberately checked *before* any
+      // name resolution below — if nothing gets created, nothing should
+      // claim the name or advance the auto-name counter either (no
+      // reservation for an object that was never made).
+      let effectiveRest = rest;
+      const guarded = splitGuardedObjectLine(rest);
+      if (guarded) {
+        if (!guarded.ok) { rec.valid = false; rec.errorMsg = guarded.error; lines.push(rec); continue; }
+        let matched = null;
+        for (const term of guarded.terms) {
+          if (term.isOtherwise) { matched = term; break; }
+          const condAst = parseExprAst(term.condText);
+          if (condAst.ok && evalAst(condAst.ast, { numericEnv, boolEnv, functionEnv }) === true) { matched = term; break; }
+        }
+        if (!matched) {
+          rec.valid = true;
+          rec.parsed = null;
+          lines.push(rec);
+          continue;
+        }
+        effectiveRest = matched.payloadText;
+      }
+
+      const tok = tokenizeAttrs(effectiveRest, ['color', 'r', 'visible', 'label', 'x', 'y', 'z']);
       if (tok.error) { rec.valid = false; rec.errorMsg = tok.error; lines.push(rec); continue; }
 
       const namedUsed = tok.attrs.x !== undefined || tok.attrs.y !== undefined || tok.attrs.z !== undefined;
@@ -2643,10 +3535,12 @@ function parseCodeText(text) {
       } else if (isNameTakenIn(finalName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
         rec.valid = false; rec.errorMsg = `name '${finalName}' already used`; lines.push(rec); continue;
       }
-      const coords = coordExprs.map(t => evalExpr(t, numericEnv, functionEnv));
-      if (coords.some(c => !Number.isFinite(c))) {
-        rec.valid = false; rec.errorMsg = 'invalid coordinate expression'; lines.push(rec); continue;
+      const coordResults = coordExprs.map(t => evalGuardedExpr(t, { numericEnv, functionEnv, boolEnv }));
+      const badCoord = coordResults.find(r => !r.ok || !Number.isFinite(r.value));
+      if (badCoord) {
+        rec.valid = false; rec.errorMsg = badCoord.errorMsg ?? 'invalid coordinate expression'; lines.push(rec); continue;
       }
+      const coords = coordResults.map(r => r.value);
 
       const attrRes = resolveGoverningAttrs('vertex', tok.attrs, currentSet.vertex, { numericEnv, colorEnv, boolEnv, functionEnv });
       if (!attrRes.ok) { rec.valid = false; rec.errorMsg = attrRes.errorMsg; lines.push(rec); continue; }
@@ -2763,8 +3657,8 @@ function parseCodeText(text) {
       const domainIntervals = [];
       let domainErr = null;
       for (const { loExpr, hiExpr } of domainParse.intervals) {
-        const lo = evalExpr(loExpr, numericEnv, functionEnv);
-        const hi = evalExpr(hiExpr, numericEnv, functionEnv);
+        const lo = evalExpr(loExpr, numericEnv, functionEnv, boolEnv);
+        const hi = evalExpr(hiExpr, numericEnv, functionEnv, boolEnv);
         if (!Number.isFinite(lo) || !Number.isFinite(hi)) { domainErr = 'invalid domain bound expression'; break; }
         if (lo >= hi) { domainErr = 'domain lower bound must be less than upper bound'; break; }
         domainIntervals.push({ loExpr, hiExpr, lo, hi });
@@ -2861,7 +3755,17 @@ function formatCoordExpr(v, i) {
 
 function formatConstLine(c) {
   const kindTok = c.kind === 'boolean' ? 'bool' : c.kind; // 'number' | 'color' | 'bool'
-  return `${kindTok} ${c.name}: ${c.expr}`;
+  // A declared domain always re-emits as a flat, sorted {v1,v2,...} set
+  // literal — never the original \range/U sugar the user may have typed
+  // — same "canonicalize, don't preserve input sugar" convention every
+  // other shortcut form in this grammar already has (`new`, `naming=`
+  // shortcuts, etc.). This is what keeps a domain-restricted constant's
+  // restriction alive across any reconstruction of the text (Sort, Save,
+  // and — critically — every interpreter submission, which reconstructs
+  // the whole file via serializeState() before appending the new line;
+  // without this, the domain silently vanished on the very next submission).
+  const domainClause = c.domain ? ` in {${[...c.domain].sort((a, b) => a - b).join(',')}}` : '';
+  return `${kindTok} ${c.name}${domainClause}: ${c.expr}`;
 }
 
 // Every field is always written out explicitly — necessary now that a
@@ -5206,7 +6110,7 @@ function renderConstList() {
     nameInp.addEventListener('change', () => {
       const n = nameInp.value.trim();
       if (n && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(n)) {
-        if (n === 'true' || n === 'false') { nameInp.value = c.name; setNameError(nameInp); return; }
+        if (n === 'true' || n === 'false' || n === 'otherwise') { nameInp.value = c.name; setNameError(nameInp); return; }
         if (isNameTaken(n, null, c.id)) { nameInp.value = c.name; setNameError(nameInp); return; }
         snapshot();
         const oldName = c.name;
@@ -5443,7 +6347,7 @@ document.getElementById('btn-add-const').addEventListener('click', () => {
   const name = nameInp.value.trim();
   const expr = exprInp.value.trim();
   if (!name || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) return;
-  if (name === 'true' || name === 'false') { setNameError(nameInp); return; }
+  if (name === 'true' || name === 'false' || name === 'otherwise') { setNameError(nameInp); return; }
   if (isNameTaken(name)) { setNameError(nameInp); return; }
   if (!addConstKind || !expr) { setNameError(exprInp); return; }
   const res = resolveConstByKind(addConstKind, expr, buildEnvs());
@@ -5823,7 +6727,7 @@ function renderVertexList() {
       entry.appendChild(mainRow);
 
       // Rows 2–4: coordinate expression inputs
-      const env = buildEnvs().numericEnv;
+      const envs = buildEnvs();
       ['a₁', 'a₂', 'a₃'].forEach((lbl, i) => {
         const row = document.createElement('div');
         row.className = 'vertex-edit-row';
@@ -5867,7 +6771,12 @@ function renderVertexList() {
         });
         exprInp.addEventListener('input', () => {
           v.exprs[i] = exprInp.value;
-          const val  = evalExpr(exprInp.value, buildEnvs().numericEnv);
+          // Pre-existing gap fixed in passing: this call used to omit
+          // functionEnv/boolEnv entirely, so a function call or bool
+          // reference typed here silently resolved to NaN — now uses the
+          // full live envs, same as every other coordinate-resolution site.
+          const liveEnvs = buildEnvs();
+          const val  = evalExpr(exprInp.value, liveEnvs.numericEnv, liveEnvs.functionEnv, liveEnvs.boolEnv);
           // isFinite, not just isNaN — a free-form expression box (unlike
           // wireNumericAttrInput's restricted grammar) can reach Infinity
           // via a literal like 1e400 or overflowing arithmetic, with no NaN
@@ -5883,7 +6792,10 @@ function renderVertexList() {
 
         const valSpan = document.createElement('span');
         valSpan.className = 'coord-value';
-        const curVal = evalExpr(exprVal, env);
+        // Pre-existing gap fixed in passing: this call used to omit
+        // functionEnv/boolEnv entirely, same issue as the input handler
+        // above.
+        const curVal = evalExpr(exprVal, envs.numericEnv, envs.functionEnv, envs.boolEnv);
         valSpan.textContent = Number.isFinite(curVal) ? +curVal.toFixed(4) : '?';
         row.appendChild(valSpan);
 
@@ -6086,9 +6998,12 @@ function addVertexFromInputs() {
   const nameInput = document.getElementById('v-name');
   const coordIds  = ['v-a1', 'v-a2', 'v-a3'];
   const coordInps = coordIds.map(id => document.getElementById(id));
-  const env       = buildEnvs().numericEnv;
+  const envs      = buildEnvs();
   const exprs     = coordInps.map(inp => inp.value.trim() || '0');
-  const vals      = exprs.map(expr => evalExpr(expr, env));
+  // Pre-existing gap fixed in passing: this call used to omit
+  // functionEnv/boolEnv entirely, same issue as the two edit-row sites
+  // above.
+  const vals      = exprs.map(expr => evalExpr(expr, envs.numericEnv, envs.functionEnv, envs.boolEnv));
   // isFinite, not just isNaN — a literal like 1e400 or overflowing
   // arithmetic evaluates to Infinity, never NaN, and would otherwise be
   // silently accepted as a coordinate (confirmed reachable during stress
@@ -6825,6 +7740,7 @@ function buildCommittedArraysFromStaged(staged) {
     expr: c.expr,
     value: c.value,
     kind: c.kind,
+    domain: c.domain ?? null,
   }));
   const newFunctions = (staged.stagedFunctions ?? []).map((fn, i) => ({
     id: i,
