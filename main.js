@@ -6145,10 +6145,13 @@ function renderConstList() {
     // color`/`edit bool` use, so a wrong-kind edit is rejected here exactly
     // as it would be from the
     // code file/interpreter, closing the hole a plain always-accepting text
-    // box used to leave open (see the const-editing design notes).
+    // box used to leave open (see the const-editing design notes). Same
+    // treatment for a declared domain (`edit number`'s own check, main.js
+    // ~3192) — this was one of the two write-paths Phase 5 left unenforced.
     const commitExprChange = newExpr => {
       const res = resolveConstByKind(c.kind, newExpr, buildEnvs());
       if (!res.ok) { exprInp.value = c.expr; setNameError(exprInp); return; }
+      if (c.domain && !c.domain.has(res.value)) { exprInp.value = c.expr; setNameError(exprInp); return; }
       c.expr = newExpr;
       c.value = res.value;
       renderConstValSpan(valSpan, c);
@@ -6352,8 +6355,15 @@ document.getElementById('btn-add-const').addEventListener('click', () => {
   if (!addConstKind || !expr) { setNameError(exprInp); return; }
   const res = resolveConstByKind(addConstKind, expr, buildEnvs());
   if (!res.ok) { setNameError(exprInp); return; }
+  // No domain-entry field exists on this add-row, so a constant created
+  // here can never be domain-restricted at birth — `domain: null` is set
+  // explicitly only for shape consistency with the other three creation
+  // sites (code-editor commit, interpreter, buildCommittedArraysFromStaged),
+  // which all carry this field. Not a live enforcement gap: there is
+  // nothing to enforce yet since a domain can't be specified through this
+  // widget at all.
   snapshot();
-  constants.push({ id: nextConstantId++, name, expr, value: res.value, kind: addConstKind });
+  constants.push({ id: nextConstantId++, name, expr, value: res.value, kind: addConstKind, domain: null });
   nameInp.value = '';
   exprInp.value = '';
   addConstKind = null;
