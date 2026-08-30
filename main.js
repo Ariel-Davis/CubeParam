@@ -912,43 +912,53 @@ function findAllGuardNodes(ast) {
   return found;
 }
 
-// A bare, non-negative integer cap on how many free bool variables a
+// A bare, non-negative integer bounding how many total combinations a
 // single guard's exhaustiveness proof will attempt to enumerate
-// (2^EXHAUSTIVENESS_CHECK_CAP combinations, worst case) — past this, the
-// check is refused rather than attempted, same "reject at the boundary
-// rather than let an unbounded computation run" instinct as this
-// project's other safety caps (the `counter=` safe-integer bound, the BSP
-// pivot-search sample cap). A guard this wide should have an explicit
-// `otherwise` clause anyway.
+// (2^EXHAUSTIVENESS_CHECK_CAP, worst case) — past this, the check is
+// refused rather than attempted, same "reject at the boundary rather than
+// let an unbounded computation run" instinct as this project's other
+// safety caps (the `counter=` safe-integer bound, the BSP pivot-search
+// sample cap). A guard this wide should have an explicit `otherwise`
+// clause anyway. Originally just "how many free bool variables" (each
+// contributing a factor of 2); generalized (`NOTES15.md`) to bound the
+// full Cartesian product's total size instead, now that a free variable
+// can also be a domain-restricted number contributing an arbitrary
+// (not-necessarily-2) factor — the bound and its meaning ("don't attempt
+// a combinatorial explosion") are unchanged, only what's being counted.
 const EXHAUSTIVENESS_CHECK_CAP = 20;
 
 // Verifies one guard node always produces a value, for every reachable
-// combination of the bool variables its own conditions reference — lazy
+// combination of the *free variables* its own conditions reference — lazy
 // semantics (first match wins) still require *some* match; exclusivity is
 // deliberately not checked (see NOTES13 — otherwise stops making sense
 // under a strict/exclusivity-checked model). Returns an error string, or
 // null if the guard is provably total.
 //
-// Deliberately scoped, not fully general — a guard is only checked if
-// every name its conditions reference is a genuine bool-kind constant (no
-// walk into a *derived* bool's own definition — see below); anything else
-// (a number referenced via a comparison with no declared domain — that
-// needs Phase 5's domain-restricted declarations to even have a finite
-// space to enumerate — or a local function parameter, not yet supported)
-// requires an explicit `otherwise` instead of an automatic proof.
+// A free variable is enumerable if it has a known *finite* set of legal
+// values: a global bool constant or a function's own bool-role parameter
+// (`envs.boolEnv`, extended by the function-registration call site to
+// also carry its own bool-role params — see classifyFunctionParamKinds)
+// — true/false, exactly as before — or a number with a *declared domain*
+// (`envs.domainEnv`, `NOTES15.md`'s extension) — its domain's own values,
+// not just two. Anything else (a number with no declared domain, or
+// anything not resolvable in either env at all — a local function
+// parameter with no fixed bool role, an undeclared name) can't be
+// enumerated and requires an explicit `otherwise` instead of an automatic
+// proof.
 //
-// Treating every directly-referenced bool name as independently free,
-// rather than walking into a *derived* bool's own definition to find its
-// true independent roots, is a deliberate simplification, not an
-// oversight: it can only ever test a *superset* of the states actually
-// reachable (an impossible combination, where two referenced bools are
-// secretly correlated through a shared derivation, just adds an extra
-// constraint to satisfy) — which can make this check reject a guard that
-// a fuller analysis would have accepted, but can never make it accept one
-// that a fuller analysis would have rejected. Sound, not maximally
-// precise; revisit only if a real case actually needs the precision.
+// Deliberately scoped, not fully general: treating every directly-
+// referenced free name as independently free, rather than walking into a
+// *derived* bool/number's own definition to find its true independent
+// roots, is a deliberate simplification, not an oversight — it can only
+// ever test a *superset* of the states actually reachable (an impossible
+// combination, where two referenced variables are secretly correlated
+// through a shared derivation, just adds an extra constraint to satisfy),
+// which can make this check reject a guard that a fuller analysis would
+// have accepted, but can never make it accept one that a fuller analysis
+// would have rejected. Sound, not maximally precise; revisit only if a
+// real case actually needs the precision.
 function checkGuardExhaustive(guardNode, envs) {
-  const { numericEnv, boolEnv, functionEnv } = envs;
+  const { numericEnv, boolEnv, functionEnv, domainEnv = {} } = envs;
   if (guardNode.terms.some(t => t.isOtherwise)) return null;
 
   const refs = new Set();
@@ -956,37 +966,57 @@ function checkGuardExhaustive(guardNode, envs) {
     if (t.cond) collectAstRefs(t.cond, new Set()).forEach(r => refs.add(r));
   }
 
-  const evalCtx = (bEnv) => ({ numericEnv, boolEnv: bEnv, functionEnv });
+  const evalCtx = (nEnv, bEnv) => ({ numericEnv: nEnv, boolEnv: bEnv, functionEnv });
 
   if (refs.size === 0) {
     for (const t of guardNode.terms) {
-      if (evalAst(t.cond, evalCtx(boolEnv)) === true) return null;
+      if (evalAst(t.cond, evalCtx(numericEnv, boolEnv)) === true) return null;
     }
     return 'guard is not exhaustive (no branch matches, and no `otherwise` clause)';
   }
 
-  const freeVars = [];
+  // Each free variable contributes its own finite list of possible
+  // values — [true, false] for a bool, or the declared domain's own
+  // members for a domain-restricted number — rather than assuming every
+  // variable is boolean the way the original bool-only version could.
+  const freeVars = []; // [{ name, kind: 'bool'|'number', values: [...] }]
   for (const name of refs) {
-    if (name in boolEnv) { freeVars.push(name); continue; }
+    if (name in boolEnv) { freeVars.push({ name, kind: 'bool', values: [true, false] }); continue; }
+    if (name in domainEnv) { freeVars.push({ name, kind: 'number', values: [...domainEnv[name]] }); continue; }
     if (name in numericEnv) {
       return `guard cannot be proven exhaustive — condition references a number ('${name}') with no declared domain to enumerate; add an \`otherwise\` clause`;
     }
-    return `guard cannot be proven exhaustive — '${name}' isn't a known bool constant (a function parameter's own conditions can't yet be proven exhaustive automatically); add an \`otherwise\` clause`;
+    return `guard cannot be proven exhaustive — '${name}' isn't a known bool constant or domain-restricted number (a function parameter with no fixed bool role can't yet be proven exhaustive automatically); add an \`otherwise\` clause`;
   }
 
-  if (freeVars.length > EXHAUSTIVENESS_CHECK_CAP) {
-    return `guard references too many variables (${freeVars.length}) to verify exhaustiveness automatically — add an \`otherwise\` clause`;
+  const totalCombinations = freeVars.reduce((acc, v) => acc * v.values.length, 1);
+  if (totalCombinations > (1 << EXHAUSTIVENESS_CHECK_CAP)) {
+    return `guard's free variables span too many combinations (${totalCombinations}) to verify exhaustiveness automatically — add an \`otherwise\` clause`;
   }
 
-  const total = 1 << freeVars.length;
-  for (let mask = 0; mask < total; mask++) {
+  // Mixed-radix counter over the free variables' own value lists — a
+  // direct generalization of the old 1<<n bitmask loop, which was really
+  // just the special case where every variable's radix happened to be 2.
+  const indices = new Array(freeVars.length).fill(0);
+  while (true) {
+    const hypNumericEnv = { ...numericEnv };
     const hypBoolEnv = { ...boolEnv };
-    freeVars.forEach((name, i) => { hypBoolEnv[name] = !!(mask & (1 << i)); });
-    const matched = guardNode.terms.some(t => evalAst(t.cond, evalCtx(hypBoolEnv)) === true);
+    freeVars.forEach((v, i) => {
+      const val = v.values[indices[i]];
+      if (v.kind === 'bool') hypBoolEnv[v.name] = val; else hypNumericEnv[v.name] = val;
+    });
+    const matched = guardNode.terms.some(t => evalAst(t.cond, evalCtx(hypNumericEnv, hypBoolEnv)) === true);
     if (!matched) {
-      const assignment = freeVars.map((name, i) => `${name}=${!!(mask & (1 << i))}`).join(', ');
+      const assignment = freeVars.map((v, i) => `${v.name}=${v.values[indices[i]]}`).join(', ');
       return `guard is not exhaustive — no branch matches when ${assignment}`;
     }
+    let carry = true;
+    for (let i = 0; i < indices.length && carry; i++) {
+      indices[i]++;
+      if (indices[i] >= freeVars[i].values.length) indices[i] = 0;
+      else carry = false;
+    }
+    if (carry) break; // wrapped around after the last combination
   }
   return null;
 }
@@ -1020,7 +1050,13 @@ function findGuardTotalityError(ast, envs) {
 // single call — a genuine definition-time error, independent of how the
 // function is ever called, checked once at registration exactly like
 // guard totality already is.
-function findFunctionParamKindConflict(fn) {
+//
+// Renamed from findFunctionParamKindConflict and extended to also return
+// `roles` (`NOTES15.md`'s totality-checker extension) — the totality
+// checker reuses this same fixed-kind classification to let a guard
+// condition reference a function's own bool-role *parameter*, not just a
+// global bool constant, and still be proven exhaustive automatically.
+function classifyFunctionParamKinds(fn) {
   const paramSet = new Set(fn.params);
   let conflict = null;
   const fixedKind = {};
@@ -1047,7 +1083,9 @@ function findFunctionParamKindConflict(fn) {
     }
   }
   walk(fn.bodyAst, null);
-  return conflict;
+  const roles = {};
+  for (const p of fn.params) roles[p] = fixedKind[p] ?? 'generic';
+  return { roles, conflict };
 }
 
 // The actual novel piece Phase 6 needs: a structural, per-call
@@ -1297,10 +1335,10 @@ function topoSortDependencies(items) {
 // expression referencing another color constant still needs that
 // constant to be *earlier*, exactly like a plain (non-guarded) color
 // reference already required; guards don't relax that.
-function resolveColorAttr(exprText, colorEnv, numericEnv = {}, functionEnv = {}, boolEnv = {}) {
+function resolveColorAttr(exprText, colorEnv, numericEnv = {}, functionEnv = {}, boolEnv = {}, domainEnv = {}) {
   if (CODE_COLOR_RE.test(exprText)) return { ok: true, value: exprText };
   if (CODE_IDENT_RE.test(exprText) && exprText in colorEnv) return { ok: true, value: colorEnv[exprText] };
-  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv, colorEnv });
+  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv, colorEnv, domainEnv });
   if (!res.ok) return { ok: false, errorMsg: res.errorMsg };
   return (typeof res.value === 'string' && CODE_COLOR_RE.test(res.value)) ? { ok: true, value: res.value } : { ok: false };
 }
@@ -1312,8 +1350,8 @@ function resolveColorAttr(exprText, colorEnv, numericEnv = {}, functionEnv = {},
 // specific error message threaded through when that's the actual failure
 // — every other rejection reason still falls back to the caller's own
 // generic message, unchanged.
-function resolveNumAttr(exprText, numericEnv, functionEnv = {}, boolEnv = {}) {
-  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv });
+function resolveNumAttr(exprText, numericEnv, functionEnv = {}, boolEnv = {}, domainEnv = {}) {
+  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv, domainEnv });
   if (!res.ok) return { ok: false, errorMsg: res.errorMsg };
   return Number.isFinite(res.value) ? { ok: true, value: res.value } : { ok: false };
 }
@@ -1323,8 +1361,8 @@ function resolveNumAttr(exprText, numericEnv, functionEnv = {}, boolEnv = {}) {
 // 2-arg call site keeps working unchanged (it just can't resolve a
 // numeric comparison inside a bool expression from that spot, same
 // "unmet reference" fallback evalExpr already has everywhere else).
-function resolveBoolAttr(exprText, boolEnv, numericEnv = {}, functionEnv = {}) {
-  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv });
+function resolveBoolAttr(exprText, boolEnv, numericEnv = {}, functionEnv = {}, domainEnv = {}) {
+  const res = evalGuardedExpr(exprText, { numericEnv, functionEnv, boolEnv, domainEnv });
   if (!res.ok) return { ok: false, errorMsg: res.errorMsg };
   return typeof res.value === 'boolean' ? { ok: true, value: res.value } : { ok: false };
 }
@@ -1336,9 +1374,9 @@ function resolveBoolAttr(exprText, boolEnv, numericEnv = {}, functionEnv = {}) {
 // answer is identical everywhere a constant's kind can no longer change
 // but its value can.
 function resolveConstByKind(kind, exprText, envs) {
-  return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
-         kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv) :
-                               resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv);
+  return kind === 'color'   ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv, envs.domainEnv) :
+         kind === 'boolean' ? resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv, envs.domainEnv) :
+                               resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv, envs.domainEnv);
 }
 
 // Resolves one object's full attribute set (per ATTR_DEFS[type]) against
@@ -1356,9 +1394,9 @@ function resolveGoverningAttrs(type, explicitAttrs, governingText, envs) {
   for (const def of ATTR_DEFS[type]) {
     const exprText = explicitAttrs[def.token] ?? governingText[def.token] ?? BUILTIN_SET_DEFAULTS[type][def.token];
     const res =
-      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
-      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
-                               resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv);
+      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv, envs.domainEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv, envs.domainEnv) :
+                               resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv, envs.domainEnv);
     if (!res.ok) {
       // res.errorMsg is only ever set for a guard-specific failure
       // (non-exhaustive, or a syntax error) — resolveNumAttr/
@@ -1391,9 +1429,9 @@ function resolveEditFields(type, explicitAttrs, envs) {
     if (!(def.token in explicitAttrs)) continue;
     const exprText = explicitAttrs[def.token];
     const res =
-      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
-      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv) :
-                               resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv);
+      def.kind === 'color'  ? resolveColorAttr(exprText, envs.colorEnv, envs.numericEnv, envs.functionEnv, envs.boolEnv, envs.domainEnv) :
+      def.kind === 'number' ? resolveNumAttr(exprText, envs.numericEnv, envs.functionEnv, envs.boolEnv, envs.domainEnv) :
+                               resolveBoolAttr(exprText, envs.boolEnv, envs.numericEnv, envs.functionEnv, envs.domainEnv);
     if (!res.ok) {
       // res.errorMsg is only ever set for a guard-specific failure
       // (non-exhaustive, or a syntax error) — resolveNumAttr/
@@ -1462,6 +1500,11 @@ function buildEnvs() {
 
   const numericEnv  = {};
   const functionEnv = {};
+  // Mirrors numericEnv but only for names with a declared domain (Set of
+  // legal values) — the totality checker's own domain-aware enumeration
+  // needs the *set*, not just the current value, to prove a guard
+  // condition on a domain-restricted number covers every reachable case.
+  const domainEnv   = {};
   let workingItems = items;
   while (true) {
     const topo = topoSortDependencies(workingItems);
@@ -1478,7 +1521,10 @@ function buildEnvs() {
           // that has to be caught, not just at the moment of a direct edit.
           const domainOk = !item.ref.domain || item.ref.domain.has(value);
           item.ref.value = (Number.isFinite(value) && domainOk) ? value : undefined;
-          if (Number.isFinite(value) && domainOk) numericEnv[name] = value;
+          if (Number.isFinite(value) && domainOk) {
+            numericEnv[name] = value;
+            if (item.ref.domain) domainEnv[name] = item.ref.domain;
+          }
         } else if (item.kind === 'boolean') {
           const value = evalAst(item.ast, { numericEnv, boolEnv, functionEnv });
           item.ref.value = (typeof value === 'boolean') ? value : undefined;
@@ -1501,13 +1547,13 @@ function buildEnvs() {
     if (c.kind === 'number' || c.kind === 'boolean') {
       if (!items.has(c.name)) c.value = undefined; // failed to even parse
     } else {
-      const res = resolveColorAttr(c.expr.trim(), colorEnv, numericEnv, functionEnv, boolEnv);
+      const res = resolveColorAttr(c.expr.trim(), colorEnv, numericEnv, functionEnv, boolEnv, domainEnv);
       c.value = res.ok ? res.value : undefined;
       if (res.ok) colorEnv[c.name] = c.value;
     }
   }
 
-  return { numericEnv, colorEnv, boolEnv, functionEnv };
+  return { numericEnv, colorEnv, boolEnv, functionEnv, domainEnv };
 }
 
 // Perpendicular distance from p to the segment a-b (clamped projection,
@@ -1905,29 +1951,29 @@ function tessellateOneInterval(xExpr, yExpr, zExpr, param, lo, hi, numericEnv, f
 // `constants` changes — the mechanism that makes editing a constant bulk-
 // update everything referencing it, persistently, across Saves.
 function reEvalObjects() {
-  const { numericEnv, colorEnv, boolEnv, functionEnv } = buildEnvs();
+  const { numericEnv, colorEnv, boolEnv, functionEnv, domainEnv } = buildEnvs();
   for (const v of vertices) {
     for (let i = 0; i < 3; i++) {
       const expr = v.exprs?.[i];
       if (expr) v.coords[i] = evalExpr(expr, numericEnv, functionEnv, boolEnv);
     }
-    if (v.colorExpr)   { const r = resolveColorAttr(v.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv);  if (r.ok) v.color     = r.value; }
-    if (v.radiusExpr)  { const r = resolveNumAttr(v.radiusExpr, numericEnv, functionEnv, boolEnv); if (r.ok) v.radius    = r.value; }
-    if (v.visibleExpr) { const r = resolveBoolAttr(v.visibleExpr, boolEnv, numericEnv, functionEnv);  if (r.ok) v.visible   = r.value; }
-    if (v.labelExpr)   { const r = resolveBoolAttr(v.labelExpr, boolEnv, numericEnv, functionEnv);    if (r.ok) v.showLabel = r.value; }
+    if (v.colorExpr)   { const r = resolveColorAttr(v.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv, domainEnv);  if (r.ok) v.color     = r.value; }
+    if (v.radiusExpr)  { const r = resolveNumAttr(v.radiusExpr, numericEnv, functionEnv, boolEnv, domainEnv); if (r.ok) v.radius    = r.value; }
+    if (v.visibleExpr) { const r = resolveBoolAttr(v.visibleExpr, boolEnv, numericEnv, functionEnv, domainEnv);  if (r.ok) v.visible   = r.value; }
+    if (v.labelExpr)   { const r = resolveBoolAttr(v.labelExpr, boolEnv, numericEnv, functionEnv, domainEnv);    if (r.ok) v.showLabel = r.value; }
   }
   for (const s of segments) {
-    if (s.colorExpr)   { const r = resolveColorAttr(s.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv);  if (r.ok) s.color     = r.value; }
-    if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv, functionEnv, boolEnv);  if (r.ok) s.lineWidth = r.value; }
-    if (s.visibleExpr) { const r = resolveBoolAttr(s.visibleExpr, boolEnv, numericEnv, functionEnv);  if (r.ok) s.visible   = r.value; }
+    if (s.colorExpr)   { const r = resolveColorAttr(s.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv, domainEnv);  if (r.ok) s.color     = r.value; }
+    if (s.widthExpr)   { const r = resolveNumAttr(s.widthExpr, numericEnv, functionEnv, boolEnv, domainEnv);  if (r.ok) s.lineWidth = r.value; }
+    if (s.visibleExpr) { const r = resolveBoolAttr(s.visibleExpr, boolEnv, numericEnv, functionEnv, domainEnv);  if (r.ok) s.visible   = r.value; }
   }
   for (const fc of faces) {
-    if (fc.colorExpr)   { const r = resolveColorAttr(fc.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv); if (r.ok) fc.color   = r.value; }
-    if (fc.visibleExpr) { const r = resolveBoolAttr(fc.visibleExpr, boolEnv, numericEnv, functionEnv); if (r.ok) fc.visible  = r.value; }
+    if (fc.colorExpr)   { const r = resolveColorAttr(fc.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv, domainEnv); if (r.ok) fc.color   = r.value; }
+    if (fc.visibleExpr) { const r = resolveBoolAttr(fc.visibleExpr, boolEnv, numericEnv, functionEnv, domainEnv); if (r.ok) fc.visible  = r.value; }
   }
   for (const cv of curves) {
-    if (cv.colorExpr)   { const r = resolveColorAttr(cv.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv); if (r.ok) cv.color   = r.value; }
-    if (cv.visibleExpr) { const r = resolveBoolAttr(cv.visibleExpr, boolEnv, numericEnv, functionEnv); if (r.ok) cv.visible  = r.value; }
+    if (cv.colorExpr)   { const r = resolveColorAttr(cv.colorExpr, colorEnv, numericEnv, functionEnv, boolEnv, domainEnv); if (r.ok) cv.color   = r.value; }
+    if (cv.visibleExpr) { const r = resolveBoolAttr(cv.visibleExpr, boolEnv, numericEnv, functionEnv, domainEnv); if (r.ok) cv.visible  = r.value; }
     // Domain bounds are expressions too (may reference constants) — re-
     // resolve every interval before re-tessellating, same relationship
     // vertex's exprs->coords has to reEvalObjects. Only commits (and
@@ -3123,6 +3169,11 @@ function resolveConstantsAndFunctions(rawLines) {
   const numericEnv  = {};
   const boolEnv     = {};
   const functionEnv = {};
+  // Mirrors numericEnv but only for names with a declared domain — see
+  // buildEnvs()'s own domainEnv for the full reasoning (the totality
+  // checker's domain-aware enumeration needs the *set*, not just the
+  // current value).
+  const domainEnv   = {};
   const resultByName = new Map();
   for (const name of order) {
     const item = items.get(name);
@@ -3141,7 +3192,7 @@ function resolveConstantsAndFunctions(rawLines) {
       // — even a syntactically-garbage edit value used to corrupt the
       // creation line into "invalid expression" for any later reference).
       const tryEval = (ast) => {
-        const totalityErr = findGuardTotalityError(ast, { numericEnv, boolEnv, functionEnv });
+        const totalityErr = findGuardTotalityError(ast, { numericEnv, boolEnv, functionEnv, domainEnv });
         if (totalityErr) return { ok: false, err: totalityErr };
         const kindErr = inferExprKind(ast, {}, { numericEnv, boolEnv, functionEnv }).error;
         if (kindErr) return { ok: false, err: kindErr };
@@ -3161,14 +3212,13 @@ function resolveConstantsAndFunctions(rawLines) {
       if (!res.ok) { parseErrors.set(name, res.err); continue; }
       if (item.keyword === 'number') {
         numericEnv[name] = res.value;
+        if (item.domain) domainEnv[name] = item.domain;
         resultByName.set(name, { ok: true, keyword: 'number', name, value: res.value, domain: item.domain });
       } else {
         boolEnv[name] = res.value;
         resultByName.set(name, { ok: true, keyword: 'bool', name, value: res.value });
       }
     } else {
-      const totalityErr = findGuardTotalityError(item.ast, { numericEnv, boolEnv, functionEnv });
-      if (totalityErr) { parseErrors.set(name, totalityErr); continue; }
       // Phase 6: a parameter used as more than one fixed kind (e.g. both a
       // number and a bool operand somewhere in the body) can never be
       // satisfied by any call — reject the definition itself, once, rather
@@ -3177,12 +3227,26 @@ function resolveConstantsAndFunctions(rawLines) {
       // reasoning). Independent of the per-call check inferExprKind does
       // at every actual call site below (evalGuardedExpr/tryEval) — this
       // one exists purely for a clean, call-independent error message.
-      const conflict = findFunctionParamKindConflict({ params: item.params, bodyAst: item.ast });
+      // Computed *before* the totality check below since its `roles`
+      // result is also what lets a bool-role parameter (not just a global
+      // bool constant) be enumerated as a free variable there.
+      const fnShape = { params: item.params, bodyAst: item.ast };
+      const { roles, conflict } = classifyFunctionParamKinds(fnShape);
       if (conflict) {
         const label = k => (k === 'boolean' ? 'bool' : k);
         parseErrors.set(name, `parameter '${conflict.name}' is used as both a ${label(conflict.kinds[0])} and a ${label(conflict.kinds[1])}`);
         continue;
       }
+      // A function's own bool-role parameter is enumerable exactly like a
+      // global bool constant — merging it into a *copy* of boolEnv (never
+      // the shared one) is enough to make checkGuardExhaustive pick it up
+      // as a free variable; the placeholder value itself is never read,
+      // since the enumeration loop overwrites every free variable's entry
+      // with each hypothetical value before evaluating anything.
+      const boolEnvForTotality = { ...boolEnv };
+      for (const p of item.params) if (roles[p] === 'boolean') boolEnvForTotality[p] = false;
+      const totalityErr = findGuardTotalityError(item.ast, { numericEnv, boolEnv: boolEnvForTotality, functionEnv, domainEnv });
+      if (totalityErr) { parseErrors.set(name, totalityErr); continue; }
       functionEnv[name] = { params: item.params, bodyAst: item.ast };
       resultByName.set(name, { ok: true, keyword: 'function', name, params: item.params, bodyExpr: item.bodyExpr, bodyAst: item.ast });
     }
@@ -3204,7 +3268,7 @@ function resolveConstantsAndFunctions(rawLines) {
     byLineIdx.set(c.lineIdx, resultByName.get(c.name));
   }
 
-  return { byLineIdx, numericEnv, boolEnv, functionEnv };
+  return { byLineIdx, numericEnv, boolEnv, functionEnv, domainEnv };
 }
 
 function parseCodeText(text) {
