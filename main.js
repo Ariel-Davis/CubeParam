@@ -2046,6 +2046,13 @@ function renameConstantEverywhere(oldName, newName) {
     const stateObj = t.lastSet?.();
     if (!stateObj) continue;
     for (const f of Object.keys(stateObj)) {
+      // naming/counter hold a name *prefix* / a raw integer, never a
+      // symbolic reference — a plain equality scan over every field would
+      // otherwise happily "rename" a governing `naming=P` prefix the
+      // moment a constant literally named "P" gets renamed, a real
+      // (if narrow) latent bug found while generalizing this same logic
+      // for the `rename` interpreter command, not hypothetical.
+      if (f === 'naming' || f === 'counter') continue;
       if (stateObj[f] === oldName) stateObj[f] = newName;
     }
   }
@@ -2067,6 +2074,96 @@ function renameConstantEverywhere(oldName, newName) {
         loExpr: renameInExpr(iv.loExpr, oldName, newName),
         hiExpr: renameInExpr(iv.hiExpr, oldName, newName),
       }));
+    }
+  }
+}
+
+// Interpreter-command counterpart to renameConstantEverywhere, for the
+// `rename TYPE OLD_NAME: NEW_NAME` line (NOTES16.md) — same "rename
+// everywhere" logic, including the exact same function-parameter/
+// curve-bound-parameter shadowing exclusions, but operating on the
+// *staged* arrays parseCodeText builds up mid-parse rather than live
+// committed state, and generalized to all six renameable kinds, not just
+// constants:
+//   - number/color/bool/function are referenced *symbolically*, inside
+//     arbitrary expression text anywhere — the renameInExpr regex pass.
+//   - vertex is referenced *structurally*, by exact name, only in
+//     segment.v1Name/v2Name and face.vertexNames — never inside
+//     expression text (vertices never appear in numericEnv/boolEnv/etc.).
+//   - segment/face/curve are referenced from nowhere else in the current
+//     grammar at all — nothing further is needed beyond the caller's own
+//     byName-map/object-identity update once this returns.
+// Deliberately a separate function rather than one core shared with
+// renameConstantEverywhere: the staged and live shapes differ in real
+// ways (a staged segment carries v1Name/v2Name directly; a live one only
+// carries numeric vertexIds, translated from names exactly once at
+// commit — see buildCommittedArraysFromStaged) — not worth coupling an
+// already-working, separately-tested live path to this for the sake of
+// avoiding some structural duplication.
+function renameStagedObjectEverywhere(renameType, oldName, newName, staged) {
+  const { stagedVertices, stagedConstants, stagedSegments, stagedFaces, stagedCurves, stagedFunctions, currentSet } = staged;
+
+  const isSymbolic = renameType === 'number' || renameType === 'color' || renameType === 'bool' || renameType === 'function';
+  if (isSymbolic) {
+    // Constants use a bare `expr` field, not `*Expr` — the one name that
+    // doesn't fit the suffix convention the generic scan below relies on
+    // (same reason renameConstantEverywhere needs its own explicit pass).
+    for (const c of stagedConstants) c.expr = renameInExpr(c.expr, oldName, newName);
+    for (const fn of stagedFunctions) {
+      if (fn.params.includes(oldName)) continue; // shadowed by its own parameter
+      fn.bodyExpr = renameInExpr(fn.bodyExpr, oldName, newName);
+    }
+    for (const list of [stagedVertices, stagedSegments, stagedFaces, stagedCurves]) {
+      for (const obj of list) {
+        for (const f of Object.keys(obj)) {
+          if (!f.endsWith('Expr') || !obj[f]) continue;
+          // A curve's own bound parameter shadows any same-named constant
+          // within its x=/y=/z= body only — not its domain bounds, which
+          // resolve before the curve's parameter is ever bound (see
+          // renameConstantEverywhere's own comment for the full reasoning).
+          if (obj.param && oldName === obj.param && (f === 'xExpr' || f === 'yExpr' || f === 'zExpr')) continue;
+          obj[f] = renameInExpr(obj[f], oldName, newName);
+        }
+      }
+    }
+    // Vertex coordinates (`exprs`) and a curve's domain bounds
+    // (`domainIntervals`) are the same kind of structural exception
+    // renameConstantEverywhere already has to handle — plain arrays, not
+    // flat `*Expr` fields.
+    for (const v of stagedVertices) {
+      if (v.exprs) v.exprs = v.exprs.map(e => renameInExpr(e, oldName, newName));
+    }
+    for (const cv of stagedCurves) {
+      if (cv.domainIntervals) {
+        cv.domainIntervals = cv.domainIntervals.map(iv => ({
+          ...iv,
+          loExpr: renameInExpr(iv.loExpr, oldName, newName),
+          hiExpr: renameInExpr(iv.hiExpr, oldName, newName),
+        }));
+      }
+    }
+    // currentSet is this one parse's own order-dependent "paintbrush"
+    // state — the exact parse-time analogue of lastSetVertex/etc. A
+    // governing default set *earlier* in the same file (`set vertex:
+    // visible=oldName`) needs the same rewrite, so an object created
+    // *later* in the file (inheriting it) picks up the new name, not a
+    // reference to a name that's about to stop existing.
+    for (const type of ['vertex', 'segment', 'face', 'curve']) {
+      const stateObj = currentSet[type];
+      for (const f of Object.keys(stateObj)) {
+        if (f === 'naming' || f === 'counter') continue; // a prefix/integer, never a symbolic reference
+        if (stateObj[f] === oldName) stateObj[f] = newName;
+      }
+    }
+  }
+
+  if (renameType === 'vertex') {
+    for (const s of stagedSegments) {
+      if (s.v1Name === oldName) s.v1Name = newName;
+      if (s.v2Name === oldName) s.v2Name = newName;
+    }
+    for (const f of stagedFaces) {
+      if (f.vertexNames) f.vertexNames = f.vertexNames.map(n => (n === oldName ? newName : n));
     }
   }
 }
@@ -2426,6 +2523,11 @@ function evalSetAst(ast) {
 // normalized to the colon form on next Sort/Save.
 const CODE_SET_RE    = /^set\s+(vertex|segment|face|curve)(?:\s*:\s*|\s+)(.+)$/;
 const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|number|color|bool)\b\s*([^:]*):(.*)$/;
+// Deliberately covers all six renameable kinds, not just the four `edit`
+// currently does — curve/function have nothing else about them to edit
+// yet, but renaming one is exactly as well-defined as any other kind
+// (NOTES16.md).
+const CODE_RENAME_RE = /^rename\s+(vertex|segment|face|curve|number|color|bool|function)\b\s*([^:]*):(.*)$/;
 const CODE_IDENT_RE  = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const CODE_COLOR_RE  = /^#[0-9a-fA-F]{6}$/;
 
@@ -3591,6 +3693,73 @@ function parseCodeText(text) {
       continue;
     }
 
+    // `rename TYPE OLD_NAME: NEW_NAME` (NOTES16.md) — a sibling of `edit`
+    // in shape (same target-must-exist-via-an-earlier-line requirement,
+    // which falls out for free from byName only ever containing what's
+    // already been staged by this point in the order-dependent walk; same
+    // kind-mismatch check for number/color/bool, which share one byName
+    // map/namespace) but covers all six renameable kinds, including
+    // curve/function, which `edit` doesn't support at all yet — renaming
+    // one is exactly as well-defined as any other kind, with no
+    // attribute-editing machinery needed. Absorbed by Sort once applied,
+    // same as `edit` — nothing of its own left to re-emit once every
+    // affected object's own line already reflects the new name.
+    const renameMatch = trimmed.match(CODE_RENAME_RE);
+    if (renameMatch) {
+      const [, renameType, nameRaw, newNameRaw] = renameMatch;
+      rec.kind = 'rename';
+      const targetName = nameRaw.trim();
+      if (targetName === '') {
+        rec.valid = false; rec.errorMsg = 'rename requires an object name'; lines.push(rec); continue;
+      }
+      const byName =
+        renameType === 'vertex'   ? vertexByName :
+        renameType === 'segment'  ? segmentByName :
+        renameType === 'face'     ? faceByName :
+        renameType === 'curve'    ? curveByName :
+        renameType === 'function' ? functionByName :
+                                     constByName;
+      const target = byName.get(targetName);
+      if (!target) {
+        rec.valid = false; rec.errorMsg = `unknown ${renameType} '${targetName}'`; lines.push(rec); continue;
+      }
+      if (renameType === 'number' || renameType === 'color' || renameType === 'bool') {
+        const renameKind = renameType === 'bool' ? 'boolean' : renameType;
+        if (target.kind !== renameKind) {
+          rec.valid = false;
+          rec.errorMsg = `'${targetName}' is a ${target.kind === 'boolean' ? 'bool' : target.kind}, not a ${renameType}`;
+          lines.push(rec); continue;
+        }
+      }
+      const newName = newNameRaw.trim();
+      if (newName === '') {
+        rec.valid = false; rec.errorMsg = 'rename requires a new name'; lines.push(rec); continue;
+      }
+      // Same name -> harmless no-op, matching the control panel's own
+      // name-input fields (a rename to the current name already does
+      // nothing there, silently, not an error).
+      if (newName !== targetName) {
+        if (!CODE_IDENT_RE.test(newName)) {
+          rec.valid = false; rec.errorMsg = `invalid name '${newName}'`; lines.push(rec); continue;
+        }
+        if (newName === 'true' || newName === 'false' || newName === 'otherwise') {
+          rec.valid = false; rec.errorMsg = `'${newName}' is reserved and cannot be used as a name`; lines.push(rec); continue;
+        }
+        if (isNameTakenIn(newName, stagedVertices, stagedConstants, stagedFaces, stagedSegments, null, null, null, null, stagedCurves, null, stagedFunctions)) {
+          rec.valid = false; rec.errorMsg = `name '${newName}' already used`; lines.push(rec); continue;
+        }
+        renameStagedObjectEverywhere(renameType, targetName, newName, {
+          stagedVertices, stagedConstants, stagedSegments, stagedFaces, stagedCurves, stagedFunctions, currentSet,
+        });
+        target.name = newName;
+        byName.delete(targetName);
+        byName.set(newName, target);
+      }
+      rec.parsed = { renameType, targetName, newName };
+      lines.push(rec);
+      continue;
+    }
+
     const setMatch = trimmed.match(CODE_SET_RE);
     if (setMatch) {
       const [, setType, fieldTok] = setMatch;
@@ -4343,6 +4512,10 @@ function sortCodeText(text) {
     // anything of its own to re-emit, unlike `set` there's no consolidated
     // block to build either. It just vanishes once absorbed.
     if (rec.kind === 'edit' && rec.valid) return;
+    // A valid `rename` line, same reasoning as `edit` just above — every
+    // affected object's own line already reflects the new name by the
+    // time Sort/serialize format it.
+    if (rec.kind === 'rename' && rec.valid) return;
     // A valid view-setting line is consolidated exactly like `set` (one
     // canonical block, built below from `finalView`) — dropped regardless
     // of where it was typed. An invalid one falls through to homeOf(i)
