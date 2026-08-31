@@ -6454,7 +6454,21 @@ function renderConstList() {
         renameConstantEverywhere(oldName, n);
         reEvalObjects();
         renderConstList();
-        if (editingVertexId !== null) renderVertexList();
+        // Unconditional, not just "if a vertex happens to be mid-edit" —
+        // renameConstantEverywhere already rewrites every *Expr field on
+        // every vertex/segment/face (not just the one being edited), so
+        // every one of these lists' own displayed text (a visible/label
+        // toggle's sub-label, in particular — normal, non-edit-mode rows
+        // show it too, not just the edit row) needs the same refresh, or
+        // it silently keeps showing the pre-rename name until something
+        // unrelated happens to re-render that specific list later. Found
+        // via a real user report: a vertex's own `visible=` sub-label
+        // stayed on the old name after renaming the bool constant it
+        // referenced, even though the underlying data (and the code
+        // editor's own serialization) were already correct.
+        renderVertexList();
+        renderSegmentList();
+        renderFaceList();
         draw();
       } else { nameInp.value = c.name; }
     });
