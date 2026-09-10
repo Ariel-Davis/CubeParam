@@ -5257,7 +5257,97 @@ function drawSelectedFaceHalo(facesArr, vertsArr, vecs, heights, scale, normS) {
   ctx.restore();
 }
 
+// ─── Segment-vs-segment crossing resolution (NOTES19.md, mechanism 3,
+// standalone — no face interleaving yet) ────────────────────────────────
+//
+// Two segments whose *projected* images cross on screen, but that don't
+// truly meet in 3D, need a depth-based occlusion decision right at that
+// crossing — the nearer one should read as passing in front, the farther
+// one should show a real gap. A hairline cut at the zero-width centerline
+// crossing doesn't work once strokes have real rendered width: cutting a
+// wide ribbon at a single point doesn't correctly compute where the other
+// ribbon's own width actually covers it. The fix (the classical
+// knot-diagram crossing convention — an actual gap in the "under" strand,
+// not a point-cut) carves an actual gap out of the far ("under") ribbon,
+// bounded by the *near* ("over") ribbon's own two edges (parallel to it,
+// not perpendicular to the far one) — what remains of the far ribbon on
+// either side of the gap is therefore a trapezoid, not a rectangle
+// (derived and verified, NOTES19.md).
+//
+// Segments don't have genuine 3D width (`lineWidth` is a cosmetic,
+// screen-space-only quantity, matching how vertex radius already works —
+// `scaleNodes: false`), so "depth across a ribbon's width" isn't a
+// separately meaningful quantity; a ribbon's own centerline depth is used
+// throughout. Width is also treated as *constant* along a segment's own
+// length here (`perspScaleSegs`/`scaleSegments` tapering is NOT applied
+// in this path) — constant width is what keeps a ribbon's edges genuine
+// straight lines, which the whole construction below depends on;
+// combining this with tapered width is a real, separate follow-up, not
+// attempted here. Vertex/segment-vs-face interleaving (mechanism 2) is
+// also explicitly not part of this yet — faces still render entirely
+// separately via drawFaces, unchanged.
+// 3-or-more-ribbon mutual overlap is a known, deferred limitation (medium-
+// low priority backlog item, SotU.md) — not guarded against here.
+
+// 2D line-line intersection — both given as {point:[x,y], dir:[x,y]}
+// (dir need not be unit). Returns the intersection point, or null if
+// parallel (within a small tolerance) — a real edge case (near-coincident
+// directions) skipped rather than guessed at.
+function intersectLines2D(a, b) {
+  const [ax, ay] = a.point, [adx, ady] = a.dir;
+  const [bx, by] = b.point, [bdx, bdy] = b.dir;
+  const denom = adx * bdy - ady * bdx;
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((bx - ax) * bdy - (by - ay) * bdx) / denom;
+  return [ax + t * adx, ay + t * ady];
+}
+
+// Where line a crosses line b, as a's own parameter (a.point + t*a.dir) —
+// same math as intersectLines2D, returning the scalar instead of the
+// point. Used only to order which of a segment's two candidate cut lines
+// is encountered first along its own length.
+function lineParamAtCrossing2D(a, b) {
+  const [ax, ay] = a.point, [adx, ady] = a.dir;
+  const [bx, by] = b.point, [bdx, bdy] = b.dir;
+  const denom = adx * bdy - ady * bdx;
+  if (Math.abs(denom) < 1e-9) return null;
+  return ((bx - ax) * bdy - (by - ay) * bdx) / denom;
+}
+
+// Do open segments p1-p2 and p3-p4 (each [x,y]) cross at a point strictly
+// interior to both? A small epsilon margin excludes near-endpoint
+// touches — genuinely shared endpoints/3D-coincident crossings are a
+// separate case (NOTES19.md), not handled by this path at all yet.
+const SEG_CROSS_EPS = 1e-6;
+function screenSegmentsCross(p1, p2, p3, p4) {
+  const d1x = p2[0] - p1[0], d1y = p2[1] - p1[1];
+  const d2x = p4[0] - p3[0], d2y = p4[1] - p3[1];
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-9) return null; // parallel (or near-parallel) on screen
+  const t = ((p3[0] - p1[0]) * d2y - (p3[1] - p1[1]) * d2x) / denom;
+  const s = ((p3[0] - p1[0]) * d1y - (p3[1] - p1[1]) * d1x) / denom;
+  if (t <= SEG_CROSS_EPS || t >= 1 - SEG_CROSS_EPS) return null;
+  if (s <= SEG_CROSS_EPS || s >= 1 - SEG_CROSS_EPS) return null;
+  return { t, s };
+}
+
+// Exact perspective-correct interpolation of depth at screen parameter u
+// (0..1) along a segment, given each endpoint's own `depth` (from
+// projectPoint) and `factor` (= 1/d, from applyPerspective — already 1
+// under orthographic, so this one formula needs no mode branch). Screen
+// position is a *rational*, not affine, function of the original 3D
+// parameter once perspective divides — but factor(u) and depth(u)*factor(u)
+// are each exactly affine in screen-space u (the standard "1/w is affine
+// in screen space" rasterizer identity), so this is exact, not an
+// approximation.
+function depthAtScreenParam(depth0, factor0, depth1, factor1, u) {
+  const f = (1 - u) * factor0 + u * factor1;
+  return ((1 - u) * depth0 * factor0 + u * depth1 * factor1) / f;
+}
+
 function drawSegments(segs, verts, vecs, heights, scale, normS) {
+  // Pass 1: project every visible-or-highlighted segment's endpoints once.
+  const items = [];
   for (const seg of segs) {
     // A selected-but-hidden segment still needs an on-canvas anchor — same
     // reasoning as drawVertices' isHighlighted gate above (see NOTES6,
@@ -5270,61 +5360,102 @@ function drawSegments(segs, verts, vecs, heights, scale, normS) {
     if (!v1 || !v2) continue;
     const r1 = projectPoint(v1.coords, vecs, heights);
     const r2 = projectPoint(v2.coords, vecs, heights);
-    if (isNaN(r1.depth) || isNaN(r1.pt.re) || isNaN(r2.depth) || isNaN(r2.pt.re)) continue;
+    if (!Number.isFinite(r1.depth) || !Number.isFinite(r1.pt.re) || !Number.isFinite(r2.depth) || !Number.isFinite(r2.pt.re)) continue;
     const a1 = applyPerspective(r1.pt, r1.depth, normS);
     const a2 = applyPerspective(r2.pt, r2.depth, normS);
     if (!a1.ok || !a2.ok) continue;
     const p1 = toScreen(a1.pt, scale);
     const p2 = toScreen(a2.pt, scale);
-    const w = seg.lineWidth ?? 1.5;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.5) continue; // degenerate on screen -- nothing meaningful to draw or notch
+    const dir = [dx / len, dy / len];
+    const perp = [-dir[1], dir[0]];
+    const halfWidth = (seg.lineWidth ?? 1.5) / 2;
+    items.push({
+      seg, isHighlighted,
+      p1: [p1.x, p1.y], p2: [p2.x, p2.y], dir, perp, halfWidth,
+      depth1: r1.depth, factor1: a1.factor, depth2: r2.depth, factor2: a2.factor,
+      notches: [], // filled in pass 2, {t, entryCorners, exitCorners} — see below
+    });
+  }
+
+  // Pass 2: every pair, find real screen crossings, resolve which one is
+  // nearer at that point (larger interpolated depth = nearer the viewer,
+  // the same convention traverseFaceBsp's own frontIsNear uses — see
+  // NOTES19.md), and record a notch on the losing (farther) one.
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const A = items[i], B = items[j];
+      const crossing = screenSegmentsCross(A.p1, A.p2, B.p1, B.p2);
+      if (!crossing) continue;
+      const depthA = depthAtScreenParam(A.depth1, A.factor1, A.depth2, A.factor2, crossing.t);
+      const depthB = depthAtScreenParam(B.depth1, B.factor1, B.depth2, B.factor2, crossing.s);
+      const winner = depthA > depthB ? A : B;
+      const loser  = depthA > depthB ? B : A;
+      const loserParam = depthA > depthB ? crossing.s : crossing.t;
+      const winnerLeft  = { point: [winner.p1[0] + winner.perp[0] * winner.halfWidth, winner.p1[1] + winner.perp[1] * winner.halfWidth], dir: winner.dir };
+      const winnerRight = { point: [winner.p1[0] - winner.perp[0] * winner.halfWidth, winner.p1[1] - winner.perp[1] * winner.halfWidth], dir: winner.dir };
+      const loserCenterline = { point: loser.p1, dir: loser.dir };
+      // Which of the winner's two edges does the loser's own centerline
+      // cross first (smaller parameter along the loser's own p1->p2
+      // direction)? That's the notch's entry boundary; the other is exit.
+      const tLeft  = lineParamAtCrossing2D(loserCenterline, winnerLeft);
+      const tRight = lineParamAtCrossing2D(loserCenterline, winnerRight);
+      if (tLeft === null || tRight === null) continue; // near-parallel -- skip this notch rather than guess
+      const entryLine = tLeft < tRight ? winnerLeft : winnerRight;
+      const exitLine  = tLeft < tRight ? winnerRight : winnerLeft;
+      const loserLeft  = { point: [loser.p1[0] + loser.perp[0] * loser.halfWidth, loser.p1[1] + loser.perp[1] * loser.halfWidth], dir: loser.dir };
+      const loserRight = { point: [loser.p1[0] - loser.perp[0] * loser.halfWidth, loser.p1[1] - loser.perp[1] * loser.halfWidth], dir: loser.dir };
+      const entryCorners = [intersectLines2D(loserLeft, entryLine), intersectLines2D(loserRight, entryLine)];
+      const exitCorners  = [intersectLines2D(loserLeft, exitLine),  intersectLines2D(loserRight, exitLine)];
+      if (entryCorners.some(c => !c) || exitCorners.some(c => !c)) continue; // near-parallel edge case -- skip
+      loser.notches.push({ t: loserParam, entryCorners, exitCorners });
+    }
+  }
+
+  // Pass 3: build each segment's visible piece(s) (its full ribbon, minus
+  // any notches, in order along its own length) and paint them.
+  for (const item of items) {
+    const { seg, isHighlighted, p1, p2, perp, halfWidth, notches } = item;
+    notches.sort((a, b) => a.t - b.t);
+    const startCap = [
+      [p1[0] + perp[0] * halfWidth, p1[1] + perp[1] * halfWidth],
+      [p1[0] - perp[0] * halfWidth, p1[1] - perp[1] * halfWidth],
+    ];
+    const endCap = [
+      [p2[0] + perp[0] * halfWidth, p2[1] + perp[1] * halfWidth],
+      [p2[0] - perp[0] * halfWidth, p2[1] - perp[1] * halfWidth],
+    ];
+    const pieces = [];
+    let prevCorners = startCap;
+    for (const n of notches) {
+      pieces.push([prevCorners[0], n.entryCorners[0], n.entryCorners[1], prevCorners[1]]);
+      prevCorners = n.exitCorners;
+    }
+    pieces.push([prevCorners[0], endCap[0], endCap[1], prevCorners[1]]);
+
     // Ghost stand-in when hidden (only reachable here because isHighlighted
     // is true) — same faded-real-color treatment as vertex's ghost marker,
-    // not a generic grey. The selection halo below is drawn at full
-    // strength either way, same as vertex's glow never dimmed either.
-    const strokeColor = seg.visible ? themeColor(seg.color) : fadedColor(seg.color, 0.4);
+    // not a generic grey.
+    const fillColor = seg.visible ? themeColor(seg.color) : fadedColor(seg.color, 0.4);
     ctx.save();
-    if (perspScaleSegs) {
-      const dx = p2.x - p1.x, dy = p2.y - p1.y;
-      const len = Math.hypot(dx, dy);
-      if (len < 0.5) { ctx.restore(); continue; }
-      const px = -dy / len, py = dx / len;   // unit perpendicular
-      const hw1 = Math.min(w * a1.factor / 2, 10);
-      const hw2 = Math.min(w * a2.factor / 2, 10);
-      if (isHighlighted) {
-        const e = 3;
-        ctx.beginPath();
-        ctx.moveTo(p1.x + px*(hw1+e), p1.y + py*(hw1+e));
-        ctx.lineTo(p2.x + px*(hw2+e), p2.y + py*(hw2+e));
-        ctx.lineTo(p2.x - px*(hw2+e), p2.y - py*(hw2+e));
-        ctx.lineTo(p1.x - px*(hw1+e), p1.y - py*(hw1+e));
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(30,100,220,0.28)';
-        ctx.fill();
-      }
+    if (isHighlighted) {
+      ctx.strokeStyle = 'rgba(30,100,220,0.28)';
+      ctx.lineWidth = halfWidth * 2 + 6;
       ctx.beginPath();
-      ctx.moveTo(p1.x + px*hw1, p1.y + py*hw1);
-      ctx.lineTo(p2.x + px*hw2, p2.y + py*hw2);
-      ctx.lineTo(p2.x - px*hw2, p2.y - py*hw2);
-      ctx.lineTo(p1.x - px*hw1, p1.y - py*hw1);
-      ctx.closePath();
-      ctx.fillStyle = strokeColor;
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      if (isHighlighted) {
-        ctx.strokeStyle = 'rgba(30,100,220,0.28)';
-        ctx.lineWidth = w + 6;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-      }
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = isHighlighted ? w + 1 : w;
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
       ctx.stroke();
     }
+    ctx.fillStyle = fillColor;
+    ctx.beginPath();
+    for (const piece of pieces) {
+      ctx.moveTo(piece[0][0], piece[0][1]);
+      for (let k = 1; k < piece.length; k++) ctx.lineTo(piece[k][0], piece[k][1]);
+      ctx.closePath();
+    }
+    ctx.fill();
     ctx.restore();
   }
 }
