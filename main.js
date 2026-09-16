@@ -8371,17 +8371,19 @@ document.getElementById('seg-add-visible').addEventListener('click', () => {
 document.getElementById('btn-toggle-controls').addEventListener('click', () => {
   const body = document.getElementById('controls-main');
   const btn  = document.getElementById('btn-toggle-controls');
-  const wasCollapsed = body.classList.contains('collapsed');
   body.classList.toggle('collapsed');
   btn.classList.toggle('active', !body.classList.contains('collapsed'));
-  // Opening the panel always starts with every submenu closed — a fresh
-  // default each time, not a memory of whatever was left open before.
-  if (wasCollapsed) {
-    ['view', 'aux', 'disp'].forEach(key => {
-      document.getElementById(`sub-${key}`).style.display = 'none';
-      document.getElementById(`btn-sub-${key}`).classList.remove('active');
-    });
-  }
+  // Closing then reopening the panel is deliberately the identity on
+  // whatever submenus were open — it only ever collapses/reveals
+  // #controls-main itself (display:none via .collapsed), never touches any
+  // individual submenu's own display/active state. "Every submenu starts
+  // closed" is a *fresh-session* default only (index.html's own initial
+  // markup for sub-view/sub-aux/sub-disp), not something re-applied on
+  // every open — user-caught: an earlier version of this handler
+  // force-closed all three submenus every time the panel opened, which
+  // also collapsed whatever was left open across a plain close/reopen of
+  // the panel itself (demo mode's own enter/exit/cycle never call this
+  // handler at all, so that path was never affected either way).
   // Collapsing the whole panel hides the vertex list along with it, but
   // never told any floating button to notice — bug, user-caught: a
   // "use"/"close"/"remove" button could be left floating on screen with
@@ -8392,9 +8394,9 @@ document.getElementById('btn-toggle-controls').addEventListener('click', () => {
   updateArmButtons();
 });
 
-// Same breakpoint as style.css's own "Hide sliders on phone-sized screens"
-// query — kept as a single source of truth here rather than a second
-// hardcoded 767 elsewhere.
+// "Phone-sized" — the one remaining 767px breakpoint in this codebase
+// (style.css's own copy, formerly used to hide the scale/perspective
+// sliders on phone, was removed once those sliders were restored there).
 function isPhoneViewport() {
   return window.matchMedia('(max-width: 767px)').matches;
 }
@@ -8407,6 +8409,19 @@ function flashButtonError(btn) {
   btn.classList.remove('flash-error');
   void btn.offsetWidth;
   btn.classList.add('flash-error');
+  // Actually remove the class once the flash finishes, rather than leaving
+  // it attached forever — otherwise the next time an ancestor toggles
+  // display:none -> visible (e.g. closing/reopening the whole control
+  // panel), the still-attached class restarts the CSS animation from
+  // scratch with no click involved. A plain setTimeout, not an
+  // `animationend` listener, so cleanup still happens on schedule even if
+  // the button ends up hidden mid-flash (display:none can suppress
+  // animation events). Duration must match style.css's own
+  // `.flash-error` animation length (0.5s). Clears any pending removal
+  // first so a rapid re-tap extends the flash instead of an earlier tap's
+  // timer cutting the new one short.
+  clearTimeout(btn._flashTimer);
+  btn._flashTimer = setTimeout(() => btn.classList.remove('flash-error'), 500);
 }
 
 ['view', 'aux', 'disp'].forEach(key => {
