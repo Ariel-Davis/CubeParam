@@ -490,14 +490,6 @@ button.active-loop {
   text-align: right;
 }
 
-/* Hide sliders on phone-sized screens */
-@media (max-width: 767px) {
-  #slider-scale,
-  #slider-persp {
-    display: none;
-  }
-}
-
 .section-divider {
   border-top: 1px solid rgba(0, 0, 0, 0.12);
   margin: 2px 0;
