@@ -6829,6 +6829,7 @@ function renderConstList() {
       const res = resolveConstByKind(c.kind, newExpr, buildEnvs());
       if (!res.ok) { exprInp.value = c.expr; setNameError(exprInp); return; }
       if (c.domain && !c.domain.has(res.value)) { exprInp.value = c.expr; setNameError(exprInp); return; }
+      snapshot();
       c.expr = newExpr;
       c.value = res.value;
       renderConstValSpan(valSpan, c);
