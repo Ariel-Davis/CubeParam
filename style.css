@@ -170,6 +170,18 @@ body.dark-mode .seg-endpoint-dash {
   min-width: 0;
 }
 
+/* Signals "disabled right now" on a control that's only disabled on phone —
+   an inset red fill that fades out, layered on top of whatever the
+   button's own background already is (light/dark mode, active/inactive),
+   so it doesn't need to know or match that color. */
+.submenu-btn.flash-error {
+  animation: submenu-btn-flash-error 0.5s ease-out;
+}
+@keyframes submenu-btn-flash-error {
+  from { box-shadow: inset 0 0 0 999px rgba(210, 40, 40, 0.75); }
+  to   { box-shadow: inset 0 0 0 999px rgba(210, 40, 40, 0); }
+}
+
 .submenu {
   display: flex;
   flex-direction: column;

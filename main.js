@@ -203,6 +203,29 @@ let lastSetSegment = { color: undefined, width: undefined, visible: undefined, n
 let lastSetFace    = { color: undefined, visible: undefined, naming: undefined, counter: undefined };
 let lastSetCurve   = { color: undefined, visible: undefined, naming: undefined, counter: undefined };
 
+// This governing-default cluster is deliberately outside captureState()/
+// restoreState() (see above) since ordinary undo/redo shouldn't touch it —
+// but demo mode swaps to an entirely different document temporarily, which
+// *does* need to save/restore it, or a demo scene's own governing defaults
+// (e.g. `set face: color=c5`) leak into the user's real document once demo
+// mode exits. These two helpers are demo mode's own save/restore pair for
+// exactly this cluster, kept separate from captureState()/restoreState() on
+// purpose.
+function captureLastSet() {
+  return {
+    vertex:  { ...lastSetVertex },
+    segment: { ...lastSetSegment },
+    face:    { ...lastSetFace },
+    curve:   { ...lastSetCurve },
+  };
+}
+function applyLastSet(s) {
+  lastSetVertex  = { ...s.vertex };
+  lastSetSegment = { ...s.segment };
+  lastSetFace    = { ...s.face };
+  lastSetCurve   = { ...s.curve };
+}
+
 // Reparsing/validation is gated on "leaving a line after changing it" (not on
 // every keystroke) — these track the line the caret was in and its text as of
 // entering it, so a move to a different line can tell whether anything changed.
@@ -8368,11 +8391,47 @@ document.getElementById('btn-toggle-controls').addEventListener('click', () => {
   updateArmButtons();
 });
 
+// Same breakpoint as style.css's own "Hide sliders on phone-sized screens"
+// query — kept as a single source of truth here rather than a second
+// hardcoded 767 elsewhere.
+function isPhoneViewport() {
+  return window.matchMedia('(max-width: 767px)').matches;
+}
+
+// Briefly flashes a button red — signals "this is disabled right now"
+// without giving it a permanently-disabled look, since it isn't disabled on
+// every screen size. Removes-then-re-adds the class (forcing a reflow in
+// between) so a rapid re-tap restarts the animation instead of no-op'ing.
+function flashButtonError(btn) {
+  btn.classList.remove('flash-error');
+  void btn.offsetWidth;
+  btn.classList.add('flash-error');
+}
+
 ['view', 'aux', 'disp'].forEach(key => {
   document.getElementById(`btn-sub-${key}`).addEventListener('click', () => {
     const sub  = document.getElementById(`sub-${key}`);
     const btn  = document.getElementById(`btn-sub-${key}`);
+
+    // Phone: creating/editing vertices/segments/faces by touch isn't
+    // supported, so Display stays present but inert — flash red, open
+    // nothing.
+    if (key === 'disp' && isPhoneViewport()) {
+      flashButtonError(btn);
+      return;
+    }
+
     const open = sub.style.display === 'none';
+    // Phone: only one submenu open at a time — opening this one closes
+    // whatever else was open instead of stacking (View/Aux only in
+    // practice, since Display can never be the "whatever else").
+    if (open && isPhoneViewport()) {
+      ['view', 'aux', 'disp'].forEach(otherKey => {
+        if (otherKey === key) return;
+        document.getElementById(`sub-${otherKey}`).style.display = 'none';
+        document.getElementById(`btn-sub-${otherKey}`).classList.remove('active');
+      });
+    }
     sub.style.display = open ? '' : 'none';
     btn.classList.toggle('active', open);
     // Only 'disp' actually contains the vertex list, but this is cheap and
@@ -9801,7 +9860,7 @@ let _preDemoState = null;
 let demoSceneLiveState = DEMO_SCENES.map(() => null);
 
 function saveCurrentSceneState() {
-  demoSceneLiveState[demoSceneIndex] = { object: captureState(), view: currentViewSettingsSnapshot() };
+  demoSceneLiveState[demoSceneIndex] = { object: captureState(), view: currentViewSettingsSnapshot(), lastSet: captureLastSet() };
 }
 
 // Shared by entering demo mode and cycling — either resumes a scene exactly
@@ -9819,6 +9878,7 @@ function loadDemoScene(index) {
   if (saved) {
     restoreState(saved.object);
     applyViewSettings(stripDarkMode(saved.view));
+    applyLastSet(saved.lastSet);
   } else {
     const scene  = DEMO_SCENES[index];
     const staged = parseCodeText(scene.codeText);
@@ -9867,6 +9927,7 @@ function loadDemoScene(index) {
   renderVertexList();
   renderSegmentList();
   renderFaceList();
+  renderAddRowDefaults();
 
   // If the code editor happens to be open, refresh it to the new scene's
   // own text — matches what opening it fresh would show.
@@ -9880,7 +9941,7 @@ function loadDemoScene(index) {
 }
 
 function enterDemoMode() {
-  _preDemoState = { object: captureState(), view: currentViewSettingsSnapshot() };
+  _preDemoState = { object: captureState(), view: currentViewSettingsSnapshot(), lastSet: captureLastSet() };
   demoMode = true;
   document.getElementById('btn-demo').classList.add('active');
   document.getElementById('btn-demo-cycle').style.display = '';
@@ -9909,6 +9970,8 @@ function exitDemoMode() {
   // on in demoSceneLiveState (just saved above), never here.
   restoreState(_preDemoState.object);
   applyViewSettings(stripDarkMode(_preDemoState.view));
+  applyLastSet(_preDemoState.lastSet);
+  renderAddRowDefaults();
 
   // Same reasoning as loadDemoScene: a demo-mode session's undo history
   // shouldn't be reachable once you're back to your own document.
