@@ -8347,8 +8347,17 @@ document.getElementById('seg-add-visible').addEventListener('click', () => {
 document.getElementById('btn-toggle-controls').addEventListener('click', () => {
   const body = document.getElementById('controls-main');
   const btn  = document.getElementById('btn-toggle-controls');
+  const wasCollapsed = body.classList.contains('collapsed');
   body.classList.toggle('collapsed');
   btn.classList.toggle('active', !body.classList.contains('collapsed'));
+  // Opening the panel always starts with every submenu closed — a fresh
+  // default each time, not a memory of whatever was left open before.
+  if (wasCollapsed) {
+    ['view', 'aux', 'disp'].forEach(key => {
+      document.getElementById(`sub-${key}`).style.display = 'none';
+      document.getElementById(`btn-sub-${key}`).classList.remove('active');
+    });
+  }
   // Collapsing the whole panel hides the vertex list along with it, but
   // never told any floating button to notice — bug, user-caught: a
   // "use"/"close"/"remove" button could be left floating on screen with
