@@ -8397,46 +8397,42 @@ document.getElementById('btn-toggle-controls').addEventListener('click', () => {
 // "Phone-sized" — the one remaining 767px breakpoint in this codebase
 // (style.css's own copy, formerly used to hide the scale/perspective
 // sliders on phone, was removed once those sliders were restored there).
+// A single persistent MediaQueryList (rather than a fresh matchMedia() call
+// per check) so it can also carry a 'change' listener — needed for a real
+// phone case, not just a resized desktop window: rotating a phone to
+// landscape can cross this breakpoint mid-session.
+const phoneMediaQuery = window.matchMedia('(max-width: 767px)');
 function isPhoneViewport() {
-  return window.matchMedia('(max-width: 767px)').matches;
+  return phoneMediaQuery.matches;
 }
 
-// Briefly flashes a button red — signals "this is disabled right now"
-// without giving it a permanently-disabled look, since it isn't disabled on
-// every screen size. Removes-then-re-adds the class (forcing a reflow in
-// between) so a rapid re-tap restarts the animation instead of no-op'ing.
-function flashButtonError(btn) {
-  btn.classList.remove('flash-error');
-  void btn.offsetWidth;
-  btn.classList.add('flash-error');
-  // Actually remove the class once the flash finishes, rather than leaving
-  // it attached forever — otherwise the next time an ancestor toggles
-  // display:none -> visible (e.g. closing/reopening the whole control
-  // panel), the still-attached class restarts the CSS animation from
-  // scratch with no click involved. A plain setTimeout, not an
-  // `animationend` listener, so cleanup still happens on schedule even if
-  // the button ends up hidden mid-flash (display:none can suppress
-  // animation events). Duration must match style.css's own
-  // `.flash-error` animation length (0.5s). Clears any pending removal
-  // first so a rapid re-tap extends the flash instead of an earlier tap's
-  // timer cutting the new one short.
-  clearTimeout(btn._flashTimer);
-  btn._flashTimer = setTimeout(() => btn.classList.remove('flash-error'), 500);
+// Creating/editing vertices/segments/faces by touch isn't supported, so
+// Display is a genuinely disabled control on phone — not just visually
+// inert, native `disabled` so it can't be clicked/tapped at all (a plain
+// CSS look-alike was tried first and rejected: a red flash on tap read as
+// "error" rather than "unavailable," inconsistent with how every other
+// disabled control in this app already looks — see `button:disabled` in
+// style.css). Re-evaluated on load and on every breakpoint crossing, not
+// just once, for the phone-rotation case above.
+function updateDispSubmenuDisabled() {
+  const btn = document.getElementById('btn-sub-disp');
+  const wasDisabled = btn.disabled;
+  btn.disabled = isPhoneViewport();
+  // Rotating from landscape (where Display could have been open) back to
+  // portrait shouldn't leave a now-disabled control's own submenu visibly
+  // open.
+  if (btn.disabled && !wasDisabled) {
+    document.getElementById('sub-disp').style.display = 'none';
+    btn.classList.remove('active');
+  }
 }
+updateDispSubmenuDisabled();
+phoneMediaQuery.addEventListener('change', updateDispSubmenuDisabled);
 
 ['view', 'aux', 'disp'].forEach(key => {
   document.getElementById(`btn-sub-${key}`).addEventListener('click', () => {
     const sub  = document.getElementById(`sub-${key}`);
     const btn  = document.getElementById(`btn-sub-${key}`);
-
-    // Phone: creating/editing vertices/segments/faces by touch isn't
-    // supported, so Display stays present but inert — flash red, open
-    // nothing.
-    if (key === 'disp' && isPhoneViewport()) {
-      flashButtonError(btn);
-      return;
-    }
-
     const open = sub.style.display === 'none';
     // Phone: only one submenu open at a time — opening this one closes
     // whatever else was open instead of stacking (View/Aux only in
