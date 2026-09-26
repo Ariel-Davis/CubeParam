@@ -9311,6 +9311,79 @@ function syncViewSettingToEditor(token, isFinal) {
 //   history — "undo" should never reach back across a scene boundary into
 //   a different scene or into the pre-demo content.
 const DEMO_SCENES = [
+  { name: 'Cube', codeText: `
+#======== VIEW SETTINGS ========
+
+darkMode: false
+mode: polynomial
+anchor: diagonal
+pointer: 0.173333, 1.06
+showPointer: true
+showAxes: false
+scale: 1
+perspective: false
+invF: 0
+scaleNodes: false
+scaleSegments: false
+clipBehind: true
+
+#======== AUXILIARY CONSTANTS ========
+
+#======== POLYTOPES ========
+
+#-------- VERTICES --------
+
+set vertex: color=#4d4d4d
+set vertex: r=5
+set vertex: visible=true
+set vertex: label=true
+set vertex: naming=P
+
+vertex P0: x=0  y=0  z=0  color=#4d4d4d  r=5  visible=false  label=true
+vertex P1: x=0  y=0  z=1  color=#4d4d4d  r=5  visible=false  label=true
+vertex P2: x=0  y=1  z=0  color=#4d4d4d  r=5  visible=false  label=true
+vertex P3: x=0  y=1  z=1  color=#4d4d4d  r=5  visible=false  label=true
+vertex P4: x=1  y=0  z=0  color=#4d4d4d  r=5  visible=false  label=true
+vertex P5: x=1  y=0  z=1  color=#4d4d4d  r=5  visible=false  label=true
+vertex P6: x=1  y=1  z=0  color=#4d4d4d  r=5  visible=false  label=true
+vertex P7: x=1  y=1  z=1  color=#4d4d4d  r=5  visible=false  label=true
+
+#-------- SEGMENTS --------
+
+set segment: color=#4d4d4d
+set segment: w=1.5
+set segment: visible=true
+set segment: naming=S
+
+segment S0:  P4  P5  color=#4d4d4d  w=1.5  visible=true
+segment S1:  P0  P1  color=#4d4d4d  w=1.5  visible=true
+segment S2:  P2  P3  color=#4d4d4d  w=1.5  visible=true
+segment S3:  P6  P7  color=#4d4d4d  w=1.5  visible=true
+segment S4:  P5  P1  color=#4d4d4d  w=1.5  visible=true
+segment S5:  P4  P0  color=#4d4d4d  w=1.5  visible=true
+segment S6:  P7  P3  color=#4d4d4d  w=1.5  visible=true
+segment S7:  P6  P2  color=#4d4d4d  w=1.5  visible=true
+segment S8:  P4  P6  color=#4d4d4d  w=1.5  visible=true
+segment S9:  P0  P2  color=#4d4d4d  w=1.5  visible=true
+segment S10:  P5  P7  color=#4d4d4d  w=1.5  visible=true
+segment S11:  P1  P3  color=#4d4d4d  w=1.5  visible=true
+
+#-------- FACES --------
+
+set face: color=#4d4d4d
+set face: visible=true
+set face: naming=F
+
+#======== AUXILIARY FUNCTIONS ========
+
+#-------- CURVES --------
+
+set curve: color=#4d4d4d
+set curve: visible=true
+set curve: naming=C
+
+#----------------------------------------
+` },
   { name: 'Rhombic Dodecahedron', codeText: `
 #======== VIEW SETTINGS ========
 
