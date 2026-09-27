@@ -2250,17 +2250,44 @@ function nextAutoName(prefix) {
 }
 
 // Called after a code-file/interpreter commit (codeSave, submitInterpreterLine)
-// to let an explicit `counter=` in the file carry forward into the live
-// session — otherwise a `set vertex: counter=50` with no actual name
-// collision at P0..P49 would have no effect on the *next* controls-driven
-// "+" click, silently defeating the whole point of declaring one. Only
-// moves the live counter forward (max, never regresses it) — a save that
-// happened to touch this prefix less than the live session already has
-// must not roll a further-along live counter backward.
-function syncNameCounterFromParse(governing, defaultPrefix, staged) {
-  const prefix = governing.naming ?? defaultPrefix;
-  if (staged.nameCounters[prefix] === undefined) return;
-  nameCounters[prefix] = Math.max(nameCounters[prefix] ?? 0, staged.nameCounters[prefix]);
+// to let any counter change from that one parse — an explicit `counter=`
+// (either `set TYPE: counter=N`, resolved against whichever naming= that
+// type currently has selected, or `set naming PREFIX: counter=N`,
+// addressing a scheme directly by its own name) or ordinary auto-name
+// consumption from a blank-name object line — carry forward into the live
+// session, in either direction (up or down; see below for why a downward
+// reset needs to actually take effect, not just be computed and discarded).
+//
+// A blanket sync over *every* prefix `parsedCounters` knows about, not just
+// whichever single prefix each of the four object types currently has
+// selected (an earlier version resolved one prefix per type and synced
+// only those four) — that narrower version silently failed to sync a
+// `set naming PREFIX: ...` reset for any prefix that wasn't already some
+// type's active naming=, which is exactly the case that construct exists
+// for. Safe as a blanket copy: `parsedCounters` starts as an exact snapshot
+// of the live counters at the start of that one parse (see parseCodeText),
+// so any prefix this parse didn't actually touch already equals its live
+// value — this only ever changes what a real counter= or auto-name
+// consumption in this specific parse actually computed.
+//
+// The sync direction itself is a direct assignment, not a max — a save's
+// resulting counter becomes the live value outright, whether that's higher
+// (new auto-named objects created) or lower (a deliberate reset, e.g. after
+// deleting some trailing objects to close a naming gap on purpose). An
+// earlier version capped this at Math.max(...), reasoning that a save
+// touching a prefix less than the live session already had must not roll a
+// further-along live counter backward — but that scenario can't actually
+// arise: `counter=` is one-time/absorbed (never re-emitted by
+// serializeState, so a stale value can't linger into a later save), and
+// object creation via the control panel is disabled outright while the
+// code editor is open, so there's no interleaved race to protect against
+// either. The real safety net against a duplicate name is the collision-
+// skip in advanceAutoName/findNextAutoName, which runs at the moment of
+// each actual creation regardless of which direction the counter moved —
+// so capping this sync direction was never load-bearing for correctness,
+// only an overcautious leftover that happened to block a deliberate reset.
+function syncNameCountersFromParse(parsedCounters) {
+  Object.assign(nameCounters, parsedCounters);
 }
 
 function setNameError(el) {
@@ -2545,6 +2572,18 @@ function evalSetAst(ast) {
 // color=X` (the original, pre-decision shape) still parses, silently
 // normalized to the colon form on next Sort/Save.
 const CODE_SET_RE    = /^set\s+(vertex|segment|face|curve)(?:\s*:\s*|\s+)(.+)$/;
+// `set naming PREFIX: counter=N` — addresses a naming scheme directly, by
+// its own prefix, rather than indirectly via whichever type currently has
+// it selected (`set TYPE: counter=N` above). See NOTES20: needed
+// specifically for a scheme that isn't any type's active `naming=` right
+// now — the only other way to reach it is to temporarily reassign some
+// type's `naming=` just to seed it, then switch back. The prefix itself is
+// captured loosely here (any non-whitespace run) and validated against
+// CODE_IDENT_RE below, same "match loosely, validate the captured piece for
+// a specific error" pattern every other identifier in this grammar uses —
+// not baked into the regex the way vertex/segment/face/curve are above,
+// since a prefix is an open-ended user choice, not a fixed keyword set.
+const CODE_SET_NAMING_RE = /^set\s+naming\s+(\S+)\s*:\s*(.+)$/;
 const CODE_EDIT_RE   = /^edit\s+(vertex|segment|face|number|color|bool)\b\s*([^:]*):(.*)$/;
 // Deliberately covers all six renameable kinds, not just the four `edit`
 // currently does — curve/function have nothing else about them to edit
@@ -2874,7 +2913,7 @@ const SET_FIELD_ORDER = {
 // a governing setting: its effect is applied immediately at parse time
 // (seeding parseNameCounters — see parseCodeText) and from then on lives
 // only in the resulting object names and the live nameCounters it advances
-// (see syncNameCounterFromParse), the same way an `edit` line's effect
+// (see syncNameCountersFromParse), the same way an `edit` line's effect
 // lives on only in the target object it already mutated. Auto-redisplaying
 // it here would also churn the file on every single object creation, which
 // naming/color/etc. never do since they're stable across many creations.
@@ -3428,7 +3467,7 @@ function parseCodeText(text) {
   const functionByName  = new Map(); // name -> staged function, built incrementally
   const curveByName     = new Map(); // name -> staged curve, built incrementally
   // Per-prefix auto-name counters, local to this one parse (mutations here
-  // never touch the live nameCounters directly — see syncNameCounterFromParse,
+  // never touch the live nameCounters directly — see syncNameCountersFromParse,
   // called only after a real commit) — but *seeded* from the live session's
   // counters, not started fresh at 0. This is what carries a `naming=`/
   // `counter=` override across separate interpreter submissions: each
@@ -3840,6 +3879,43 @@ function parseCodeText(text) {
       }
       currentSet[setType][field] = rawText;
       rec.parsed = { setType, field, value: rawText };
+      lines.push(rec);
+      continue;
+    }
+
+    const setNamingMatch = trimmed.match(CODE_SET_NAMING_RE);
+    if (setNamingMatch) {
+      const [, prefix, fieldTok] = setNamingMatch;
+      rec.kind = 'setNaming';
+      if (!CODE_IDENT_RE.test(prefix)) {
+        rec.valid = false;
+        rec.errorMsg = `invalid naming scheme '${prefix}'`;
+        lines.push(rec);
+        continue;
+      }
+      // Only `counter=` is meaningful on a naming scheme addressed directly
+      // like this — it has no other properties (no color, no visibility,
+      // ...) the way an object type does.
+      const tok = tokenizeAttrs(fieldTok.trim(), ['counter']);
+      const attrKeys = tok.error ? [] : Object.keys(tok.attrs);
+      if (tok.error || tok.positional.length > 0 || attrKeys.length !== 1) {
+        rec.valid = false;
+        rec.errorMsg = tok.error || 'expected counter=value';
+        lines.push(rec);
+        continue;
+      }
+      const rawText = tok.attrs.counter;
+      if (!(/^\d+$/.test(rawText) && Number.isSafeInteger(parseInt(rawText, 10)))) {
+        rec.valid = false;
+        rec.errorMsg = `invalid counter value '${rawText}'`;
+        lines.push(rec);
+        continue;
+      }
+      // Applied immediately, same as `set TYPE: counter=N` above — seeds
+      // parseNameCounters for this prefix directly, with no indirection
+      // through any type's current naming= at all.
+      parseNameCounters[prefix] = parseInt(rawText, 10);
+      rec.parsed = { prefix, field: 'counter', value: rawText };
       lines.push(rec);
       continue;
     }
@@ -4473,8 +4549,19 @@ function serializeState(vertsArr, constsArr, segsArr, facesArr, curvesArr, funct
 // raw text untouched. `set` lines are also never moved (their effect is
 // purely positional — which object lines follow them — so relocating one
 // would silently change what it governs) but are still reformatted in place.
+// Returns { text, nameCounters } rather than a bare string — nameCounters is
+// this call's own parse's result, needed by codeSave() below because a valid
+// `counter=` line is dropped from `text` right here (absorbed, one-time,
+// same as `edit` — see the loop below), so it's already gone from the text
+// codeSave() goes on to re-parse for the actual commit. Without threading
+// this out, an explicit counter reset with no auto-named object to "carry"
+// it forward via a baked-in literal name (see NOTES20-era discussion) would
+// silently vanish before syncNameCountersFromParse ever saw it, regardless of
+// that function's own fix — a Save with no other change touching the prefix
+// simply re-seeds from the live value, since nothing in the re-parsed text
+// mentions the prefix at all any more.
 function sortCodeText(text) {
-  const { lines, finalSet, finalView } = parseCodeText(text);
+  const { lines, finalSet, finalView, nameCounters: parsedCounters } = parseCodeText(text);
 
   const headerIdx = {};
   let dividerIdx = -1;
@@ -4530,6 +4617,10 @@ function sortCodeText(text) {
     // so it drops for the same reason `edit` does two branches down: nothing
     // left to re-emit once absorbed.
     if (rec.kind === 'set' && rec.valid) return;
+    // `set naming PREFIX: counter=N` — same reasoning as `counter=` just
+    // above, one line up: a one-time imperative, already applied at parse
+    // time, nothing left to re-emit once absorbed.
+    if (rec.kind === 'setNaming' && rec.valid) return;
     // A valid `edit` line's effect is already baked into its target's own
     // line (Object.assign in parseCodeText, at parse time) — it never had
     // anything of its own to re-emit, unlike `set` there's no consolidated
@@ -4579,7 +4670,7 @@ function sortCodeText(text) {
   out.push('');
   for (const rec of scratchKept) out.push(formatLineForOutput(rec));
 
-  return out.join('\n');
+  return { text: out.join('\n'), nameCounters: parsedCounters };
 }
 
 // ─── Theme helpers ────────────────────────────────────────────────────────────
@@ -8602,19 +8693,25 @@ function resetCodeLineTracking() {
 
 function codeSort() {
   const textarea = document.getElementById('code-textarea');
-  textarea.value = sortCodeText(textarea.value);
+  textarea.value = sortCodeText(textarea.value).text;
   reparseAndPreview();
   resetCodeLineTracking();
 }
 
 function codeSave() {
-  // codeSort() already reformats every valid line to its canonical form (via
+  // Calls sortCodeText() directly rather than through codeSort() — it
+  // already reformats every valid line to canonical form (via
   // formatLineForOutput) as part of reassembling the text, so the textarea
-  // is fully canonical by the time it returns — no separate re-serialize
-  // pass needed. Invalid lines are left exactly as typed either way, so the
-  // user can still see and fix them (no cascade-delete).
-  codeSort();
+  // is fully canonical by the time it returns and the re-parse below needs
+  // no separate re-serialize pass (invalid lines are left exactly as typed
+  // either way, so the user can still see and fix them — no cascade-delete).
+  // Going through codeSort() would also work for the text itself, but its
+  // own parse's nameCounters — the only parse that still sees a valid
+  // `counter=` line before it's absorbed/dropped — would be thrown away;
+  // calling it directly here keeps that value reachable for the sync below.
   const textarea = document.getElementById('code-textarea');
+  const sorted = sortCodeText(textarea.value);
+  textarea.value = sorted.text;
   const staged = parseCodeText(textarea.value);
   const { newVertices, newConstants, newFunctions, newSegments, newFaces, newCurves } = buildCommittedArraysFromStaged(staged);
 
@@ -8626,10 +8723,11 @@ function codeSave() {
   lastSetCurve   = { ...staged.finalSet.curve };
   // Let an explicit `counter=` (or a run of blank-name lines under a custom
   // `naming=`) carry forward into future controls-driven creation too.
-  syncNameCounterFromParse(lastSetVertex,  AUTO_NAME_PREFIX.vertex,  staged);
-  syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
-  syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
-  syncNameCounterFromParse(lastSetCurve,   AUTO_NAME_PREFIX.curve,   staged);
+  // Sourced from sortCodeText's own parse (sorted.nameCounters) — a lone
+  // counter= reset with nothing else in the file to consume it is already
+  // gone from `staged` (the re-parse just above) by the time this runs, same
+  // as an `edit` line, so `staged.nameCounters` alone would never see it.
+  syncNameCountersFromParse(sorted.nameCounters);
   // View settings are tier-2 singleton state, same as lastSet*/naming above —
   // applied directly, outside snapshot()'s undo capture (see applyViewSettings).
   applyViewSettings(staged.finalView);
@@ -8682,6 +8780,34 @@ let _preCodeViewSnapshot = null;
 function openCodeSubmenu() {
   if (editingVertexId !== null)  cancelEdit();
   if (editingSegmentId !== null) cancelSegmentEdit();
+  // An in-progress face/segment *definition* gets the same hard cancel as
+  // the two edits just above, for the same underlying reason: the editor
+  // can delete or retarget any vertex a pending pick references while
+  // canvas interaction is frozen, with no way to detect that after the
+  // fact (this is what the mid-pick-deletion bug actually was — see
+  // NOTES20/21). A real cancel, not the "pause, resumable" treatment
+  // switching between face/segment mode on canvas already gives each
+  // other (that's safe there because nothing can delete a referenced
+  // vertex out from under a merely-paused pick) — facePickOrder/
+  // selectedVertexIds are actually cleared here, not just left for later.
+  // Face *editing* (not yet built) belongs in this same spot once it
+  // exists. Functions/curves need no equivalent — they have no
+  // canvas-driven creation gesture to interrupt in the first place. The
+  // interpreter's own input is deliberately untouched by any of this.
+  faceMode      = 'off';
+  facePickOrder = [];
+  if (segmentMode !== 'off') {
+    segmentMode       = 'off';
+    selectedVertexIds = new Set();
+  }
+  clearArmedStates();
+  clearPendingListPick();
+  updateFaceButton();
+  updateSegmentButton();
+  renderVertexList();
+  renderSegmentList();
+  renderFaceList();
+  draw();
 
   _preCodeViewSnapshot = currentViewSettingsSnapshot();
 
@@ -8917,10 +9043,7 @@ function submitInterpreterLine() {
   // renderAddRowDefaults() call) picks it up automatically, since the
   // add-rows now read lastSetVertex/lastSetSegment/lastSetFace directly
   // rather than a separately-synced shadow copy.
-  syncNameCounterFromParse(lastSetVertex,  AUTO_NAME_PREFIX.vertex,  staged);
-  syncNameCounterFromParse(lastSetSegment, AUTO_NAME_PREFIX.segment, staged);
-  syncNameCounterFromParse(lastSetFace,    AUTO_NAME_PREFIX.face,    staged);
-  syncNameCounterFromParse(lastSetCurve,   AUTO_NAME_PREFIX.curve,   staged);
+  syncNameCountersFromParse(staged.nameCounters);
   // A multi-line paste mixing a view-setting line with object/set/edit
   // lines falls through to here (the lone-line fast path above only covers
   // a single view line by itself) — still needs applying.
