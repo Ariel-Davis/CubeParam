@@ -10019,8 +10019,6 @@ curve C8: x=s*fx(t,8) ; y=s*fy(t,8) ; z=s*fz(t) ; t in [-32, 32]  color=#4d4d4d 
 #----------------------------------------
 ` },
   { name: 'Constellations', forceDark: true, codeText: `
-#======== VIEW SETTINGS ========
-
 darkMode: true
 mode: compact
 anchor: zaxis
@@ -10034,7 +10032,6 @@ scaleNodes: false
 scaleSegments: false
 clipBehind: true
 
-#======== AUXILIARY CONSTANTS ========
 
 color col0: #000000
 color col1: #c0c0c0
@@ -10045,1906 +10042,1879 @@ bool vis1: true
 bool lab: false
 number s: 1
 number a: 2
-number b: 2
-number wid: 0.5
+number b: 3 
+number wid: 0.5 
 bool RadByBright: true
-bool ShowGrid: true
-color col0Ant: col0
-bool visAnt: true
-bool labAnt: false
-color col1Ant: col1
-bool showNameAnt: false
-color col0Ara: col0
-bool visAra: true
-bool labAra: false
-color col1Ara: col1
-bool showNameAra: false
-color col0And: col0
-bool visAnd: true
-bool labAnd: false
-color col1And: col1
-bool showNameAnd: false
-color col0Sgr: col0
-bool visSgr: true
-bool labSgr: false
-color col1Sgr: col1
-bool showNameSgr: false
-color col0Sge: col0
-bool visSge: true
-bool labSge: false
-color col1Sge: col1
-bool showNameSge: false
-color col0Com: col0
-bool visCom: true
-bool labCom: false
-color col1Com: col1
-bool showNameCom: false
-color col0Aps: col0
-bool visAps: true
-bool labAps: false
-color col1Aps: col1
-bool showNameAps: false
-color col0Boo: col0
-bool visBoo: true
-bool labBoo: false
-color col1Boo: col1
-bool showNameBoo: false
-color col0Tau: col0
-bool visTau: true
-bool labTau: false
-color col1Tau: col1
-bool showNameTau: false
-color col0Cap: col0
-bool visCap: true
-bool labCap: false
-color col1Cap: col1
-bool showNameCap: false
-color col0Nor: col0
-bool visNor: true
-bool labNor: false
-color col1Nor: col1
-bool showNameNor: false
-color col0Cas: col0
-bool visCas: true
-bool labCas: false
-color col1Cas: col1
-bool showNameCas: false
-color col0Cen: col0
-bool visCen: true
-bool labCen: false
-color col1Cen: col1
-bool showNameCen: false
-color col0Cep: col0
-bool visCep: true
-bool labCep: false
-color col1Cep: col1
-bool showNameCep: false
-color col0Cha: col0
-bool visCha: true
-bool labCha: false
-color col1Cha: col1
-bool showNameCha: false
-color col0Aur: col0
-bool visAur: true
-bool labAur: false
-color col1Aur: col1
-bool showNameAur: false
-color col0Hor: col0
-bool visHor: true
-bool labHor: false
-color col1Hor: col1
-bool showNameHor: false
-color col0Cnc: col0
-bool visCnc: true
-bool labCnc: false
-color col1Cnc: col1
-bool showNameCnc: false
-color col0Gru: col0
-bool visGru: true
-bool labGru: false
-color col1Gru: col1
-bool showNameGru: false
-color col0Crv: col0
-bool visCrv: true
-bool labCrv: false
-color col1Crv: col1
-bool showNameCrv: false
-color col0Crt: col0
-bool visCrt: true
-bool labCrt: false
-color col1Crt: col1
-bool showNameCrt: false
-color col0Del: col0
-bool visDel: true
-bool labDel: false
-color col1Del: col1
-bool showNameDel: false
-color col0Col: col0
-bool visCol: true
-bool labCol: false
-color col1Col: col1
-bool showNameCol: false
-color col0Dra: col0
-bool visDra: true
-bool labDra: false
-color col1Dra: col1
-bool showNameDra: false
-color col0Cir: col0
-bool visCir: true
-bool labCir: false
-color col1Cir: col1
-bool showNameCir: false
-color col0Aql: col0
-bool visAql: true
-bool labAql: false
-color col1Aql: col1
-bool showNameAql: false
-color col0Cae: col0
-bool visCae: true
-bool labCae: false
-color col1Cae: col1
-bool showNameCae: false
-color col0Eri: col0
-bool visEri: true
-bool labEri: false
-color col1Eri: col1
-bool showNameEri: false
-color col0Psc: col0
-bool visPsc: true
-bool labPsc: false
-color col1Psc: col1
-bool showNamePsc: false
-color col0Mus: col0
-bool visMus: true
-bool labMus: false
-color col1Mus: col1
-bool showNameMus: false
-color col0Vol: col0
-bool visVol: true
-bool labVol: false
-color col1Vol: col1
-bool showNameVol: false
-color col0Vul: col0
-bool visVul: true
-bool labVul: false
-color col1Vul: col1
-bool showNameVul: false
-color col0For: col0
-bool visFor: true
-bool labFor: false
-color col1For: col1
-bool showNameFor: false
-color col0Cam: col0
-bool visCam: true
-bool labCam: false
-color col1Cam: col1
-bool showNameCam: false
-color col0UMa: col0
-bool visUMa: true
-bool labUMa: false
-color col1UMa: col1
-bool showNameUMa: false
-color col0CMa: col0
-bool visCMa: true
-bool labCMa: false
-color col1CMa: col1
-bool showNameCMa: false
-color col0Lep: col0
-bool visLep: true
-bool labLep: false
-color col1Lep: col1
-bool showNameLep: false
-color col0Her: col0
-bool visHer: true
-bool labHer: false
-color col1Her: col1
-bool showNameHer: false
-color col0CVn: col0
-bool visCVn: true
-bool labCVn: false
-color col1CVn: col1
-bool showNameCVn: false
-color col0Ind: col0
-bool visInd: true
-bool labInd: false
-color col1Ind: col1
-bool showNameInd: false
-color col0Car: col0
-bool visCar: true
-bool labCar: false
-color col1Car: col1
-bool showNameCar: false
-color col0UMi: col0
-bool visUMi: true
-bool labUMi: false
-color col1UMi: col1
-bool showNameUMi: false
-color col0CMi: col0
-bool visCMi: true
-bool labCMi: false
-color col1CMi: col1
-bool showNameCMi: false
-color col0LMi: col0
-bool visLMi: true
-bool labLMi: false
-color col1LMi: col1
-bool showNameLMi: false
-color col0Hyi: col0
-bool visHyi: true
-bool labHyi: false
-color col1Hyi: col1
-bool showNameHyi: false
-color col0Leo: col0
-bool visLeo: true
-bool labLeo: false
-color col1Leo: col1
-bool showNameLeo: false
-color col0Equ: col0
-bool visEqu: true
-bool labEqu: false
-color col1Equ: col1
-bool showNameEqu: false
-color col0Lac: col0
-bool visLac: true
-bool labLac: false
-color col1Lac: col1
-bool showNameLac: false
-color col0Lyn: col0
-bool visLyn: true
-bool labLyn: false
-color col1Lyn: col1
-bool showNameLyn: false
-color col0Lyr: col0
-bool visLyr: true
-bool labLyr: false
-color col1Lyr: col1
-bool showNameLyr: false
-color col0Vir: col0
-bool visVir: true
-bool labVir: false
-color col1Vir: col1
-bool showNameVir: false
-color col0Pyx: col0
-bool visPyx: true
-bool labPyx: false
-color col1Pyx: col1
-bool showNamePyx: false
-color col0Mic: col0
-bool visMic: true
-bool labMic: false
-color col1Mic: col1
-bool showNameMic: false
-color col0CrB: col0
-bool visCrB: true
-bool labCrB: false
-color col1CrB: col1
-bool showNameCrB: false
-color col0Oct: col0
-bool visOct: true
-bool labOct: false
-color col1Oct: col1
-bool showNameOct: false
-color col0Ori: col0
-bool visOri: true
-bool labOri: false
-color col1Ori: col1
-bool showNameOri: false
-color col0Pic: col0
-bool visPic: true
-bool labPic: false
-color col1Pic: col1
-bool showNamePic: false
-color col0Pav: col0
-bool visPav: true
-bool labPav: false
-color col1Pav: col1
-bool showNamePav: false
-color col0Peg: col0
-bool visPeg: true
-bool labPeg: false
-color col1Peg: col1
-bool showNamePeg: false
-color col0Per: col0
-bool visPer: true
-bool labPer: false
-color col1Per: col1
-bool showNamePer: false
-color col0Phe: col0
-bool visPhe: true
-bool labPhe: false
-color col1Phe: col1
-bool showNamePhe: false
-color col0Ari: col0
-bool visAri: true
-bool labAri: false
-color col1Ari: col1
-bool showNameAri: false
-color col0Ret: col0
-bool visRet: true
-bool labRet: false
-color col1Ret: col1
-bool showNameRet: false
-color col0Vel: col0
-bool visVel: true
-bool labVel: false
-color col1Vel: col1
-bool showNameVel: false
-color col0Lib: col0
-bool visLib: true
-bool labLib: false
-color col1Lib: col1
-bool showNameLib: false
-color col0Sco: col0
-bool visSco: true
-bool labSco: false
-color col1Sco: col1
-bool showNameSco: false
-color col0Scl: col0
-bool visScl: true
-bool labScl: false
-color col1Scl: col1
-bool showNameScl: false
-color col0Ser: col0
-bool visSer: true
-bool labSer: false
-color col1Ser: col1
-bool showNameSer: false
-color col0Oph: col0
-bool visOph: true
-bool labOph: false
-color col1Oph: col1
-bool showNameOph: false
-color col0Sex: col0
-bool visSex: true
-bool labSex: false
-color col1Sex: col1
-bool showNameSex: false
-color col0Sct: col0
-bool visSct: true
-bool labSct: false
-color col1Sct: col1
-bool showNameSct: false
-color col0Cru: col0
-bool visCru: true
-bool labCru: false
-color col1Cru: col1
-bool showNameCru: false
-color col0CrA: col0
-bool visCrA: true
-bool labCrA: false
-color col1CrA: col1
-bool showNameCrA: false
-color col0PsA: col0
-bool visPsA: true
-bool labPsA: false
-color col1PsA: col1
-bool showNamePsA: false
-color col0TrA: col0
-bool visTrA: true
-bool labTrA: false
-color col1TrA: col1
-bool showNameTrA: false
-color col0Pup: col0
-bool visPup: true
-bool labPup: false
-color col1Pup: col1
-bool showNamePup: false
-color col0Cyg: col0
-bool visCyg: true
-bool labCyg: false
-color col1Cyg: col1
-bool showNameCyg: false
-color col0Dor: col0
-bool visDor: true
-bool labDor: false
-color col1Dor: col1
-bool showNameDor: false
-color col0Men: col0
-bool visMen: true
-bool labMen: false
-color col1Men: col1
-bool showNameMen: false
-color col0Tel: col0
-bool visTel: true
-bool labTel: false
-color col1Tel: col1
-bool showNameTel: false
-color col0Tuc: col0
-bool visTuc: true
-bool labTuc: false
-color col1Tuc: col1
-bool showNameTuc: false
-color col0Tri: col0
-bool visTri: true
-bool labTri: false
-color col1Tri: col1
-bool showNameTri: false
-color col0Gem: col0
-bool visGem: true
-bool labGem: false
-color col1Gem: col1
-bool showNameGem: false
-color col0Mon: col0
-bool visMon: true
-bool labMon: false
-color col1Mon: col1
-bool showNameMon: false
-color col0Aqr: col0
-bool visAqr: true
-bool labAqr: false
-color col1Aqr: col1
-bool showNameAqr: false
-color col0Hya: col0
-bool visHya: true
-bool labHya: false
-color col1Hya: col1
-bool showNameHya: false
-color col0Cet: col0
-bool visCet: true
-bool labCet: false
-color col1Cet: col1
-bool showNameCet: false
-color col0Lup: col0
-bool visLup: true
-bool labLup: false
-color col1Lup: col1
-bool showNameLup: false
+bool ShowGrid: true 
 
-#======== POLYTOPES ========
 
-#-------- VERTICES --------
+color col0Ant : col0
+bool visAnt : true
+bool labAnt : false
+color col1Ant : col1
+bool showNameAnt : false
+color col0Ara : col0
+bool visAra : true
+bool labAra : false
+color col1Ara : col1
+bool showNameAra : false
+color col0And : col0
+bool visAnd : true
+bool labAnd : false
+color col1And : col1
+bool showNameAnd : false
+color col0Sgr : col0
+bool visSgr : true
+bool labSgr : false
+color col1Sgr : col1
+bool showNameSgr : false
+color col0Sge : col0
+bool visSge : true
+bool labSge : false
+color col1Sge : col1
+bool showNameSge : false
+color col0Com : col0
+bool visCom : true
+bool labCom : false
+color col1Com : col1
+bool showNameCom : false
+color col0Aps : col0
+bool visAps : true
+bool labAps : false
+color col1Aps : col1
+bool showNameAps : false
+color col0Boo : col0
+bool visBoo : true
+bool labBoo : false
+color col1Boo : col1
+bool showNameBoo : false
+color col0Tau : col0
+bool visTau : true
+bool labTau : false
+color col1Tau : col1
+bool showNameTau : false
+color col0Cap : col0
+bool visCap : true
+bool labCap : false
+color col1Cap : col1
+bool showNameCap : false
+color col0Nor : col0
+bool visNor : true
+bool labNor : false
+color col1Nor : col1
+bool showNameNor : false
+color col0Cas : col0
+bool visCas : true
+bool labCas : false
+color col1Cas : col1
+bool showNameCas : false
+color col0Cen : col0
+bool visCen : true
+bool labCen : false
+color col1Cen : col1
+bool showNameCen : false
+color col0Cep : col0
+bool visCep : true
+bool labCep : false
+color col1Cep : col1
+bool showNameCep : false
+color col0Cha : col0
+bool visCha : true
+bool labCha : false
+color col1Cha : col1
+bool showNameCha : false
+color col0Aur : col0
+bool visAur : true
+bool labAur : false
+color col1Aur : col1
+bool showNameAur : false
+color col0Hor : col0
+bool visHor : true
+bool labHor : false
+color col1Hor : col1
+bool showNameHor : false
+color col0Cnc : col0
+bool visCnc : true
+bool labCnc : false
+color col1Cnc : col1
+bool showNameCnc : false
+color col0Gru : col0
+bool visGru : true
+bool labGru : false
+color col1Gru : col1
+bool showNameGru : false
+color col0Crv : col0
+bool visCrv : true
+bool labCrv : false
+color col1Crv : col1
+bool showNameCrv : false
+color col0Crt : col0
+bool visCrt : true
+bool labCrt : false
+color col1Crt : col1
+bool showNameCrt : false
+color col0Del : col0
+bool visDel : true
+bool labDel : false
+color col1Del : col1
+bool showNameDel : false
+color col0Col : col0
+bool visCol : true
+bool labCol : false
+color col1Col : col1
+bool showNameCol : false
+color col0Dra : col0
+bool visDra : true
+bool labDra : false
+color col1Dra : col1
+bool showNameDra : false
+color col0Cir : col0
+bool visCir : true
+bool labCir : false
+color col1Cir : col1
+bool showNameCir : false
+color col0Aql : col0
+bool visAql : true
+bool labAql : false
+color col1Aql : col1
+bool showNameAql : false
+color col0Cae : col0
+bool visCae : true
+bool labCae : false
+color col1Cae : col1
+bool showNameCae : false
+color col0Eri : col0
+bool visEri : true
+bool labEri : false
+color col1Eri : col1
+bool showNameEri : false
+color col0Psc : col0
+bool visPsc : true
+bool labPsc : false
+color col1Psc : col1
+bool showNamePsc : false
+color col0Mus : col0
+bool visMus : true
+bool labMus : false
+color col1Mus : col1
+bool showNameMus : false
+color col0Vol : col0
+bool visVol : true
+bool labVol : false
+color col1Vol : col1
+bool showNameVol : false
+color col0Vul : col0
+bool visVul : true
+bool labVul : false
+color col1Vul : col1
+bool showNameVul : false
+color col0For : col0
+bool visFor : true
+bool labFor : false
+color col1For : col1
+bool showNameFor : false
+color col0Cam : col0
+bool visCam : true
+bool labCam : false
+color col1Cam : col1
+bool showNameCam : false
+color col0UMa : col0
+bool visUMa : true
+bool labUMa : false
+color col1UMa : col1
+bool showNameUMa : false
+color col0CMa : col0
+bool visCMa : true
+bool labCMa : false
+color col1CMa : col1
+bool showNameCMa : false
+color col0Lep : col0
+bool visLep : true
+bool labLep : false
+color col1Lep : col1
+bool showNameLep : false
+color col0Her : col0
+bool visHer : true
+bool labHer : false
+color col1Her : col1
+bool showNameHer : false
+color col0CVn : col0
+bool visCVn : true
+bool labCVn : false
+color col1CVn : col1
+bool showNameCVn : false
+color col0Ind : col0
+bool visInd : true
+bool labInd : false
+color col1Ind : col1
+bool showNameInd : false
+color col0Car : col0
+bool visCar : true
+bool labCar : false
+color col1Car : col1
+bool showNameCar : false
+color col0UMi : col0
+bool visUMi : true
+bool labUMi : false
+color col1UMi : col1
+bool showNameUMi : false
+color col0CMi : col0
+bool visCMi : true
+bool labCMi : false
+color col1CMi : col1
+bool showNameCMi : false
+color col0LMi : col0
+bool visLMi : true
+bool labLMi : false
+color col1LMi : col1
+bool showNameLMi : false
+color col0Hyi : col0
+bool visHyi : true
+bool labHyi : false
+color col1Hyi : col1
+bool showNameHyi : false
+color col0Leo : col0
+bool visLeo : true
+bool labLeo : false
+color col1Leo : col1
+bool showNameLeo : false
+color col0Equ : col0
+bool visEqu : true
+bool labEqu : false
+color col1Equ : col1
+bool showNameEqu : false
+color col0Lac : col0
+bool visLac : true
+bool labLac : false
+color col1Lac : col1
+bool showNameLac : false
+color col0Lyn : col0
+bool visLyn : true
+bool labLyn : false
+color col1Lyn : col1
+bool showNameLyn : false
+color col0Lyr : col0
+bool visLyr : true
+bool labLyr : false
+color col1Lyr : col1
+bool showNameLyr : false
+color col0Vir : col0
+bool visVir : true
+bool labVir : false
+color col1Vir : col1
+bool showNameVir : false
+color col0Pyx : col0
+bool visPyx : true
+bool labPyx : false
+color col1Pyx : col1
+bool showNamePyx : false
+color col0Mic : col0
+bool visMic : true
+bool labMic : false
+color col1Mic : col1
+bool showNameMic : false
+color col0CrB : col0
+bool visCrB : true
+bool labCrB : false
+color col1CrB : col1
+bool showNameCrB : false
+color col0Oct : col0
+bool visOct : true
+bool labOct : false
+color col1Oct : col1
+bool showNameOct : false
+color col0Ori : col0
+bool visOri : true
+bool labOri : false
+color col1Ori : col1
+bool showNameOri : false
+color col0Pic : col0
+bool visPic : true
+bool labPic : false
+color col1Pic : col1
+bool showNamePic : false
+color col0Pav : col0
+bool visPav : true
+bool labPav : false
+color col1Pav : col1
+bool showNamePav : false
+color col0Peg : col0
+bool visPeg : true
+bool labPeg : false
+color col1Peg : col1
+bool showNamePeg : false
+color col0Per : col0
+bool visPer : true
+bool labPer : false
+color col1Per : col1
+bool showNamePer : false
+color col0Phe : col0
+bool visPhe : true
+bool labPhe : false
+color col1Phe : col1
+bool showNamePhe : false
+color col0Ari : col0
+bool visAri : true
+bool labAri : false
+color col1Ari : col1
+bool showNameAri : false
+color col0Ret : col0
+bool visRet : true
+bool labRet : false
+color col1Ret : col1
+bool showNameRet : false
+color col0Vel : col0
+bool visVel : true
+bool labVel : false
+color col1Vel : col1
+bool showNameVel : false
+color col0Lib : col0
+bool visLib : true
+bool labLib : false
+color col1Lib : col1
+bool showNameLib : false
+color col0Sco : col0
+bool visSco : true
+bool labSco : false
+color col1Sco : col1
+bool showNameSco : false
+color col0Scl : col0
+bool visScl : true
+bool labScl : false
+color col1Scl : col1
+bool showNameScl : false
+color col0Ser : col0
+bool visSer : true
+bool labSer : false
+color col1Ser : col1
+bool showNameSer : false
+color col0Oph : col0
+bool visOph : true
+bool labOph : false
+color col1Oph : col1
+bool showNameOph : false
+color col0Sex : col0
+bool visSex : true
+bool labSex : false
+color col1Sex : col1
+bool showNameSex : false
+color col0Sct : col0
+bool visSct : true
+bool labSct : false
+color col1Sct : col1
+bool showNameSct : false
+color col0Cru : col0
+bool visCru : true
+bool labCru : false
+color col1Cru : col1
+bool showNameCru : false
+color col0CrA : col0
+bool visCrA : true
+bool labCrA : false
+color col1CrA : col1
+bool showNameCrA : false
+color col0PsA : col0
+bool visPsA : true
+bool labPsA : false
+color col1PsA : col1
+bool showNamePsA : false
+color col0TrA : col0
+bool visTrA : true
+bool labTrA : false
+color col1TrA : col1
+bool showNameTrA : false
+color col0Pup : col0
+bool visPup : true
+bool labPup : false
+color col1Pup : col1
+bool showNamePup : false
+color col0Cyg : col0
+bool visCyg : true
+bool labCyg : false
+color col1Cyg : col1
+bool showNameCyg : false
+color col0Dor : col0
+bool visDor : true
+bool labDor : false
+color col1Dor : col1
+bool showNameDor : false
+color col0Men : col0
+bool visMen : true
+bool labMen : false
+color col1Men : col1
+bool showNameMen : false
+color col0Tel : col0
+bool visTel : true
+bool labTel : false
+color col1Tel : col1
+bool showNameTel : false
+color col0Tuc : col0
+bool visTuc : true
+bool labTuc : false
+color col1Tuc : col1
+bool showNameTuc : false
+color col0Tri : col0
+bool visTri : true
+bool labTri : false
+color col1Tri : col1
+bool showNameTri : false
+color col0Gem : col0
+bool visGem : true
+bool labGem : false
+color col1Gem : col1
+bool showNameGem : false
+color col0Mon : col0
+bool visMon : true
+bool labMon : false
+color col1Mon : col1
+bool showNameMon : false
+color col0Aqr : col0
+bool visAqr : true
+bool labAqr : false
+color col1Aqr : col1
+bool showNameAqr : false
+color col0Hya : col0
+bool visHya : true
+bool labHya : false
+color col1Hya : col1
+bool showNameHya : false
+color col0Cet : col0
+bool visCet : true
+bool labCet : false
+color col1Cet : col1
+bool showNameCet : false
+color col0Lup : col0
+bool visLup : true
+bool labLup : false
+color col1Lup : col1
+bool showNameLup : false
 
-set vertex: color=#4d4d4d
-set vertex: r=5
-set vertex: visible=true
-set vertex: label=true
-set vertex: naming=P
 
-vertex alphaAnt: x=-0.787878972260081*s  y=0.332899625746599*s  z=-0.518097060644212*s  color=col0Ant  r=RadByBright{0.3622*b},!RadByBright{a}  visible=visAnt&vis0  label=labAnt
-vertex etaAnt: x=-0.700491184480606*s  y=0.404339963768132*s  z=-0.588065722657717*s  color=col0Ant  r=RadByBright{0.2946*b},!RadByBright{a}  visible=visAnt&vis0  label=labAnt
-vertex alphaAra: x=-0.0731696235890633*s  y=-0.640031971359185*s  z=-0.764856379866122*s  color=col0Ara  r=RadByBright{0.5264*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex betaAra: x=-0.079876723907555*s  y=-0.559992761818228*s  z=-0.824637990689848*s  color=col0Ara  r=RadByBright{0.5020*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex zetaAra: x=-0.142634782221537*s  y=-0.540260117532553*s  z=-0.829321604870105*s  color=col0Ara  r=RadByBright{0.4744*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex gammaAra: x=-0.0778515585196622*s  y=-0.547895311794805*s  z=-0.832916479696094*s  color=col0Ara  r=RadByBright{0.4709*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex deltaAra: x=-0.05641515245633*s  y=-0.486081174336695*s  z=-0.872090833874998*s  color=col0Ara  r=RadByBright{0.4397*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex thetaAra: x=0.0243876404428531*s  y=-0.641166064555745*s  z=-0.767014550485015*s  color=col0Ara  r=RadByBright{0.4332*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex etaAra: x=-0.149976155280045*s  y=-0.491376804779129*s  z=-0.857937053968687*s  color=col0Ara  r=RadByBright{0.4096*b},!RadByBright{a}  visible=visAra&vis0  label=labAra
-vertex alphaAnd: x=0.871804667172319*s  y=0.0372110032429284*s  z=0.488438290405468*s  color=col0And  r=RadByBright{0.6256*b},!RadByBright{a}  visible=visAnd&vis0  label=labAnd
-vertex betaAnd: x=0.772568661268937*s  y=0.248188675497734*s  z=0.58441427513349*s  color=col0And  r=RadByBright{0.6062*b},!RadByBright{a}  visible=visAnd&vis0  label=labAnd
-vertex gamma1And: x=0.629817525376067*s  y=0.384265457703552*s  z=0.675033290101345*s  color=col0And  r=RadByBright{0.5969*b},!RadByBright{a}  visible=visAnd&vis0  label=labAnd
-vertex deltaAnd: x=0.843581618310615*s  y=0.151649966604828*s  z=0.515143029533739*s  color=col0And  r=RadByBright{0.4536*b},!RadByBright{a}  visible=visAnd&vis0  label=labAnd
-vertex muAnd: x=0.755952781271134*s  y=0.19637568131594*s  z=0.624477368906302*s  color=col0And  r=RadByBright{0.4071*b},!RadByBright{a}  visible=visAnd&vis0  label=labAnd
-vertex nuAnd: x=0.733374710362447*s  y=0.16695395762283*s  z=0.659005242949456*s  color=col0And  r=RadByBright{0.3560*b},!RadByBright{a}  visible=visAnd&vis0  label=labAnd
-vertex epsilonSgr: x=0.0932474501065654*s  y=-0.820132238521186*s  z=-0.564524600338065*s  color=col0Sgr  r=RadByBright{0.6608*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex sigmaSgr: x=0.220451162351473*s  y=-0.869269331593688*s  z=-0.442461426757799*s  color=col0Sgr  r=RadByBright{0.6295*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex zetaSgr: x=0.240230112008231*s  y=-0.833496303374978*s  z=-0.497567488432232*s  color=col0Sgr  r=RadByBright{0.5469*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex deltaSgr: x=0.0858188057855319*s  y=-0.8633884206559*s  z=-0.4971876583855*s  color=col0Sgr  r=RadByBright{0.5170*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex lambdaSgr: x=0.116422014438455*s  y=-0.895768313844251*s  z=-0.429004711473801*s  color=col0Sgr  r=RadByBright{0.5030*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex phiSgr: x=0.18274948643171*s  y=-0.872381221171207*s  z=-0.453380226914209*s  color=col0Sgr  r=RadByBright{0.4860*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex gamma2Sgr: x=0.0283144428265955*s  y=-0.861862313773109*s  z=-0.50635130534549*s  color=col0Sgr  r=RadByBright{0.4857*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex etaSgr: x=0.0678703744911183*s  y=-0.798364838499125*s  z=-0.598337026194018*s  color=col0Sgr  r=RadByBright{0.4841*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex tauSgr: x=0.261277908930666*s  y=-0.846567524566994*s  z=-0.46374268797829*s  color=col0Sgr  r=RadByBright{0.4499*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex xi2Sgr: x=0.23885624259997*s  y=-0.902059642587966*s  z=-0.359494223298643*s  color=col0Sgr  r=RadByBright{0.4278*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex muSgr: x=0.0625137467301933*s  y=-0.931175216981237*s  z=-0.359172307882582*s  color=col0Sgr  r=RadByBright{0.4099*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex omicronSgr: x=0.264990965447518*s  y=-0.890543463147988*s  z=-0.369746032400052*s  color=col0Sgr  r=RadByBright{0.4054*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex alphaSgr: x=0.277606956005104*s  y=-0.707153424889143*s  z=-0.650283331821703*s  color=col0Sgr  r=RadByBright{0.4046*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex rho1Sgr: x=0.338202404543968*s  y=-0.890069756227772*s  z=-0.305605894264678*s  color=col0Sgr  r=RadByBright{0.3992*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex iotaSgr: x=0.3645619601384*s  y=-0.650311531312636*s  z=-0.666475422999125*s  color=col0Sgr  r=RadByBright{0.3735*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex theta1Sgr: x=0.413097442707313*s  y=-0.705016441176162*s  z=-0.576456694383869*s  color=col0Sgr  r=RadByBright{0.3706*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex beta2Sgr: x=0.257831618246152*s  y=-0.661773080044581*s  z=-0.703973896647368*s  color=col0Sgr  r=RadByBright{0.3672*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex cSgr: x=0.457276241057159*s  y=-0.75879981587868*s  z=-0.463811684616846*s  color=col0Sgr  r=RadByBright{0.3588*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex XSgr: x=-0.0414812123876013*s  y=-0.883294840651792*s  z=-0.466979157454355*s  color=col0Sgr  r=RadByBright{0.3414*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex dSgr: x=0.320459212993029*s  y=-0.890141018514304*s  z=-0.323967374848465*s  color=col0Sgr  r=RadByBright{0.3128*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex h01Sgr: x=0.375608409491224*s  y=-0.827562067757142*s  z=-0.417204202674178*s  color=col0Sgr  r=RadByBright{0.2691*b},!RadByBright{a}  visible=visSgr&vis0  label=labSgr
-vertex gammaSge: x=0.470937233269342*s  y=-0.816125462579759*s  z=0.334899017092604*s  color=col0Sge  r=RadByBright{0.4343*b},!RadByBright{a}  visible=visSge&vis0  label=labSge
-vertex deltaSge: x=0.432408667702518*s  y=-0.843366410367493*s  z=0.318991915194699*s  color=col0Sge  r=RadByBright{0.4134*b},!RadByBright{a}  visible=visSge&vis0  label=labSge
-vertex alphaSge: x=0.406608831045165*s  y=-0.859293617619678*s  z=0.310296208862066*s  color=col0Sge  r=RadByBright{0.3525*b},!RadByBright{a}  visible=visSge&vis0  label=labSge
-vertex betaSge: x=0.411435531860501*s  y=-0.860173862608164*s  z=0.301366436764976*s  color=col0Sge  r=RadByBright{0.3506*b},!RadByBright{a}  visible=visSge&vis0  label=labSge
-vertex etaSge: x=0.491975127590761*s  y=-0.800127368743589*s  z=0.343156913990546*s  color=col0Sge  r=RadByBright{0.2985*b},!RadByBright{a}  visible=visSge&vis0  label=labSge
-vertex betaCom: x=-0.840379865677439*s  y=-0.277600641419169*s  z=0.465510005529027*s  color=col0Com  r=RadByBright{0.3664*b},!RadByBright{a}  visible=visCom&vis0  label=labCom
-vertex alphaCom: x=-0.908504053577909*s  y=-0.292075614348887*s  z=0.2988515018119*s  color=col0Com  r=RadByBright{0.3607*b},!RadByBright{a}  visible=visCom&vis0  label=labCom
-vertex gammaCom: x=-0.875262296917113*s  y=-0.108505324726658*s  z=0.471319961492553*s  color=col0Com  r=RadByBright{0.3535*b},!RadByBright{a}  visible=visCom&vis0  label=labCom
-vertex alphaAps: x=-0.137990203008457*s  y=-0.127911473792519*s  z=-0.982139174835171*s  color=col0Aps  r=RadByBright{0.3999*b},!RadByBright{a}  visible=visAps&vis0  label=labAps
-vertex gammaAps: x=-0.067395666470675*s  y=-0.179400575430259*s  z=-0.981464853000995*s  color=col0Aps  r=RadByBright{0.3963*b},!RadByBright{a}  visible=visAps&vis0  label=labAps
-vertex betaAps: x=-0.0674519778643948*s  y=-0.204442214236741*s  z=-0.976551899143184*s  color=col0Aps  r=RadByBright{0.3635*b},!RadByBright{a}  visible=visAps&vis0  label=labAps
-vertex alphaBoo: x=-0.78162199059278*s  y=-0.531598417418933*s  z=0.326297696006984*s  color=col0Boo  r=RadByBright{0.9748*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex epsilonBoo: x=-0.667145744007293*s  y=-0.591046295973603*s  z=0.453410225148087*s  color=col0Boo  r=RadByBright{0.5601*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex etaBoo: x=-0.830639309367636*s  y=-0.460233290215068*s  z=0.313406535207979*s  color=col0Boo  r=RadByBright{0.5253*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex gammaBoo: x=-0.616884641212009*s  y=-0.486985637625463*s  z=0.618302780345724*s  color=col0Boo  r=RadByBright{0.4900*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex deltaBoo: x=-0.547260410627503*s  y=-0.632786710509112*s  z=0.547801991565268*s  color=col0Boo  r=RadByBright{0.4338*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex betaBoo: x=-0.532401577220196*s  y=-0.546304846186316*s  z=0.646606198243408*s  color=col0Boo  r=RadByBright{0.4318*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex rhoBoo: x=-0.678390471781018*s  y=-0.534714408506665*s  z=0.503852030989352*s  color=col0Boo  r=RadByBright{0.4234*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex zetaBoo: x=-0.737859682146237*s  y=-0.632575810725907*s  z=0.235395270019421*s  color=col0Boo  r=RadByBright{0.4172*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex upsilonBoo: x=-0.85256567153811*s  y=-0.447453189752327*s  z=0.270032254916409*s  color=col0Boo  r=RadByBright{0.3838*b},!RadByBright{a}  visible=visBoo&vis0  label=labBoo
-vertex alphaTau: x=0.337800064784727*s  y=0.897021309953837*s  z=0.28503313091663*s  color=col0Tau  r=RadByBright{0.7940*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex betaTau: x=0.122216765354903*s  y=0.869203445991717*s  z=0.479112128569407*s  color=col0Tau  r=RadByBright{0.6894*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex zetaTau: x=0.0843419236577431*s  y=0.928777235474192*s  z=0.360914514502574*s  color=col0Tau  r=RadByBright{0.5107*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex lambdaTau: x=0.480017620299682*s  y=0.8498616080876*s  z=0.217527771331823*s  color=col0Tau  r=RadByBright{0.4595*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex theta2Tau: x=0.367243060331352*s  y=0.888718854942594*s  z=0.274429101058887*s  color=col0Tau  r=RadByBright{0.4508*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex f27Tau: x=0.487789484639488*s  y=0.771295505742116*s  z=0.4088577521549*s  color=col0Tau  r=RadByBright{0.4357*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex epsilonTau: x=0.360621267140749*s  y=0.872578022339449*s  z=0.329484288875776*s  color=col0Tau  r=RadByBright{0.4267*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex omicronTau: x=0.613778502395055*s  y=0.773399135454981*s  z=0.15852358586397*s  color=col0Tau  r=RadByBright{0.4198*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex gammaTau: x=0.401842082081104*s  y=0.874864982583619*s  z=0.270433362064831*s  color=col0Tau  r=RadByBright{0.4157*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex deltaTau: x=0.385862305030873*s  y=0.87158037221424*s  z=0.302420132145906*s  color=col0Tau  r=RadByBright{0.4045*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex tauTau: x=0.300228150921929*s  y=0.870126024572626*s  z=0.390824460282921*s  color=col0Tau  r=RadByBright{0.3770*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex delta3Tau: x=0.375295800758941*s  y=0.873954466461392*s  z=0.30879872487575*s  color=col0Tau  r=RadByBright{0.3697*b},!RadByBright{a}  visible=visTau&vis0  label=labTau
-vertex deltaCap: x=0.807332964997227*s  y=-0.521722222472512*s  z=-0.275716169651199*s  color=col0Cap  r=RadByBright{0.5080*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex beta1Cap: x=0.56346233124485*s  y=-0.786231538685117*s  z=-0.253673350679476*s  color=col0Cap  r=RadByBright{0.4775*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex alpha2Cap: x=0.558444286939627*s  y=-0.800991857255894*s  z=-0.215759178238714*s  color=col0Cap  r=RadByBright{0.4228*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex gammaCap: x=0.789000981609946*s  y=-0.54445403404987*s  z=-0.284687997332806*s  color=col0Cap  r=RadByBright{0.4201*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex zetaCap: x=0.72957545390029*s  y=-0.569038641053674*s  z=-0.379360886299542*s  color=col0Cap  r=RadByBright{0.4050*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex thetaCap: x=0.697353079734317*s  y=-0.653447388492781*s  z=-0.294457454748606*s  color=col0Cap  r=RadByBright{0.3905*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex omegaCap: x=0.612659041112179*s  y=-0.648934035715762*s  z=-0.451146890306428*s  color=col0Cap  r=RadByBright{0.3784*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex psiCap: x=0.604624259021896*s  y=-0.673427689678778*s  z=-0.425352385882726*s  color=col0Cap  r=RadByBright{0.3774*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex iotaCap: x=0.743587185186607*s  y=-0.603587059896572*s  z=-0.287681697630681*s  color=col0Cap  r=RadByBright{0.3598*b},!RadByBright{a}  visible=visCap&vis0  label=labCap
-vertex gamma2Nor: x=-0.265722459099149*s  y=-0.582080442706841*s  z=-0.768488082502591*s  color=col0Nor  r=RadByBright{0.3823*b},!RadByBright{a}  visible=visNor&vis0  label=labNor
-vertex epsilonNor: x=-0.260276827128338*s  y=-0.621863127385329*s  z=-0.73860830218631*s  color=col0Nor  r=RadByBright{0.3538*b},!RadByBright{a}  visible=visNor&vis0  label=labNor
-vertex etaNor: x=-0.313160362875276*s  y=-0.571956078753703*s  z=-0.758153566964182*s  color=col0Nor  r=RadByBright{0.3307*b},!RadByBright{a}  visible=visNor&vis0  label=labNor
-vertex kappaNor: x=-0.254238269081404*s  y=-0.518975753040905*s  z=-0.816104815749862*s  color=col0Nor  r=RadByBright{0.3080*b},!RadByBright{a}  visible=visNor&vis0  label=labNor
-vertex gammaCas: x=0.47123675418981*s  y=0.12262875021644*s  z=0.87344038784625*s  color=col0Cas  r=RadByBright{0.6112*b},!RadByBright{a}  visible=visCas&vis0  label=labCas
-vertex betaCas: x=0.510036721123741*s  y=0.0236566631087852*s  z=0.859827253229334*s  color=col0Cas  r=RadByBright{0.5810*b},!RadByBright{a}  visible=visCas&vis0  label=labCas
-vertex alphaCas: x=0.540046366318747*s  y=0.100195736740895*s  z=0.835649888748193*s  color=col0Cas  r=RadByBright{0.5740*b},!RadByBright{a}  visible=visCas&vis0  label=labCas
-vertex deltaCas: x=0.45868141750656*s  y=0.184365746100645*s  z=0.869264418286476*s  color=col0Cas  r=RadByBright{0.5352*b},!RadByBright{a}  visible=visCas&vis0  label=labCas
-vertex epsilonCas: x=0.385816774398325*s  y=0.214633831317128*s  z=0.897261241248613*s  color=col0Cas  r=RadByBright{0.4666*b},!RadByBright{a}  visible=visCas&vis0  label=labCas
-vertex alphaCenA: x=-0.370062844994226*s  y=-0.314512847170946*s  z=-0.874148248135981*s  color=col0Cen  r=RadByBright{0.9689*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex betaCen: x=-0.420148931734818*s  y=-0.256802283486468*s  z=-0.870360535846052*s  color=col0Cen  r=RadByBright{0.8837*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex gammaCen: x=-0.643167252952492*s  y=-0.12212486535359*s  z=-0.75592420386697*s  color=col0Cen  r=RadByBright{0.6101*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex epsilonCen: x=-0.536040310696109*s  y=-0.254532173694168*s  z=-0.804906303779105*s  color=col0Cen  r=RadByBright{0.6012*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex thetaCen: x=-0.681212082532449*s  y=-0.426769065632674*s  z=-0.594826246252482*s  color=col0Cen  r=RadByBright{0.5994*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex etaCen: x=-0.572561036438154*s  y=-0.468707078438443*s  z=-0.672671936514797*s  color=col0Cen  r=RadByBright{0.5925*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex zetaCen: x=-0.590039696224594*s  y=-0.331190650785317*s  z=-0.73631916293927*s  color=col0Cen  r=RadByBright{0.5699*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex deltaCen: x=-0.630493488374539*s  y=-0.0268541410400024*s  z=-0.775729860342058*s  color=col0Cen  r=RadByBright{0.5592*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex iotaCen: x=-0.749373727040707*s  y=-0.280588537943506*s  z=-0.59975752566837*s  color=col0Cen  r=RadByBright{0.5282*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex kappaCen: x=-0.521658129165631*s  y=-0.525829950077866*s  z=-0.671844967143851*s  color=col0Cen  r=RadByBright{0.4935*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex lambdaCen: x=-0.449110782896774*s  y=0.045164922225148*s  z=-0.892333813371567*s  color=col0Cen  r=RadByBright{0.4890*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex nuCen: x=-0.659350533281352*s  y=-0.347343424925348*s  z=-0.666790386420445*s  color=col0Cen  r=RadByBright{0.4652*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex muCen: x=-0.651017727703946*s  y=-0.343385995704218*s  z=-0.676950497576753*s  color=col0Cen  r=RadByBright{0.4574*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex upsilon1Cen: x=-0.61255769901344*s  y=-0.354887448903856*s  z=-0.706277540340816*s  color=col0Cen  r=RadByBright{0.4180*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex sigmaCen: x=-0.632438652311272*s  y=-0.0818553640092531*s  z=-0.77027336085679*s  color=col0Cen  r=RadByBright{0.4127*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex dCen: x=-0.7090306553083*s  y=-0.303179689808502*s  z=-0.636677002506533*s  color=col0Cen  r=RadByBright{0.3923*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex ACen: x=-0.578775207685011*s  y=0.0607298591879774*s  z=-0.813222689779485*s  color=col0Cen  r=RadByBright{0.3468*b},!RadByBright{a}  visible=visCen&vis0  label=labCen
-vertex alphaCep: x=0.350340738988452*s  y=-0.296019165410092*s  z=0.888613538223978*s  color=col0Cep  r=RadByBright{0.5605*b},!RadByBright{a}  visible=visCep&vis0  label=labCep
-vertex betaCep: x=0.261610115443316*s  y=-0.202570517972632*s  z=0.943676497930321*s  color=col0Cep  r=RadByBright{0.4848*b},!RadByBright{a}  visible=visCep&vis0  label=labCep
-vertex gammaCep: x=0.21087207837546*s  y=-0.0180110184726167*s  z=0.97734772203919*s  color=col0Cep  r=RadByBright{0.4595*b},!RadByBright{a}  visible=visCep&vis0  label=labCep
-vertex zetaCep: x=0.467529499906514*s  y=-0.238767396849955*s  z=0.851120612439072*s  color=col0Cep  r=RadByBright{0.4455*b},!RadByBright{a}  visible=visCep&vis0  label=labCep
-vertex iotaCep: x=0.383047007951626*s  y=-0.119599851509302*s  z=0.915953527870416*s  color=col0Cep  r=RadByBright{0.4295*b},!RadByBright{a}  visible=visCep&vis0  label=labCep
-vertex alphaCha: x=-0.127213920678054*s  y=0.18545611959276*s  z=-0.974383213161697*s  color=col0Cha  r=RadByBright{0.3847*b},!RadByBright{a}  visible=visCha&vis0  label=labCha
-vertex betaCha: x=-0.182218451510183*s  y=-0.0159238006585552*s  z=-0.983129120971308*s  color=col0Cha  r=RadByBright{0.3798*b},!RadByBright{a}  visible=visCha&vis0  label=labCha
-vertex gammaCha: x=-0.182114205021102*s  y=0.070123192691631*s  z=-0.980773752797384*s  color=col0Cha  r=RadByBright{0.3793*b},!RadByBright{a}  visible=visCha&vis0  label=labCha
-vertex alphaAur: x=0.124545301077016*s  y=0.683119600046405*s  z=0.719608282339826*s  color=col0Aur  r=RadByBright{0.9467*b},!RadByBright{a}  visible=visAur&vis0  label=labAur
-vertex betaTauAur: x=0.122216765354903*s  y=0.869203445991717*s  z=0.479112128569407*s  color=col0Aur  r=RadByBright{0.6894*b},!RadByBright{a}  visible=visAur&vis0  label=labAur
-vertex betaAur: x=-0.00460598776752077*s  y=0.707744503463336*s  z=0.706453468173327*s  color=col0Aur  r=RadByBright{0.6451*b},!RadByBright{a}  visible=visAur&vis0  label=labAur
-vertex thetaAur: x=-0.00537136384090922*s  y=0.796389202778573*s  z=0.604760602344595*s  color=col0Aur  r=RadByBright{0.5483*b},!RadByBright{a}  visible=visAur&vis0  label=labAur
-vertex iotaAur: x=0.220996375277866*s  y=0.806995350670618*s  z=0.547648706845959*s  color=col0Aur  r=RadByBright{0.5207*b},!RadByBright{a}  visible=visAur&vis0  label=labAur
-vertex zetaAur: x=0.181144196228536*s  y=0.731324779775109*s  z=0.657533912934995*s  color=col0Aur  r=RadByBright{0.4116*b},!RadByBright{a}  visible=visAur&vis0  label=labAur
-vertex alphaHor: x=0.327815600720467*s  y=0.663936924504487*s  z=-0.672104673547062*s  color=col0Hor  r=RadByBright{0.3970*b},!RadByBright{a}  visible=visHor&vis0  label=labHor
-vertex muHor: x=0.35076375559976*s  y=0.364012336272987*s  z=-0.862820842816534*s  color=col0Hor  r=RadByBright{0.3014*b},!RadByBright{a}  visible=visHor&vis0  label=labHor
-vertex zetaHor: x=0.443092699598721*s  y=0.376744958939586*s  z=-0.813469173033574*s  color=col0Hor  r=RadByBright{0.2948*b},!RadByBright{a}  visible=visHor&vis0  label=labHor
-vertex betaCnc: x=-0.559146892958826*s  y=0.81383902986628*s  z=0.158179599066393*s  color=col0Cnc  r=RadByBright{0.4294*b},!RadByBright{a}  visible=visCnc&vis0  label=labCnc
-vertex deltaCnc: x=-0.630620165375763*s  y=0.711526397116672*s  z=0.30991675209258*s  color=col0Cnc  r=RadByBright{0.3887*b},!RadByBright{a}  visible=visCnc&vis0  label=labCnc
-vertex iotaCnc: x=-0.588029644203938*s  y=0.651300232177127*s  z=0.479613537239527*s  color=col0Cnc  r=RadByBright{0.3803*b},!RadByBright{a}  visible=visCnc&vis0  label=labCnc
-vertex alphaCnc: x=-0.692124270785419*s  y=0.692442229653195*s  z=0.20368542506194*s  color=col0Cnc  r=RadByBright{0.3714*b},!RadByBright{a}  visible=visCnc&vis0  label=labCnc
-vertex gammaCnc: x=-0.613490439758734*s  y=0.700602668785444*s  z=0.364397284313905*s  color=col0Cnc  r=RadByBright{0.3410*b},!RadByBright{a}  visible=visCnc&vis0  label=labCnc
-vertex chiCnc: x=-0.515816356725838*s  y=0.725259334231772*s  z=0.455996035337775*s  color=col0Cnc  r=RadByBright{0.2996*b},!RadByBright{a}  visible=visCnc&vis0  label=labCnc
-vertex alphaGru: x=0.606728392694849*s  y=-0.316161262601292*s  z=-0.72933031853083*s  color=col0Gru  r=RadByBright{0.6764*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex betaGru: x=0.648170971263671*s  y=-0.222386153416726*s  z=-0.728298558820229*s  color=col0Gru  r=RadByBright{0.6209*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex gammaGru: x=0.681591488964097*s  y=-0.411409995438257*s  z=-0.605123836768308*s  color=col0Gru  r=RadByBright{0.5040*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex epsilonGru: x=0.59804891735872*s  y=-0.188116987430433*s  z=-0.779069631988156*s  color=col0Gru  r=RadByBright{0.4447*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex iotaGru: x=0.690341247686006*s  y=-0.147170868121155*s  z=-0.708357040848607*s  color=col0Gru  r=RadByBright{0.3936*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex delta1Gru: x=0.672768054980329*s  y=-0.275727227319377*s  z=-0.686554906990514*s  color=col0Gru  r=RadByBright{0.3856*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex zetaGru: x=0.588187275098722*s  y=-0.150899177833869*s  z=-0.794521974234195*s  color=col0Gru  r=RadByBright{0.3735*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex thetaGru: x=0.708506385512777*s  y=-0.162349731571047*s  z=-0.686775994299764*s  color=col0Gru  r=RadByBright{0.3641*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex lambdaGru: x=0.681706042116741*s  y=-0.363550486767111*s  z=-0.634907800954536*s  color=col0Gru  r=RadByBright{0.3447*b},!RadByBright{a}  visible=visGru&vis0  label=labGru
-vertex gammaCrv: x=-0.950035847199214*s  y=-0.0713732959430255*s  z=-0.303871258368903*s  color=col0Crv  r=RadByBright{0.5562*b},!RadByBright{a}  visible=visCrv&vis0  label=labCrv
-vertex betaCrv: x=-0.905590994703661*s  y=-0.142611159158464*s  z=-0.399458392820971*s  color=col0Crv  r=RadByBright{0.5236*b},!RadByBright{a}  visible=visCrv&vis0  label=labCrv
-vertex deltaCrv: x=-0.949109594707155*s  y=-0.130231337473955*s  z=-0.286759090482872*s  color=col0Crv  r=RadByBright{0.5076*b},!RadByBright{a}  visible=visCrv&vis0  label=labCrv
-vertex epsilonCrv: x=-0.920915097547053*s  y=-0.046268146165313*s  z=-0.387007289027387*s  color=col0Crv  r=RadByBright{0.4813*b},!RadByBright{a}  visible=visCrv&vis0  label=labCrv
-vertex alphaCrv: x=-0.906377068823838*s  y=-0.0387749511074239*s  z=-0.420686477411532*s  color=col0Crv  r=RadByBright{0.3891*b},!RadByBright{a}  visible=visCrv&vis0  label=labCrv
-vertex etaCrv: x=-0.949386167885672*s  y=-0.139569941752612*s  z=-0.281400311987268*s  color=col0Crv  r=RadByBright{0.3643*b},!RadByBright{a}  visible=visCrv&vis0  label=labCrv
-vertex deltaCrt: x=-0.952084004492768*s  y=0.164965799065858*s  z=-0.257531228257037*s  color=col0Crt  r=RadByBright{0.4248*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex gammaCrt: x=-0.941641701382804*s  y=0.139800405941385*s  z=-0.30621357369575*s  color=col0Crt  r=RadByBright{0.3866*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex alphaCrt: x=-0.917468322647652*s  y=0.241207587112744*s  z=-0.316339654260024*s  color=col0Crt  r=RadByBright{0.3762*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex betaCrt: x=-0.901382283812534*s  y=0.187582307467629*s  z=-0.390285608694478*s  color=col0Crt  r=RadByBright{0.3567*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex thetaCrt: x=-0.980439887249342*s  y=0.0942304192940933*s  z=-0.172795415362089*s  color=col0Crt  r=RadByBright{0.3413*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex zetaCrt: x=-0.946588563933284*s  y=0.0573903911072211*s  z=-0.31729549892692*s  color=col0Crt  r=RadByBright{0.3254*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex epsilonCrt: x=-0.970800224362093*s  y=0.145249855884151*s  z=-0.19091726937117*s  color=col0Crt  r=RadByBright{0.3221*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex etaCrt: x=-0.954699796950352*s  y=0.010904551683576*s  z=-0.297370792875723*s  color=col0Crt  r=RadByBright{0.3039*b},!RadByBright{a}  visible=visCrt&vis0  label=labCrt
-vertex betaDel: x=0.617900061954013*s  y=-0.744241958400779*s  z=0.25358119171776*s  color=col0Del  r=RadByBright{0.4243*b},!RadByBright{a}  visible=visDel&vis0  label=labDel
-vertex alphaDel: x=0.620685675065481*s  y=-0.733961562840547*s  z=0.275771131631232*s  color=col0Del  r=RadByBright{0.4202*b},!RadByBright{a}  visible=visDel&vis0  label=labDel
-vertex epsilonDel: x=0.61188244764056*s  y=-0.765872566227161*s  z=0.197583102946634*s  color=col0Del  r=RadByBright{0.3983*b},!RadByBright{a}  visible=visDel&vis0  label=labDel
-vertex gamma2Del: x=0.642177350048324*s  y=-0.713838602557911*s  z=0.279361236722422*s  color=col0Del  r=RadByBright{0.3601*b},!RadByBright{a}  visible=visDel&vis0  label=labDel
-vertex deltaDel: x=0.635437543061186*s  y=-0.726445613145872*s  z=0.261717213819576*s  color=col0Del  r=RadByBright{0.3545*b},!RadByBright{a}  visible=visDel&vis0  label=labDel
-vertex alphaCol: x=0.0699754312314788*s  y=0.825477144451407*s  z=-0.56008117537757*s  color=col0Col  r=RadByBright{0.5480*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex betaCol: x=0.0286599466276874*s  y=0.810968278508752*s  z=-0.584387763999085*s  color=col0Col  r=RadByBright{0.4696*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex deltaCol: x=-0.0839262249386224*s  y=0.83012150838282*s  z=-0.551230142579108*s  color=col0Col  r=RadByBright{0.3987*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex epsilonCol: x=0.0986981645557336*s  y=0.808595931228261*s  z=-0.580026975505821*s  color=col0Col  r=RadByBright{0.3953*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex etaCol: x=0.000107460415737117*s  y=0.733552733496718*s  z=-0.67963252985106*s  color=col0Col  r=RadByBright{0.3872*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex gammaCol: x=0.00539253440146179*s  y=0.816302066872774*s  z=-0.577600083268663*s  color=col0Col  r=RadByBright{0.3708*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex kappaCol: x=-0.0623899132830968*s  y=0.815254528928419*s  z=-0.575732187550973*s  color=col0Col  r=RadByBright{0.3519*b},!RadByBright{a}  visible=visCol&vis0  label=labCol
-vertex gammaDra: x=-0.00753099353206965*s  y=-0.622650321337163*s  z=0.782463968164124*s  color=col0Dra  r=RadByBright{0.5805*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex etaDra: x=-0.193679000588262*s  y=-0.436852180456998*s  z=0.878435323265804*s  color=col0Dra  r=RadByBright{0.5162*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex betaDra: x=-0.0771024098082548*s  y=-0.606890164568332*s  z=0.791037007068558*s  color=col0Dra  r=RadByBright{0.5073*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex zetaDra: x=-0.091112223378027*s  y=-0.401596898774064*s  z=0.911273007197166*s  color=col0Dra  r=RadByBright{0.4857*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex deltaDra: x=0.118087756467651*s  y=-0.360467860472809*s  z=0.925266557992124*s  color=col0Dra  r=RadByBright{0.4753*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex iotaDra: x=-0.322631001725337*s  y=-0.403894771960639*s  z=0.856024678329176*s  color=col0Dra  r=RadByBright{0.4504*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex alphaDra: x=-0.371318118585346*s  y=-0.225575896729958*s  z=0.900687720369671*s  color=col0Dra  r=RadByBright{0.4320*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex chiDra: x=0.0265914636935373*s  y=-0.295451062007645*s  z=0.954987729773106*s  color=col0Dra  r=RadByBright{0.4298*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex kappaDra: x=-0.34394077075366*s  y=-0.0523377793060362*s  z=0.937531601105099*s  color=col0Dra  r=RadByBright{0.4130*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex xiDra: x=-0.0143251920489128*s  y=-0.546364702609917*s  z=0.837424862668131*s  color=col0Dra  r=RadByBright{0.4078*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex lambdaDra: x=-0.35291161894631*s  y=0.0418303295545671*s  z=0.934721141700588*s  color=col0Dra  r=RadByBright{0.4058*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex epsilonDra: x=0.152859817069971*s  y=-0.299782870537651*s  z=0.941681531547445*s  color=col0Dra  r=RadByBright{0.3984*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex thetaDra: x=-0.256547736230111*s  y=-0.455272942786345*s  z=0.852590057766255*s  color=col0Dra  r=RadByBright{0.3873*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex tauDra: x=0.0918335767653193*s  y=-0.270450789733004*s  z=0.958343865484244*s  color=col0Dra  r=RadByBright{0.3454*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex nu2Dra: x=-0.0676609568706382*s  y=-0.567328843107704*s  z=0.820706999295987*s  color=col0Dra  r=RadByBright{0.3206*b},!RadByBright{a}  visible=visDra&vis0  label=labDra
-vertex alphaCir: x=-0.317038818694295*s  y=-0.277306342494055*s  z=-0.906966140411811*s  color=col0Cir  r=RadByBright{0.4735*b},!RadByBright{a}  visible=visCir&vis0  label=labCir
-vertex betaCir: x=-0.33267277174932*s  y=-0.395167038057781*s  z=-0.856254540991909*s  color=col0Cir  r=RadByBright{0.3887*b},!RadByBright{a}  visible=visCir&vis0  label=labCir
-vertex gammaCir: x=-0.317565741266869*s  y=-0.397559360943065*s  z=-0.860870811736677*s  color=col0Cir  r=RadByBright{0.3518*b},!RadByBright{a}  visible=visCir&vis0  label=labCir
-vertex alphaAql: x=0.464100746387036*s  y=-0.87204196793127*s  z=0.155413330733095*s  color=col0Aql  r=RadByBright{0.8266*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex gammaAql: x=0.444332862480691*s  y=-0.876482859422022*s  z=0.185327020315744*s  color=col0Aql  r=RadByBright{0.5165*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex zetaAql: x=0.278288191415715*s  y=-0.929948839673023*s  z=0.240314040599729*s  color=col0Aql  r=RadByBright{0.5020*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex thetaAql: x=0.547091441714624*s  y=-0.836973122597052*s  z=-0.0129207760120796*s  color=col0Aql  r=RadByBright{0.4760*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex lambdaAql: x=0.289946814425437*s  y=-0.953315767077806*s  z=-0.0843794586697234*s  color=col0Aql  r=RadByBright{0.4568*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex deltaAql: x=0.36936804874877*s  y=-0.9276363274356*s  z=0.0552999872090227*s  color=col0Aql  r=RadByBright{0.4528*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex betaAql: x=0.484090486673521*s  y=-0.867720012139636*s  z=0.11277580079336*s  color=col0Aql  r=RadByBright{0.4105*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex etaAql: x=0.47643871595233*s  y=-0.879007056847451*s  z=0.0187814790173009*s  color=col0Aql  r=RadByBright{0.3941*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex epsilonAql: x=0.253278185274357*s  y=-0.931628104088915*s  z=0.260613193326473*s  color=col0Aql  r=RadByBright{0.3816*b},!RadByBright{a}  visible=visAql&vis0  label=labAql
-vertex alphaCae: x=0.250552110710586*s  y=0.701936830679667*s  z=-0.666714575777262*s  color=col0Cae  r=RadByBright{0.3525*b},!RadByBright{a}  visible=visCae&vis0  label=labCae
-vertex deltaCae: x=0.266346379846931*s  y=0.656389859948149*s  z=-0.705841311981443*s  color=col0Cae  r=RadByBright{0.3162*b},!RadByBright{a}  visible=visCae&vis0  label=labCae
-vertex betaCae: x=0.262961355451447*s  y=0.753060921327764*s  z=-0.6031173802073*s  color=col0Cae  r=RadByBright{0.3069*b},!RadByBright{a}  visible=visCae&vis0  label=labCae
-vertex alphaEri: x=0.493549986315245*s  y=0.226762364688671*s  z=-0.839635183260577*s  color=col0Eri  r=RadByBright{0.9072*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex betaEri: x=0.219133664245852*s  y=0.971709968880746*s  z=-0.088091847363792*s  color=col0Eri  r=RadByBright{0.5217*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex thetaEri: x=0.541801054766084*s  y=0.538385285883764*s  z=-0.645440083197671*s  color=col0Eri  r=RadByBright{0.5084*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex upsilon4Eri: x=0.355046031675112*s  y=0.752019390082693*s  z=-0.555345975344568*s  color=col0Eri  r=RadByBright{0.4449*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex phiEri: x=0.515101168301975*s  y=0.352248911579557*s  z=-0.781403538963676*s  color=col0Eri  r=RadByBright{0.4445*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex deltaEri: x=0.549342597457428*s  y=0.818523889842245*s  z=-0.168051636041565*s  color=col0Eri  r=RadByBright{0.4285*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex tau4Eri: x=0.595192334235273*s  y=0.713785029826133*s  z=-0.36913008068115*s  color=col0Eri  r=RadByBright{0.4236*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex chiEri: x=0.543423860714921*s  y=0.304320097538501*s  z=-0.782355281083887*s  color=col0Eri  r=RadByBright{0.4120*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex epsilonEri: x=0.586220055277095*s  y=0.793626459168106*s  z=-0.162797696848617*s  color=col0Eri  r=RadByBright{0.4107*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex nuEri: x=0.351024237218149*s  y=0.934595566755308*s  z=-0.0575596341783116*s  color=col0Eri  r=RadByBright{0.4101*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex muEri: x=0.313327674027343*s  y=0.947995173723006*s  z=-0.0559546180980839*s  color=col0Eri  r=RadByBright{0.4009*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex upsilon2Eri: x=0.306673945520681*s  y=0.805118953803934*s  z=-0.507675645825597*s  color=col0Eri  r=RadByBright{0.4006*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex lEri: x=0.333848105162223*s  y=0.909902942337738*s  z=-0.246215511706149*s  color=col0Eri  r=RadByBright{0.3958*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex etaEri: x=0.705665322426257*s  y=0.691858214572957*s  z=-0.152868125039092*s  color=col0Eri  r=RadByBright{0.3928*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex f43Eri: x=0.333921352778696*s  y=0.759281526169792*s  z=-0.558558944226763*s  color=col0Eri  r=RadByBright{0.3896*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex tau3Eri: x=0.638174168406767*s  y=0.658380556677685*s  z=-0.39908491999462*s  color=col0Eri  r=RadByBright{0.3861*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex lambdaEri: x=0.212135337374347*s  y=0.96540413584397*s  z=-0.151635922961645*s  color=col0Eri  r=RadByBright{0.3807*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex kappaEri: x=0.538740571921289*s  y=0.405841040849974*s  z=-0.738276131083575*s  color=col0Eri  r=RadByBright{0.3802*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex tau5Eri: x=0.550092389138929*s  y=0.750028175859421*s  z=-0.367227584514583*s  color=col0Eri  r=RadByBright{0.3771*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex fEri: x=0.427249203093105*s  y=0.667980318842051*s  z=-0.609311424557245*s  color=col0Eri  r=RadByBright{0.3741*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex iotaEri: x=0.585304230731992*s  y=0.498671673883311*s  z=-0.639332088318464*s  color=col0Eri  r=RadByBright{0.3737*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex tau6Eri: x=0.500701363974525*s  y=0.771011304811369*s  z=-0.393496775040306*s  color=col0Eri  r=RadByBright{0.3702*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex gEri: x=0.432662314278109*s  y=0.682134612760003*s  z=-0.589487652015096*s  color=col0Eri  r=RadByBright{0.3691*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex eEri: x=0.467903973747394*s  y=0.562569852787361*s  z=-0.681601813441107*s  color=col0Eri  r=RadByBright{0.3635*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex omegaEri: x=0.281873766036813*s  y=0.954807964395715*s  z=-0.0942811282640155*s  color=col0Eri  r=RadByBright{0.3600*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex tau1Eri: x=0.70944841605972*s  y=0.629613768972077*s  z=-0.316653512330323*s  color=col0Eri  r=RadByBright{0.3490*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex sEri: x=0.560581737736713*s  y=0.473806270832267*s  z=-0.6791581060667*s  color=col0Eri  r=RadByBright{0.3341*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex zetaEri: x=0.644769983999107*s  y=0.749184307424683*s  z=-0.151639510822178*s  color=col0Eri  r=RadByBright{0.3262*b},!RadByBright{a}  visible=visEri&vis0  label=labEri
-vertex etaPsc: x=0.885582681118407*s  y=0.380107200431159*s  z=0.266949117030795*s  color=col0Psc  r=RadByBright{0.4177*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex alphaPsc: x=0.857344227450378*s  y=0.51226523956777*s  z=0.0504499751049536*s  color=col0Psc  r=RadByBright{0.4142*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex gammaPsc: x=0.981930505195839*s  y=-0.179542389752729*s  z=0.0598081369691769*s  color=col0Psc  r=RadByBright{0.4123*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex omegaPsc: x=0.99251748152043*s  y=0.00297395391015552*s  z=0.12206639371458*s  color=col0Psc  r=RadByBright{0.3871*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex iotaPsc: x=0.991630714397899*s  y=-0.0809708863626969*s  z=0.100559643119656*s  color=col0Psc  r=RadByBright{0.3770*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex omicronPsc: x=0.8816314495982*s  y=0.443462442168139*s  z=0.161452932663505*s  color=col0Psc  r=RadByBright{0.3608*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex epsilonPsc: x=0.951428865078735*s  y=0.274321781582828*s  z=0.139752190838688*s  color=col0Psc  r=RadByBright{0.3608*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex thetaPsc: x=0.98463476088794*s  y=-0.132576312791858*s  z=0.113656979273885*s  color=col0Psc  r=RadByBright{0.3597*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex lambdaPsc: x=0.996817602678913*s  y=-0.0722739999055799*s  z=0.033632364280739*s  color=col0Psc  r=RadByBright{0.3501*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex nuPsc: x=0.896692763965994*s  y=0.431676964625718*s  z=0.0979647143748844*s  color=col0Psc  r=RadByBright{0.3475*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex xiPsc: x=0.875375074565295*s  y=0.479966301640875*s  z=0.0578863379303377*s  color=col0Psc  r=RadByBright{0.3335*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex upsilonPsc: x=0.832987412018137*s  y=0.307072313004036*s  z=0.460259237827637*s  color=col0Psc  r=RadByBright{0.3331*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex phiPsc: x=0.859858614952644*s  y=0.2927518474177*s  z=0.418257717352884*s  color=col0Psc  r=RadByBright{0.3285*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex kappaPsc: x=0.990155125104931*s  y=-0.13781844549565*s  z=0.0244725215211289*s  color=col0Psc  r=RadByBright{0.3197*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex f19Psc: x=0.996564823253701*s  y=-0.0532761786553763*s  z=0.0634050616370642*s  color=col0Psc  r=RadByBright{0.3192*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex muPsc: x=0.915673494920715*s  y=0.386747193582596*s  z=0.10940136633365*s  color=col0Psc  r=RadByBright{0.3177*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex f7Psc: x=0.981488080882563*s  y=-0.165537289544063*s  z=0.0963252451638109*s  color=col0Psc  r=RadByBright{0.3008*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex sigmaPsc: x=0.815367402860272*s  y=0.234923219775448*s  z=0.529138053028915*s  color=col0Psc  r=RadByBright{0.2822*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex dPsc: x=0.984883011528644*s  y=0.0947306478636879*s  z=0.145022611883787*s  color=col0Psc  r=RadByBright{0.2793*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex f62Psc: x=0.968362734247782*s  y=0.213265132303963*s  z=0.129582399512945*s  color=col0Psc  r=RadByBright{0.2462*b},!RadByBright{a}  visible=visPsc&vis0  label=labPsc
-vertex alphaMus: x=-0.348700349894332*s  y=-0.0596199557819695*s  z=-0.935336050228006*s  color=col0Mus  r=RadByBright{0.5482*b},!RadByBright{a}  visible=visMus&vis0  label=labMus
-vertex betaMus: x=-0.362413928365877*s  y=-0.076952722020039*s  z=-0.928834981630278*s  color=col0Mus  r=RadByBright{0.5036*b},!RadByBright{a}  visible=visMus&vis0  label=labMus
-vertex lambdaMus: x=-0.392061559233564*s  y=0.0224570782660492*s  z=-0.919664837539796*s  color=col0Mus  r=RadByBright{0.4282*b},!RadByBright{a}  visible=visMus&vis0  label=labMus
-vertex gammaMus: x=-0.300996773142084*s  y=-0.04512021179207*s  z=-0.952557142142082*s  color=col0Mus  r=RadByBright{0.4178*b},!RadByBright{a}  visible=visMus&vis0  label=labMus
-vertex gamma2Vol: x=-0.0981046515517484*s  y=0.318340776493712*s  z=-0.942886327913016*s  color=col0Vol  r=RadByBright{0.4046*b},!RadByBright{a}  visible=visVol&vis0  label=labVol
-vertex betaVol: x=-0.239813865225155*s  y=0.324031483742147*s  z=-0.915146385880223*s  color=col0Vol  r=RadByBright{0.4044*b},!RadByBright{a}  visible=visVol&vis0  label=labVol
-vertex alphaVol: x=-0.285419850386917*s  y=0.278378230587885*s  z=-0.917082913230787*s  color=col0Vol  r=RadByBright{0.3936*b},!RadByBright{a}  visible=visVol&vis0  label=labVol
-vertex zetaVol: x=-0.127622449794556*s  y=0.269152356636131*s  z=-0.954604378381774*s  color=col0Vol  r=RadByBright{0.3884*b},!RadByBright{a}  visible=visVol&vis0  label=labVol
-vertex deltaVol: x=-0.123178813984043*s  y=0.353671389166697*s  z=-0.92722355894918*s  color=col0Vol  r=RadByBright{0.3873*b},!RadByBright{a}  visible=visVol&vis0  label=labVol
-vertex epsilonVol: x=-0.192538206791396*s  y=0.308108576426345*s  z=-0.931664179872815*s  color=col0Vol  r=RadByBright{0.3706*b},!RadByBright{a}  visible=visVol&vis0  label=labVol
-vertex alphaVul: x=0.346949633082867*s  y=-0.839487583146628*s  z=0.418194392413739*s  color=col0Vul  r=RadByBright{0.3514*b},!RadByBright{a}  visible=visVul&vis0  label=labVul
-vertex f15Vul: x=0.44951301665063*s  y=-0.761579983408256*s  z=0.466833992692832*s  color=col0Vul  r=RadByBright{0.3377*b},!RadByBright{a}  visible=visVul&vis0  label=labVul
-vertex alphaFor: x=0.582438182842472*s  y=0.653791630922606*s  z=-0.483034436145828*s  color=col0For  r=RadByBright{0.3998*b},!RadByBright{a}  visible=visFor&vis0  label=labFor
-vertex betaFor: x=0.622705579649675*s  y=0.571653148235201*s  z=-0.534275620991587*s  color=col0For  r=RadByBright{0.3452*b},!RadByBright{a}  visible=visFor&vis0  label=labFor
-vertex alphaCam: x=0.109197360115918*s  y=0.385432775363886*s  z=0.91625188251867*s  color=col0Cam  r=RadByBright{0.3720*b},!RadByBright{a}  visible=visCam&vis0  label=labCam
-vertex HD21291: x=0.301917030859507*s  y=0.397969363197814*s  z=0.866294691449108*s  color=col0Cam  r=RadByBright{0.3708*b},!RadByBright{a}  visible=visCam&vis0  label=labCam
-vertex gammaCam: x=0.167475343212818*s  y=0.271240715523691*s  z=0.947829353659162*s  color=col0Cam  r=RadByBright{0.3438*b},!RadByBright{a}  visible=visCam&vis0  label=labCam
-vertex HD24479: x=0.226173912418674*s  y=0.390990675359901*s  z=0.892172434635165*s  color=col0Cam  r=RadByBright{0.3202*b},!RadByBright{a}  visible=visCam&vis0  label=labCam
-vertex HD33564: x=0.0267399722233987*s  y=0.184508371208599*s  z=0.982467116416342*s  color=col0Cam  r=RadByBright{0.3027*b},!RadByBright{a}  visible=visCam&vis0  label=labCam
-vertex epsilonUMa: x=-0.545647999811483*s  y=-0.134019494622085*s  z=0.827228526685926*s  color=col0UMa  r=RadByBright{0.6676*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex etaUMa: x=-0.581662996460096*s  y=-0.298266699565221*s  z=0.756772842059975*s  color=col0UMa  r=RadByBright{0.6608*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex alphaUMa: x=-0.462075420531191*s  y=0.112311010822413*s  z=0.879700257240482*s  color=col0UMa  r=RadByBright{0.6380*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex zetaUMa: x=-0.53742399417484*s  y=-0.208986593057615*s  z=0.817006765215155*s  color=col0UMa  r=RadByBright{0.5951*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex betaUMa: x=-0.538898832720637*s  y=0.135768167270527*s  z=0.831357355683064*s  color=col0UMa  r=RadByBright{0.5821*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex gammaUMa: x=-0.594048364208791*s  y=0.0123757480339756*s  z=0.804334123260638*s  color=col0UMa  r=RadByBright{0.5716*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex muUMa: x=-0.685522885653708*s  y=0.30552961669402*s  z=0.6608403941708*s  color=col0UMa  r=RadByBright{0.4837*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex psiUMa: x=-0.698870849945666*s  y=0.151238832007884*s  z=0.699075354156556*s  color=col0UMa  r=RadByBright{0.4826*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex iotaUMa: x=-0.475859487006737*s  y=0.471618232967602*s  z=0.742383991582659*s  color=col0UMa  r=RadByBright{0.4800*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex thetaUMa: x=-0.500837811196012*s  y=0.368472871918217*s  z=0.783191693991151*s  color=col0UMa  r=RadByBright{0.4702*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex deltaUMa: x=-0.544877272127408*s  y=-0.0398654345372517*s  z=0.837567612463705*s  color=col0UMa  r=RadByBright{0.4640*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex lambdaUMa: x=-0.66343044037149*s  y=0.313964267292223*s  z=0.679180748882172*s  color=col0UMa  r=RadByBright{0.4509*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex omicronUMa: x=-0.302769067618179*s  y=0.385913075606717*s  z=0.871436738822378*s  color=col0UMa  r=RadByBright{0.4463*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex kappaUMa: x=-0.493102256413622*s  y=0.470237053361217*s  z=0.731933930328383*s  color=col0UMa  r=RadByBright{0.4387*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex hUMa: x=-0.365192568676289*s  y=0.271197686581228*s  z=0.890553874045026*s  color=col0UMa  r=RadByBright{0.4234*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex upsilonUMa: x=-0.438934079422352*s  y=0.27197068440166*s  z=0.856369558512997*s  color=col0UMa  r=RadByBright{0.4123*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex chiUMa: x=-0.672893285847991*s  y=0.0368766032382923*s  z=0.738819830536715*s  color=col0UMa  r=RadByBright{0.4116*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex phiUMa: x=-0.501793076845435*s  y=0.307777524184966*s  z=0.808379059375343*s  color=col0UMa  r=RadByBright{0.3483*b},!RadByBright{a}  visible=visUMa&vis0  label=labUMa
-vertex alphaCMa: x=-0.192242128406119*s  y=0.938051384163544*s  z=-0.288275154556797*s  color=col0CMa  r=RadByBright{1.2847*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex epsilonCMa: x=-0.225157465433638*s  y=0.845052927840993*s  z=-0.484963570700795*s  color=col0CMa  r=RadByBright{0.7218*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex betaCMa: x=-0.0989263039637815*s  y=0.946054448235336*s  z=-0.308536168638621*s  color=col0CMa  r=RadByBright{0.6470*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex deltaCMa: x=-0.26731829675268*s  y=0.854588659910067*s  z=-0.445218093269311*s  color=col0CMa  r=RadByBright{0.6364*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex etaCMa: x=-0.31643922104475*s  y=0.812111014307456*s  z=-0.4902467948137*s  color=col0CMa  r=RadByBright{0.5727*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex zetaCMa: x=-0.0804624710066597*s  y=0.86160502461207*s  z=-0.501161223881833*s  color=col0CMa  r=RadByBright{0.5068*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex omicron2CMa: x=-0.252597304950735*s  y=0.878857362986381*s  z=-0.404727484928131*s  color=col0CMa  r=RadByBright{0.5006*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex kappaCMa: x=-0.185478231030402*s  y=0.822350167148818*s  z=-0.537901504370589*s  color=col0CMa  r=RadByBright{0.4504*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex sigmaCMa: x=-0.238926947736328*s  y=0.850220921581654*s  z=-0.469082400171062*s  color=col0CMa  r=RadByBright{0.4380*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex omegaCMa: x=-0.290163486389386*s  y=0.843933474678492*s  z=-0.451200001643888*s  color=col0CMa  r=RadByBright{0.3995*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex gammaCMa: x=-0.269295799739172*s  y=0.924383892399138*s  z=-0.270174372796271*s  color=col0CMa  r=RadByBright{0.3914*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex nu2CMa: x=-0.155186114100394*s  y=0.931069076082688*s  z=-0.330193345712704*s  color=col0CMa  r=RadByBright{0.3873*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex thetaCMa: x=-0.23422172926165*s  y=0.949413467087682*s  z=-0.209175165959607*s  color=col0CMa  r=RadByBright{0.3794*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex iotaCMa: x=-0.236618406991254*s  y=0.926090231737451*s  z=-0.293885372472663*s  color=col0CMa  r=RadByBright{0.3657*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex xi2CMa: x=-0.144718631113366*s  y=0.909142483110089*s  z=-0.390533562210849*s  color=col0CMa  r=RadByBright{0.3521*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex HD50896: x=-0.218480110852263*s  y=0.887301603535855*s  z=-0.40615551888985*s  color=col0CMa  r=RadByBright{0.2169*b},!RadByBright{a}  visible=visCMa&vis0  label=labCMa
-vertex alphaLep: x=0.108148400997129*s  y=0.945940562974216*s  z=-0.305778309698035*s  color=col0Lep  r=RadByBright{0.5441*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex betaLep: x=0.124525590044908*s  y=0.926870054872644*s  z=-0.354126077554803*s  color=col0Lep  r=RadByBright{0.5050*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex muLep: x=0.190923163734132*s  y=0.941243950176768*s  z=-0.278582432693419*s  color=col0Lep  r=RadByBright{0.4728*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex epsilonLep: x=0.213595843423663*s  y=0.899965558691602*s  z=-0.380051060833998*s  color=col0Lep  r=RadByBright{0.4654*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex zetaLep: x=0.049886061077019*s  y=0.965473489336887*s  z=-0.25568011713443*s  color=col0Lep  r=RadByBright{0.4387*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex gammaLep: x=0.0581199429035295*s  y=0.922441252193914*s  z=-0.381738403213266*s  color=col0Lep  r=RadByBright{0.4268*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex etaLep: x=0.0100519086423294*s  y=0.969544054710712*s  z=-0.24471061502877*s  color=col0Lep  r=RadByBright{0.4179*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex deltaLep: x=0.0306825096351394*s  y=0.933833392605129*s  z=-0.356389924742669*s  color=col0Lep  r=RadByBright{0.4049*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex lambdaLep: x=0.165708613657622*s  y=0.959570398546363*s  z=-0.227519901532248*s  color=col0Lep  r=RadByBright{0.3800*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex kappaLep: x=0.192377596841545*s  y=0.955543126382362*s  z=-0.223446176644162*s  color=col0Lep  r=RadByBright{0.3687*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex iotaLep: x=0.197020436698613*s  y=0.958692215481707*s  z=-0.205163796752408*s  color=col0Lep  r=RadByBright{0.3609*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex thetaLep: x=-0.0310516174572825*s  y=0.965699218884561*s  z=-0.257799952868565*s  color=col0Lep  r=RadByBright{0.3397*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex nuLep: x=0.164518583018743*s  y=0.963132274924543*s  z=-0.21286112101598*s  color=col0Lep  r=RadByBright{0.2981*b},!RadByBright{a}  visible=visLep&vis0  label=labLep
-vertex zetaHer: x=-0.283411894672764*s  y=-0.803623319433042*s  z=0.523323282896351*s  color=col0Her  r=RadByBright{0.5089*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex betaHer: x=-0.351068590132234*s  y=-0.862104492052868*s  z=0.365413040003818*s  color=col0Her  r=RadByBright{0.5084*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex deltaHer: x=-0.172687628815877*s  y=-0.891130909848569*s  z=0.41960062484035*s  color=col0Her  r=RadByBright{0.4842*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex piHer: x=-0.152894834139084*s  y=-0.786206615013827*s  z=0.598750639416846*s  color=col0Her  r=RadByBright{0.4664*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex mu1Her: x=-0.0482353814650113*s  y=-0.884024615686077*s  z=0.464944971836463*s  color=col0Her  r=RadByBright{0.4406*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex etaHer: x=-0.254064889791648*s  y=-0.735919899000361*s  z=0.627592968436116*s  color=col0Her  r=RadByBright{0.4324*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex iotaHer: x=-0.0598839103221436*s  y=-0.692156847409699*s  z=0.719258518106248*s  color=col0Her  r=RadByBright{0.4217*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex gammaHer: x=-0.387745959357064*s  y=-0.861781663276807*s  z=0.327086281953448*s  color=col0Her  r=RadByBright{0.4157*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex omicronHer: x=0.0328338074553471*s  y=-0.875962144579993*s  z=0.481261116599715*s  color=col0Her  r=RadByBright{0.4132*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex tauHer: x=-0.290747521488816*s  y=-0.627408881654778*s  z=0.722373846404209*s  color=col0Her  r=RadByBright{0.4124*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex xiHer: x=-0.0045502490959014*s  y=-0.87251283939009*s  z=0.488569995325754*s  color=col0Her  r=RadByBright{0.4118*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex epsilonHer: x=-0.217354192566738*s  y=-0.830185631583819*s  z=0.513370209581191*s  color=col0Her  r=RadByBright{0.4063*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex thetaHer: x=-0.00982567620554203*s  y=-0.795957660182722*s  z=0.605272549587003*s  color=col0Her  r=RadByBright{0.3955*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex rhoHer: x=-0.12264866992715*s  y=-0.787854264423994*s  z=0.603525444197698*s  color=col0Her  r=RadByBright{0.3843*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex sigmaHer: x=-0.267815409375223*s  y=-0.688391180327588*s  z=0.674086410891343*s  color=col0Her  r=RadByBright{0.3800*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex lambdaHer: x=-0.110148105890836*s  y=-0.891307432819295*s  z=0.439816387791244*s  color=col0Her  r=RadByBright{0.3511*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex eHer: x=-0.143001754351411*s  y=-0.782891084897694*s  z=0.60550148425923*s  color=col0Her  r=RadByBright{0.3443*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex chiHer: x=-0.387073014823641*s  y=-0.629185372728262*s  z=0.674017987846122*s  color=col0Her  r=RadByBright{0.3373*b},!RadByBright{a}  visible=visHer&vis0  label=labHer
-vertex alpha2CVn: x=-0.761711895844409*s  y=-0.194422331297001*s  z=0.618057396058129*s  color=col0CVn  r=RadByBright{0.5192*b},!RadByBright{a}  visible=visCVn&vis0  label=labCVn
-vertex betaCVn: x=-0.743513057074794*s  y=-0.114461107839891*s  z=0.658852782305243*s  color=col0CVn  r=RadByBright{0.3658*b},!RadByBright{a}  visible=visCVn&vis0  label=labCVn
-vertex alphaInd: x=0.435487074026394*s  y=-0.52159401440407*s  z=-0.733682964565606*s  color=col0Ind  r=RadByBright{0.4709*b},!RadByBright{a}  visible=visInd&vis0  label=labInd
-vertex betaInd: x=0.365941815725684*s  y=-0.376047515785178*s  z=-0.85127836421184*s  color=col0Ind  r=RadByBright{0.4136*b},!RadByBright{a}  visible=visInd&vis0  label=labInd
-vertex thetaInd: x=0.460353454110839*s  y=-0.380311064366814*s  z=-0.80214599145567*s  color=col0Ind  r=RadByBright{0.3593*b},!RadByBright{a}  visible=visInd&vis0  label=labInd
-vertex alphaCar: x=-0.0647620454370783*s  y=0.60236121288918*s  z=-0.795592135882125*s  color=col0Car  r=RadByBright{1.1361*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex betaCar: x=-0.257757527967799*s  y=0.22908421747581*s  z=-0.938659404725391*s  color=col0Car  r=RadByBright{0.6819*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex epsilonCar: x=-0.29579160119905*s  y=0.410652384968032*s  z=-0.862480114194043*s  color=col0Car  r=RadByBright{0.6310*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex zetaPupCar: x=-0.395581636705218*s  y=0.654956711790435*s  z=-0.643853146596553*s  color=col0Car  r=RadByBright{0.6115*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex iotaCar: x=-0.386933199394324*s  y=0.331039942541735*s  z=-0.860636540967462*s  color=col0Car  r=RadByBright{0.5913*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex thetaCar: x=-0.406484109309907*s  y=0.14012751026976*s  z=-0.902848242920221*s  color=col0Car  r=RadByBright{0.5428*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex nuPupCar: x=-0.122092936157246*s  y=0.718421065959011*s  z=-0.684809818071281*s  color=col0Car  r=RadByBright{0.4854*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex omegaCar: x=-0.303817074338483*s  y=0.150864560589597*s  z=-0.940709875412453*s  color=col0Car  r=RadByBright{0.4701*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex aCar: x=-0.381397317807323*s  y=0.344401613263676*s  z=-0.857859903918325*s  color=col0Car  r=RadByBright{0.4606*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex qCar: x=-0.431122074712188*s  y=0.205681137010083*s  z=-0.878538005196188*s  color=col0Car  r=RadByBright{0.4436*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex sCar: x=-0.476553827103369*s  y=0.200163685154017*s  z=-0.856055459078847*s  color=col0Car  r=RadByBright{0.4078*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex uCar: x=-0.494265438502825*s  y=0.145027282460991*s  z=-0.857128207238328*s  color=col0Car  r=RadByBright{0.4036*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex xCar: x=-0.500946478552915*s  y=0.111649330118346*s  z=-0.858246498804136*s  color=col0Car  r=RadByBright{0.3900*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex dCar: x=-0.324800616820795*s  y=0.382971586239449*s  z=-0.86477588047197*s  color=col0Car  r=RadByBright{0.3732*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex wCar: x=-0.463004257184982*s  y=0.158152563973241*s  z=-0.87213234336153*s  color=col0Car  r=RadByBright{0.3407*b},!RadByBright{a}  visible=visCar&vis0  label=labCar
-vertex alphaUMi: x=0.00747881669798246*s  y=0.00795740221340561*s  z=0.999940371747642*s  color=PolarisCol  r=RadByBright{0.6155*b},!RadByBright{2*a}  visible=visUMi&vis0  label=labUMi
-vertex betaUMi: x=-0.202118744619829*s  y=-0.186273863159433*s  z=0.961483260892755*s  color=col0UMi  r=RadByBright{0.6020*b},!RadByBright{a}  visible=visUMi&vis0  label=labUMi
-vertex gammaUMi: x=-0.200675137671035*s  y=-0.240660061011917*s  z=0.949637943720896*s  color=col0UMi  r=RadByBright{0.4960*b},!RadByBright{a}  visible=visUMi&vis0  label=labUMi
-vertex zetaUMi: x=-0.119665827805961*s  y=-0.176017085795438*s  z=0.977086523888031*s  color=col0UMi  r=RadByBright{0.3710*b},!RadByBright{a}  visible=visUMi&vis0  label=labUMi
-vertex deltaUMi: x=-0.00943869763710869*s  y=-0.0591481227844988*s  z=0.998204593536808*s  color=col0UMi  r=RadByBright{0.3661*b},!RadByBright{a}  visible=visUMi&vis0  label=labUMi
-vertex epsilonUMi: x=-0.0457571395059932*s  y=-0.131633527380396*s  z=0.990241838468575*s  color=col0UMi  r=RadByBright{0.3658*b},!RadByBright{a}  visible=visUMi&vis0  label=labUMi
-vertex etaUMi: x=-0.107598814899899*s  y=-0.222469125761181*s  z=0.968983995283303*s  color=col0UMi  r=RadByBright{0.3133*b},!RadByBright{a}  visible=visUMi&vis0  label=labUMi
-vertex alphaCMi: x=-0.423665709335884*s  y=0.901352466482414*s  z=0.0898392892836448*s  color=col0CMi  r=RadByBright{0.8993*b},!RadByBright{a}  visible=visCMi&vis0  label=labCMi
-vertex betaCMi: x=-0.373146758390436*s  y=0.916653662119678*s  z=0.14320461034929*s  color=col0CMi  r=RadByBright{0.5182*b},!RadByBright{a}  visible=visCMi&vis0  label=labCMi
-vertex f46LMi: x=-0.79505886530525*s  y=0.232490212800091*s  z=0.560205053218637*s  color=col0LMi  r=RadByBright{0.4024*b},!RadByBright{a}  visible=visLMi&vis0  label=labLMi
-vertex betaLMi: x=-0.741224300746764*s  y=0.309220689304937*s  z=0.595792834203509*s  color=col0LMi  r=RadByBright{0.3664*b},!RadByBright{a}  visible=visLMi&vis0  label=labLMi
-vertex f21LMi: x=-0.723933271724138*s  y=0.380884882488818*s  z=0.57519329306092*s  color=col0LMi  r=RadByBright{0.3518*b},!RadByBright{a}  visible=visLMi&vis0  label=labLMi
-vertex f10LMi: x=-0.651895128710104*s  y=0.474268906380758*s  z=0.591693962791946*s  color=col0LMi  r=RadByBright{0.3391*b},!RadByBright{a}  visible=visLMi&vis0  label=labLMi
-vertex betaHyi: x=0.221622646019981*s  y=0.0263462773736707*s  z=-0.974776526409849*s  color=col0Hyi  r=RadByBright{0.5092*b},!RadByBright{a}  visible=visHyi&vis0  label=labHyi
-vertex alphaHyi: x=0.414426501796247*s  y=0.238334199277938*s  z=-0.878320832078728*s  color=col0Hyi  r=RadByBright{0.5092*b},!RadByBright{a}  visible=visHyi&vis0  label=labHyi
-vertex gammaHyi: x=0.149834036720675*s  y=0.228220315067504*s  z=-0.962011044235188*s  color=col0Hyi  r=RadByBright{0.4632*b},!RadByBright{a}  visible=visHyi&vis0  label=labHyi
-vertex epsilonHyi: x=0.285059052353578*s  y=0.239215008863487*s  z=-0.928179678836874*s  color=col0Hyi  r=RadByBright{0.3897*b},!RadByBright{a}  visible=visHyi&vis0  label=labHyi
-vertex deltaHyi: x=0.297653017282108*s  y=0.212771233027511*s  z=-0.930661637599192*s  color=col0Hyi  r=RadByBright{0.3892*b},!RadByBright{a}  visible=visHyi&vis0  label=labHyi
-vertex alphaLeo: x=-0.867745786796211*s  y=0.452714579155405*s  z=0.205101826704612*s  color=col0Leo  r=RadByBright{0.7374*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex betaLeo: x=-0.96763991705959*s  y=0.0404632987255403*s  z=0.249069693799059*s  color=col0Leo  r=RadByBright{0.6080*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex gammaLeo: x=-0.855721972385363*s  y=0.392490814760647*s  z=0.337180762063063*s  color=col0Leo  r=RadByBright{0.6070*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex deltaLeo: x=-0.919829215488336*s  y=0.180767210352023*s  z=0.348191656987441*s  color=col0Leo  r=RadByBright{0.5504*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex epsilonLeo: x=-0.766847321770447*s  y=0.501026385580233*s  z=0.401145542223643*s  color=col0Leo  r=RadByBright{0.4879*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex thetaLeo: x=-0.946623164950129*s  y=0.185544830991278*s  z=0.263586227394793*s  color=col0Leo  r=RadByBright{0.4646*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex etaLeo: x=-0.847550901892228*s  y=0.446924518137134*s  z=0.286209615124234*s  color=col0Leo  r=RadByBright{0.4464*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex zetaLeo: x=-0.829379817096732*s  y=0.394826498265112*s  z=0.395273519553613*s  color=col0Leo  r=RadByBright{0.4457*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex muLeo: x=-0.767702341644307*s  y=0.469163934187615*s  z=0.436484040362813*s  color=col0Leo  r=RadByBright{0.3936*b},!RadByBright{a}  visible=visLeo&vis0  label=labLeo
-vertex alphaEqu: x=0.754706845650482*s  y=-0.649378491904104*s  z=0.0934085187798817*s  color=col0Equ  r=RadByBright{0.3943*b},!RadByBright{a}  visible=visEqu&vis0  label=labEqu
-vertex deltaEqu: x=0.74236239066271*s  y=-0.646563026471871*s  z=0.175654017116262*s  color=col0Equ  r=RadByBright{0.3473*b},!RadByBright{a}  visible=visEqu&vis0  label=labEqu
-vertex gammaEqu: x=0.73027655812872*s  y=-0.659613042456577*s  z=0.177782965631828*s  color=col0Equ  r=RadByBright{0.3326*b},!RadByBright{a}  visible=visEqu&vis0  label=labEqu
-vertex betaEqu: x=0.772074706131137*s  y=-0.623984124312347*s  z=0.120600417738383*s  color=col0Equ  r=RadByBright{0.3032*b},!RadByBright{a}  visible=visEqu&vis0  label=labEqu
-vertex alphaLac: x=0.591166783350143*s  y=-0.237650027156207*s  z=0.770742693028029*s  color=col0Lac  r=RadByBright{0.4186*b},!RadByBright{a}  visible=visLac&vis0  label=labLac
-vertex f1Lac: x=0.711101517263534*s  y=-0.3424629916716*s  z=0.614047010806858*s  color=col0Lac  r=RadByBright{0.3724*b},!RadByBright{a}  visible=visLac&vis0  label=labLac
-vertex f5Lac: x=0.620784012789315*s  y=-0.255076222828309*s  z=0.741325387406123*s  color=col0Lac  r=RadByBright{0.3607*b},!RadByBright{a}  visible=visLac&vis0  label=labLac
-vertex f6Lac: x=0.674788810507811*s  y=-0.273842953090151*s  z=0.685324812228711*s  color=col0Lac  r=RadByBright{0.3555*b},!RadByBright{a}  visible=visLac&vis0  label=labLac
-vertex betaLac: x=0.558520868199724*s  y=-0.246868802523024*s  z=0.791902919634898*s  color=col0Lac  r=RadByBright{0.3478*b},!RadByBright{a}  visible=visLac&vis0  label=labLac
-vertex f4Lac: x=0.593765257749329*s  y=-0.259391505846345*s  z=0.761681603680067*s  color=col0Lac  r=RadByBright{0.3459*b},!RadByBright{a}  visible=visLac&vis0  label=labLac
-vertex alphaLyn: x=-0.63915474291306*s  y=0.523717106468687*s  z=0.563206540270802*s  color=col0Lyn  r=RadByBright{0.4729*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex f38Lyn: x=-0.615416465696868*s  y=0.514112674613681*s  z=0.597453539240285*s  color=col0Lyn  r=RadByBright{0.4140*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex f10UMa: x=-0.533575322764045*s  y=0.522677125416827*s  z=0.664910518418266*s  color=col0Lyn  r=RadByBright{0.3927*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex f31Lyn: x=-0.430869548277654*s  y=0.589481329769234*s  z=0.683273879363543*s  color=col0Lyn  r=RadByBright{0.3660*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex f2Lyn: x=-0.0493244557785264*s  y=0.512706265750638*s  z=0.857146068720022*s  color=col0Lyn  r=RadByBright{0.3582*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex f15Lyn: x=-0.134760085530005*s  y=0.506602099886163*s  z=0.851583250034238*s  color=col0Lyn  r=RadByBright{0.3547*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex f21Lyn: x=-0.246910166978676*s  y=0.605608342099219*s  z=0.756487875264632*s  color=col0Lyn  r=RadByBright{0.3452*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex HD77912: x=-0.574122691288764*s  y=0.534339366177707*s  z=0.620374545819018*s  color=col0Lyn  r=RadByBright{0.3367*b},!RadByBright{a}  visible=visLyn&vis0  label=labLyn
-vertex alphaLyr: x=0.128089547737062*s  y=-0.768628721918727*s  z=0.626739942561586*s  color=col0Lyr  r=RadByBright{0.9802*b},!RadByBright{a}  visible=visLyr&vis0  label=labLyr
-vertex gammaLyr: x=0.21753494805454*s  y=-0.812636675202435*s  z=0.540647926557423*s  color=col0Lyr  r=RadByBright{0.4749*b},!RadByBright{a}  visible=visLyr&vis0  label=labLyr
-vertex betaLyr: x=0.18449987916901*s  y=-0.814252489066446*s  z=0.550411372189672*s  color=col0Lyr  r=RadByBright{0.4404*b},!RadByBright{a}  visible=visLyr&vis0  label=labLyr
-vertex delta2Lyr: x=0.191481115020845*s  y=-0.776054250148126*s  z=0.600894985348857*s  color=col0Lyr  r=RadByBright{0.3786*b},!RadByBright{a}  visible=visLyr&vis0  label=labLyr
-vertex zeta1Lyr: x=0.156848800173732*s  y=-0.776233695699168*s  z=0.61062239030785*s  color=col0Lyr  r=RadByBright{0.3632*b},!RadByBright{a}  visible=visLyr&vis0  label=labLyr
-vertex alphaVir: x=-0.911427771141219*s  y=-0.361806418915613*s  z=-0.195947781880811*s  color=col0Vir  r=RadByBright{0.8149*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex gammaVir: x=-0.982056549566099*s  y=-0.186520552983548*s  z=-0.0278391229933774*s  color=col0Vir  r=RadByBright{0.5223*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex epsilonVir: x=-0.944763860168003*s  y=-0.268713190034241*s  z=0.187655189169063*s  color=col0Vir  r=RadByBright{0.5014*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex zetaVir: x=-0.913367418768363*s  y=-0.406936002188486*s  z=-0.0127690428486064*s  color=col0Vir  r=RadByBright{0.4555*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex deltaVir: x=-0.967721206895667*s  y=-0.245553130357022*s  z=0.0567391037668113*s  color=col0Vir  r=RadByBright{0.4528*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex f109Vir: x=-0.743941976783187*s  y=-0.667520595646008*s  z=0.031090023614048*s  color=col0Vir  r=RadByBright{0.4230*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex etaVir: x=-0.995593355997728*s  y=-0.0926898541705065*s  z=-0.0142288589504567*s  color=col0Vir  r=RadByBright{0.4075*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex muVir: x=-0.749532402094929*s  y=-0.654280699312454*s  z=-0.100587994895076*s  color=col0Vir  r=RadByBright{0.4019*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex nuVir: x=-0.992266441604536*s  y=0.0553312054097993*s  z=0.111111505135026*s  color=col0Vir  r=RadByBright{0.3856*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex iotaVir: x=-0.820841548855179*s  y=-0.561095296834946*s  z=-0.106729656341313*s  color=col0Vir  r=RadByBright{0.3815*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex tauVir: x=-0.85912171150562*s  y=-0.511174198349452*s  z=0.0247148490072196*s  color=col0Vir  r=RadByBright{0.3734*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex kappaVir: x=-0.819420151179482*s  y=-0.54404257804113*s  z=-0.180466864325163*s  color=col0Vir  r=RadByBright{0.3694*b},!RadByBright{a}  visible=visVir&vis0  label=labVir
-vertex alphaPyx: x=-0.550276101056742*s  y=0.629305575876559*s  z=-0.548790219279155*s  color=col0Pyx  r=RadByBright{0.4346*b},!RadByBright{a}  visible=visPyx&vis0  label=labPyx
-vertex betaPyx: x=-0.52705249761819*s  y=0.621751067329291*s  z=-0.579345557529628*s  color=col0Pyx  r=RadByBright{0.3867*b},!RadByBright{a}  visible=visPyx&vis0  label=labPyx
-vertex gammaPyx: x=-0.602288268745643*s  y=0.647752938216274*s  z=-0.466545788067538*s  color=col0Pyx  r=RadByBright{0.3820*b},!RadByBright{a}  visible=visPyx&vis0  label=labPyx
-vertex epsilonMic: x=0.648157974307594*s  y=-0.546029276264961*s  z=-0.530794941387951*s  color=col0Mic  r=RadByBright{0.3354*b},!RadByBright{a}  visible=visMic&vis0  label=labMic
-vertex gammaMic: x=0.606257744196389*s  y=-0.590979918078123*s  z=-0.532160017316484*s  color=col0Mic  r=RadByBright{0.3301*b},!RadByBright{a}  visible=visMic&vis0  label=labMic
-vertex alphaMic: x=0.566549825501819*s  y=-0.609515207474718*s  z=-0.554538102460878*s  color=col0Mic  r=RadByBright{0.3121*b},!RadByBright{a}  visible=visMic&vis0  label=labMic
-vertex alphaCrB: x=-0.526015116616504*s  y=-0.722810212478011*s  z=0.448166814733552*s  color=col0CrB  r=RadByBright{0.5997*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex betaCrB: x=-0.535584451851698*s  y=-0.69129496905098*s  z=0.485036659129515*s  color=col0CrB  r=RadByBright{0.4230*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex gammaCrB: x=-0.502119607200627*s  y=-0.743489947885517*s  z=0.441699668845109*s  color=col0CrB  r=RadByBright{0.4147*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex thetaCrB: x=-0.508385247784212*s  y=-0.687099339528538*s  z=0.519075078822738*s  color=col0CrB  r=RadByBright{0.3880*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex epsilonCrB: x=-0.450676449548308*s  y=-0.770436771940694*s  z=0.450907882237751*s  color=col0CrB  r=RadByBright{0.3716*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex deltaCrB: x=-0.480597514040222*s  y=-0.759619501151374*s  z=0.438182887581082*s  color=col0CrB  r=RadByBright{0.3358*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex iotaCrB: x=-0.425704396412567*s  y=-0.756391687897996*s  z=0.496636065297147*s  color=col0CrB  r=RadByBright{0.3186*b},!RadByBright{a}  visible=visCrB&vis0  label=labCrB
-vertex nuOct: x=0.182888859640805*s  y=-0.122955421391451*s  z=-0.975414593580461*s  color=col0Oct  r=RadByBright{0.4076*b},!RadByBright{a}  visible=visOct&vis0  label=labOct
-vertex betaOct: x=0.144969208364888*s  y=-0.0466610107350398*s  z=-0.988335306818107*s  color=col0Oct  r=RadByBright{0.3805*b},!RadByBright{a}  visible=visOct&vis0  label=labOct
-vertex deltaOct: x=-0.0854213749192179*s  y=-0.0664683422203523*s  z=-0.994125318151282*s  color=col0Oct  r=RadByBright{0.3575*b},!RadByBright{a}  visible=visOct&vis0  label=labOct
-vertex betaOri: x=0.189614907617964*s  y=0.971512959663226*s  z=-0.142157504252961*s  color=col0Ori  r=RadByBright{0.9565*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex alphaOri: x=0.0146212784802442*s  y=0.991541307770782*s  z=0.128965317817664*s  color=col0Ori  r=RadByBright{0.8913*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex gammaOri: x=0.144463497830846*s  y=0.983267079735545*s  z=0.110978140653062*s  color=col0Ori  r=RadByBright{0.7000*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex epsilonOri: x=0.0976837584439217*s  y=0.995001903037003*s  z=-0.0207146394854582*s  color=col0Ori  r=RadByBright{0.6882*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex zetaOri: x=0.0779384983426728*s  y=0.996388850545151*s  z=-0.0336875197276541*s  color=col0Ori  r=RadByBright{0.6790*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex kappaOri: x=0.0471861708062695*s  y=0.984684819898254*s  z=-0.167837036278007*s  color=col0Ori  r=RadByBright{0.6299*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex deltaOri: x=0.115913567959323*s  y=0.993247160645338*s  z=-0.00491147970715561*s  color=col0Ori  r=RadByBright{0.6115*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex pi3Ori: x=0.293109669809919*s  y=0.94826696085266*s  z=0.121969227345178*s  color=col0Ori  r=RadByBright{0.4692*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex lambdaOri: x=0.10033818724727*s  y=0.979835535612771*s  z=0.172784754334302*s  color=col0Ori  r=RadByBright{0.4645*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex pi4Ori: x=0.288323147899845*s  y=0.952460810259232*s  z=0.0984284882818593*s  color=col0Ori  r=RadByBright{0.4341*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex pi5Ori: x=0.276858002298893*s  y=0.959934230436175*s  z=0.0433118898222465*s  color=col0Ori  r=RadByBright{0.4318*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex muOri: x=-0.0165842417621652*s  y=0.985725403769581*s  z=0.16754220748358*s  color=col0Ori  r=RadByBright{0.3820*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex nuOri: x=-0.0383848533914917*s  y=0.966226434294089*s  z=0.254819702341567*s  color=col0Ori  r=RadByBright{0.3665*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex pi2Ori: x=0.288519467964108*s  y=0.944767952680477*s  z=0.155467141845623*s  color=col0Ori  r=RadByBright{0.3658*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex xiOri: x=-0.0569079856178519*s  y=0.967772061477743*s  z=0.245313510015324*s  color=col0Ori  r=RadByBright{0.3632*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex chi1Ori: x=0.0164992543904019*s  y=0.937873564748583*s  z=0.346584695493536*s  color=col0Ori  r=RadByBright{0.3530*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex pi6Ori: x=0.258965729577483*s  y=0.965401984383925*s  z=0.0305901855499841*s  color=col0Ori  r=RadByBright{0.3443*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex pi1Ori: x=0.26976049928782*s  y=0.946532709563433*s  z=0.176932480767359*s  color=col0Ori  r=RadByBright{0.3399*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex chi2Ori: x=-0.0225655750401848*s  y=0.938610721774612*s  z=0.344239317616171*s  color=col0Ori  r=RadByBright{0.3392*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex f01Ori: x=-0.0569633565507247*s  y=0.958982549510485*s  z=0.27768263493572*s  color=col0Ori  r=RadByBright{0.3227*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex f5Ori: x=0.280487628981379*s  y=0.958825690803856*s  z=0.044497018359797*s  color=col0Ori  r=RadByBright{0.2881*b},!RadByBright{a}  visible=visOri&vis0  label=labOri
-vertex alphaPic: x=-0.0986332592481691*s  y=0.459454408565029*s  z=-0.882707837633859*s  color=col0Pic  r=RadByBright{0.4666*b},!RadByBright{a}  visible=visPic&vis0  label=labPic
-vertex betaPic: x=0.0331148488509002*s  y=0.627662442087651*s  z=-0.777780988182501*s  color=col0Pic  r=RadByBright{0.4066*b},!RadByBright{a}  visible=visPic&vis0  label=labPic
-vertex gammaPic: x=0.023525060008732*s  y=0.556367600556177*s  z=-0.830603193229443*s  color=col0Pic  r=RadByBright{0.3418*b},!RadByBright{a}  visible=visPic&vis0  label=labPic
-vertex alphaPav: x=0.330389468792519*s  y=-0.439455774804618*s  z=-0.835297205132323*s  color=col0Pav  r=RadByBright{0.6519*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex betaPav: x=0.270170019563394*s  y=-0.301812638201324*s  z=-0.91428512617841*s  color=col0Pav  r=RadByBright{0.4495*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex deltaPav: x=0.219560506283849*s  y=-0.340291348295403*s  z=-0.914327612158616*s  color=col0Pav  r=RadByBright{0.4278*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex etaPav: x=-0.0216649840695858*s  y=-0.426291718291943*s  z=-0.904326268213507*s  color=col0Pav  r=RadByBright{0.4198*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex epsilonPav: x=0.151591399029094*s  y=-0.253199800661522*s  z=-0.955463190649105*s  color=col0Pav  r=RadByBright{0.4024*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex lambdaPav: x=0.110402060149414*s  y=-0.45387354361903*s  z=-0.884200311873656*s  color=col0Pav  r=RadByBright{0.3832*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex zetaPav: x=0.0637851187854551*s  y=-0.312508037247333*s  z=-0.947771167148139*s  color=col0Pav  r=RadByBright{0.3831*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex gammaPav: x=0.330689714932738*s  y=-0.256927547217134*s  z=-0.908092807987538*s  color=col0Pav  r=RadByBright{0.3690*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex piPav: x=0.021583293338062*s  y=-0.443114073469051*s  z=-0.896205377880733*s  color=col0Pav  r=RadByBright{0.3632*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex xiPav: x=0.0534080001672389*s  y=-0.47449898244702*s  z=-0.878634338718263*s  color=col0Pav  r=RadByBright{0.3558*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex kappaPav: x=0.0998113279272503*s  y=-0.374509468778762*s  z=-0.921835319681584*s  color=col0Pav  r=RadByBright{0.3548*b},!RadByBright{a}  visible=visPav&vis0  label=labPav
-vertex alphaAndPeg: x=0.871804667172319*s  y=0.0372110032429284*s  z=0.488438290405468*s  color=col0Peg  r=RadByBright{0.6256*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex alphaPeg: x=0.93777725791622*s  y=-0.224728915997662*s  z=0.264708762321257*s  color=col0Peg  r=RadByBright{0.5652*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex betaPeg: x=0.855888296598443*s  y=-0.209138508826154*s  z=0.472986583183698*s  color=col0Peg  r=RadByBright{0.5642*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex epsilonPeg: x=0.820031207682687*s  y=-0.54534627933419*s  z=0.173626766493046*s  color=col0Peg  r=RadByBright{0.5564*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex gammaPeg: x=0.962448592171687*s  y=0.0614649292547694*s  z=0.264414012295951*s  color=col0Peg  r=RadByBright{0.5304*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex etaPeg: x=0.816159660701881*s  y=-0.279992345644883*s  z=0.505457905886599*s  color=col0Peg  r=RadByBright{0.4909*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex f42Peg: x=0.926545153400371*s  y=-0.324485889320408*s  z=0.190323373084408*s  color=col0Peg  r=RadByBright{0.4582*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex thetaPeg: x=0.884683867054064*s  y=-0.452964395336325*s  z=0.110262014909327*s  color=col0Peg  r=RadByBright{0.4413*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex muPeg: x=0.867689362545816*s  y=-0.268191759332485*s  z=0.418555074453748*s  color=col0Peg  r=RadByBright{0.4297*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex iotaPeg: x=0.797567472916743*s  y=-0.422921610359146*s  z=0.43014350818817*s  color=col0Peg  r=RadByBright{0.4104*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex lambdaPeg: x=0.870580531105394*s  y=-0.283614855901414*s  z=0.402059886549592*s  color=col0Peg  r=RadByBright{0.3862*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex kappaPeg: x=0.750652861282972*s  y=-0.497511348065785*s  z=0.43474445412616*s  color=col0Peg  r=RadByBright{0.3771*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex xiPeg: x=0.929228006476604*s  y=-0.301787400977916*s  z=0.213212749596528*s  color=col0Peg  r=RadByBright{0.3710*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex pi1Peg: x=0.74203550756393*s  y=-0.384571892840908*s  z=0.549079015034359*s  color=col0Peg  r=RadByBright{0.2663*b},!RadByBright{a}  visible=visPeg&vis0  label=labPeg
-vertex alphaPer: x=0.399984491676516*s  y=0.503962934421287*s  z=0.765528423474768*s  color=col0Per  r=RadByBright{0.6461*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex betaPer: x=0.509629728881243*s  y=0.555773751895379*s  z=0.656805204108923*s  color=col0Per  r=RadByBright{0.6170*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex epsilonPer: x=0.383534461847624*s  y=0.662012862977746*s  z=0.643925683466082*s  color=col0Per  r=RadByBright{0.5206*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex zetaPer: x=0.437534308616128*s  y=0.726886468865*s  z=0.529339012509732*s  color=col0Per  r=RadByBright{0.5131*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex deltaPer: x=0.373065888092486*s  y=0.557499091494297*s  z=0.741631044472114*s  color=col0Per  r=RadByBright{0.5047*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex gammaPer: x=0.406981920697764*s  y=0.431696629228143*s  z=0.804986792772539*s  color=col0Per  r=RadByBright{0.4944*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex rhoPer: x=0.53316910100412*s  y=0.566283771969958*s  z=0.628532735295414*s  color=col0Per  r=RadByBright{0.4689*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex omicronPer: x=0.466156017729326*s  y=0.704307690929865*s  z=0.535396342564813*s  color=col0Per  r=RadByBright{0.4113*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex etaPer: x=0.407806911340741*s  y=0.382516271369277*s  z=0.829080710908456*s  color=col0Per  r=RadByBright{0.4078*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex xiPer: x=0.403026599139763*s  y=0.703070199729644*s  z=0.585885530319665*s  color=col0Per  r=RadByBright{0.3953*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex f16Per: x=0.572282632089105*s  y=0.534985904142717*s  z=0.621516428888059*s  color=col0Per  r=RadByBright{0.3709*b},!RadByBright{a}  visible=visPer&vis0  label=labPer
-vertex alphaPhe: x=0.735895236589357*s  y=0.0890557304641148*s  z=-0.671213287738404*s  color=col0Phe  r=RadByBright{0.5558*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex betaPhe: x=0.65799845826652*s  y=0.198881452558731*s  z=-0.726281072827188*s  color=col0Phe  r=RadByBright{0.4503*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex gammaPhe: x=0.67425699272236*s  y=0.27764500446644*s  z=-0.68431773267966*s  color=col0Phe  r=RadByBright{0.4433*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex zetaPhe: x=0.545991677107922*s  y=0.170849097363788*s  z=-0.820185146451006*s  color=col0Phe  r=RadByBright{0.4053*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex kappaPhe: x=0.71977556528971*s  y=0.0868222381338457*s  z=-0.688756150300894*s  color=col0Phe  r=RadByBright{0.3986*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex epsilonPhe: x=0.698892173019455*s  y=0.0328357789983083*s  z=-0.714472912089548*s  color=col0Phe  r=RadByBright{0.3940*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex deltaPhe: x=0.604294138773263*s  y=0.257633314026665*s  z=-0.753958665543356*s  color=col0Phe  r=RadByBright{0.3891*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex psiPhe: x=0.607536862255021*s  y=0.332324607490811*s  z=-0.72142866331842*s  color=col0Phe  r=RadByBright{0.3622*b},!RadByBright{a}  visible=visPhe&vis0  label=labPhe
-vertex alphaAri: x=0.775732661286478*s  y=0.487973624011675*s  z=0.400150697215824*s  color=col0Ari  r=RadByBright{0.6063*b},!RadByBright{a}  visible=visAri&vis0  label=labAri
-vertex betaAri: x=0.816624296404636*s  y=0.453238113810084*s  z=0.35735132672415*s  color=col0Ari  r=RadByBright{0.5365*b},!RadByBright{a}  visible=visAri&vis0  label=labAri
-vertex f41Ari: x=0.650636041411171*s  y=0.604425266211234*s  z=0.459720392393332*s  color=col0Ari  r=RadByBright{0.4382*b},!RadByBright{a}  visible=visAri&vis0  label=labAri
-vertex gammaAri: x=0.826820115457238*s  y=0.453625508735649*s  z=0.332554348189289*s  color=col0Ari  r=RadByBright{0.4113*b},!RadByBright{a}  visible=visAri&vis0  label=labAri
-vertex alphaRet: x=0.205266638608202*s  y=0.415213875285696*s  z=-0.886263530133518*s  color=col0Ret  r=RadByBright{0.4472*b},!RadByBright{a}  visible=visRet&vis0  label=labRet
-vertex betaRet: x=0.237930683672939*s  y=0.354555773539933*s  z=-0.904256154646695*s  color=col0Ret  r=RadByBright{0.3979*b},!RadByBright{a}  visible=visRet&vis0  label=labRet
-vertex epsilonRet: x=0.222304114351335*s  y=0.460626771796493*s  z=-0.85930428711069*s  color=col0Ret  r=RadByBright{0.3469*b},!RadByBright{a}  visible=visRet&vis0  label=labRet
-vertex deltaRet: x=0.241412465720621*s  y=0.414684419287997*s  z=-0.877357882391482*s  color=col0Ret  r=RadByBright{0.3428*b},!RadByBright{a}  visible=visRet&vis0  label=labRet
-vertex gamma2Vel: x=-0.364460174513565*s  y=0.570125613315069*s  z=-0.736291767056822*s  color=col0Vel  r=RadByBright{0.6756*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex delta1Vel: x=-0.380830643542707*s  y=0.432566813711365*s  z=-0.817223330928851*s  color=col0Vel  r=RadByBright{0.6381*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex lambdaVel: x=-0.532251485190685*s  y=0.492088645852479*s  z=-0.688881064578918*s  color=col0Vel  r=RadByBright{0.5836*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex kappaVel: x=-0.442690623317376*s  y=0.361877329582723*s  z=-0.820408319290431*s  color=col0Vel  r=RadByBright{0.5737*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex muVel: x=-0.616812451932969*s  y=0.200634794431792*s  z=-0.761109767644425*s  color=col0Vel  r=RadByBright{0.5212*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex phiVel: x=-0.497699759517051*s  y=0.293739710861883*s  z=-0.816095540754541*s  color=col0Vel  r=RadByBright{0.4464*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex omicronVel: x=-0.388806803140363*s  y=0.459035992663034*s  z=-0.798821148487966*s  color=col0Vel  r=RadByBright{0.4429*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex psiVel: x=-0.606033471234518*s  y=0.45768650452193*s  z=-0.650573973750824*s  color=col0Vel  r=RadByBright{0.4307*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex qVel: x=-0.665054088295099*s  y=0.324862528995*s  z=-0.672433934968296*s  color=col0Vel  r=RadByBright{0.4107*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex pVel: x=-0.622746364097895*s  y=0.231496177137603*s  z=-0.747393126790398*s  color=col0Vel  r=RadByBright{0.4064*b},!RadByBright{a}  visible=visVel&vis0  label=labVel
-vertex betaLib: x=-0.639105623293641*s  y=-0.751277230999072*s  z=-0.164701318928577*s  color=col0Lib  r=RadByBright{0.5528*b},!RadByBright{a}  visible=visLib&vis0  label=labLib
-vertex alpha2Lib: x=-0.701448958290809*s  y=-0.656191895787553*s  z=-0.278175402966323*s  color=col0Lib  r=RadByBright{0.5261*b},!RadByBright{a}  visible=visLib&vis0  label=labLib
-vertex sigmaLib: x=-0.622913095806461*s  y=-0.654364320959097*s  z=-0.428703406247898*s  color=col0Lib  r=RadByBright{0.4668*b},!RadByBright{a}  visible=visLib&vis0  label=labLib
-vertex gammaLib: x=-0.564574063665745*s  y=-0.784435836864017*s  z=-0.256742175108408*s  color=col0Lib  r=RadByBright{0.3920*b},!RadByBright{a}  visible=visLib&vis0  label=labLib
-vertex thetaLib: x=-0.495356694921903*s  y=-0.819162265728281*s  z=-0.289127873445225*s  color=col0Lib  r=RadByBright{0.3721*b},!RadByBright{a}  visible=visLib&vis0  label=labLib
-vertex alphaSco: x=-0.33871033986931*s  y=-0.828453991646402*s  z=-0.446026108418285*s  color=col0Sco  r=RadByBright{0.7987*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex lambdaSco: x=-0.0853303719949077*s  y=-0.792788398326055*s  z=-0.603494227888568*s  color=col0Sco  r=RadByBright{0.7040*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex thetaSco: x=-0.0661358588356493*s  y=-0.728214618726617*s  z=-0.682150655829721*s  color=col0Sco  r=RadByBright{0.6417*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex deltaSco: x=-0.454574748730689*s  y=-0.802801883402435*s  z=-0.385837963168392*s  color=col0Sco  r=RadByBright{0.5940*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex kappaSco: x=-0.0530300650374706*s  y=-0.774883720750843*s  z=-0.629875409519574*s  color=col0Sco  r=RadByBright{0.5867*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex epsilonSco: x=-0.241758122432442*s  y=-0.78952719268481*s  z=-0.564092033492039*s  color=col0Sco  r=RadByBright{0.5685*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex beta1Sco: x=-0.445134743814384*s  y=-0.82840735570268*s  z=-0.339994577702344*s  color=col0Sco  r=RadByBright{0.5503*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex tauSco: x=-0.310051418771719*s  y=-0.824353415299981*s  z=-0.473613306824144*s  color=col0Sco  r=RadByBright{0.5325*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex piSco: x=-0.447059363183758*s  y=-0.778051098298973*s  z=-0.441332543809647*s  color=col0Sco  r=RadByBright{0.5216*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex mu1Sco: x=-0.224559644556241*s  y=-0.754320418484586*s  z=-0.616906534488016*s  color=col0Sco  r=RadByBright{0.5100*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex iota1Sco: x=-0.0351587154994052*s  y=-0.763724667625043*s  z=-0.644583971865148*s  color=col0Sco  r=RadByBright{0.4888*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex etaSco: x=-0.144933092184284*s  y=-0.713542431391823*s  z=-0.685457217770261*s  color=col0Sco  r=RadByBright{0.4555*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex zeta1Sco: x=-0.203881044766791*s  y=-0.709706701877317*s  z=-0.674350737298643*s  color=col0Sco  r=RadByBright{0.3282*b},!RadByBright{a}  visible=visSco&vis0  label=labSco
-vertex alphaScl: x=0.843173519865134*s  y=0.225501735969251*s  z=-0.488064936738028*s  color=col0Scl  r=RadByBright{0.3747*b},!RadByBright{a}  visible=visScl&vis0  label=labScl
-vertex betaScl: x=0.786609135795666*s  y=-0.0882389964440916*s  z=-0.611113693995917*s  color=col0Scl  r=RadByBright{0.3671*b},!RadByBright{a}  visible=visScl&vis0  label=labScl
-vertex gammaScl: x=0.831796392743778*s  y=-0.145688144769059*s  z=-0.535620878506605*s  color=col0Scl  r=RadByBright{0.3485*b},!RadByBright{a}  visible=visScl&vis0  label=labScl
-vertex alphaSer: x=-0.550049833019731*s  y=-0.827791328264833*s  z=0.110483926634194*s  color=col0Ser  r=RadByBright{0.5252*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex deltaOph: x=-0.438406032541462*s  y=-0.896379957850792*s  z=-0.0655981843854471*s  color=col0Ser  r=RadByBright{0.5214*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex etaSer: x=0.0987355836442298*s  y=-0.993835832062156*s  z=-0.0504145160817405*s  color=col0Ser  r=RadByBright{0.4572*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex nuOph: x=0.00214802986267838*s  y=-0.985480778158772*s  z=-0.169773442703183*s  color=col0Ser  r=RadByBright{0.4480*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex muSer: x=-0.532545923608899*s  y=-0.844183723070198*s  z=-0.0612264726313978*s  color=col0Ser  r=RadByBright{0.4425*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex xiSer: x=-0.0877104205704163*s  y=-0.960036615357897*s  z=-0.265775430195333*s  color=col0Ser  r=RadByBright{0.4357*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex betaSer: x=-0.527268955353374*s  y=-0.807467852265766*s  z=0.264543221946571*s  color=col0Ser  r=RadByBright{0.4282*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex epsilonSer: x=-0.527799185310288*s  y=-0.845898831486256*s  z=0.0767019352818601*s  color=col0Ser  r=RadByBright{0.4212*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex deltaSer: x=-0.577749598662748*s  y=-0.795802002037229*s  z=0.181396181874295*s  color=col0Ser  r=RadByBright{0.4104*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex gammaSer: x=-0.490020276576193*s  y=-0.829324399266992*s  z=0.268516609029377*s  color=col0Ser  r=RadByBright{0.4031*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex kappaSer: x=-0.511019591243351*s  y=-0.801713979674913*s  z=0.310022051085549*s  color=col0Ser  r=RadByBright{0.3808*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex omicronSer: x=-0.0725861221682466*s  y=-0.972104502027032*s  z=-0.223033836014523*s  color=col0Ser  r=RadByBright{0.3736*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex nuSer: x=-0.159499760517743*s  y=-0.961734908897595*s  z=-0.222768470395874*s  color=col0Ser  r=RadByBright{0.3673*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex theta1Ser: x=0.247793576983192*s  y=-0.965987143275631*s  z=0.0739403964829768*s  color=col0Ser  r=RadByBright{0.3399*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex dSer: x=0.124366693507619*s  y=-0.992229287368867*s  z=0.00373722269238057*s  color=col0Ser  r=RadByBright{0.2948*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex HD165402: x=0.0327241664514492*s  y=-0.988935019664042*s  z=-0.144695044186522*s  color=col0Ser  r=RadByBright{0.2572*b},!RadByBright{a}  visible=visSer&vis0  label=labSer
-vertex alphaOph: x=-0.101285575664306*s  y=-0.97086599264896*s  z=0.217164583853124*s  color=col0Oph  r=RadByBright{0.6129*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex etaOph: x=-0.200452921927211*s  y=-0.941321987861005*s  z=-0.271535524858627*s  color=col0Oph  r=RadByBright{0.5703*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex zetaOph: x=-0.341659781092861*s  y=-0.921580063123053*s  z=-0.184279085187899*s  color=col0Oph  r=RadByBright{0.5532*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex betaOph: x=-0.0660877609367001*s  y=-0.994643990348579*s  z=0.0794716321578329*s  color=col0Oph  r=RadByBright{0.5096*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex kappaOph: x=-0.259814994245086*s  y=-0.951936537504343*s  z=0.162212814936642*s  color=col0Oph  r=RadByBright{0.4612*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex epsilonOph: x=-0.422190816683931*s  y=-0.902707762769405*s  z=-0.0829072333612173*s  color=col0Oph  r=RadByBright{0.4582*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex cOph: x=-0.107195226810106*s  y=-0.907371572015842*s  z=-0.40643082270742*s  color=col0Oph  r=RadByBright{0.3308*b},!RadByBright{a}  visible=visOph&vis0  label=labOph
-vertex alphaSex: x=-0.885573987220738*s  y=0.464415272629127*s  z=-0.00878451517035782*s  color=col0Sex  r=RadByBright{0.3565*b},!RadByBright{a}  visible=visSex&vis0  label=labSex
-vertex betaSex: x=-0.926539198840963*s  y=0.375955005401301*s  z=-0.0135257874023885*s  color=col0Sex  r=RadByBright{0.3140*b},!RadByBright{a}  visible=visSex&vis0  label=labSex
-vertex alphaSct: x=0.157650989375412*s  y=-0.977081855488392*s  z=-0.14302871468455*s  color=col0Sct  r=RadByBright{0.3975*b},!RadByBright{a}  visible=visSct&vis0  label=labSct
-vertex betaSct: x=0.209730055427322*s  y=-0.97429489763955*s  z=-0.0822359792547677*s  color=col0Sct  r=RadByBright{0.3648*b},!RadByBright{a}  visible=visSct&vis0  label=labSct
-vertex gammaSct: x=0.1293634032878*s  y=-0.959260927560944*s  z=-0.251164453585127*s  color=col0Sct  r=RadByBright{0.3381*b},!RadByBright{a}  visible=visSct&vis0  label=labSct
-vertex HD175156: x=0.234068567245525*s  y=-0.934445635981444*s  z=-0.268371494803121*s  color=col0Sct  r=RadByBright{0.3068*b},!RadByBright{a}  visible=visSct&vis0  label=labSct
-vertex RSct: x=0.210755655280687*s  y=-0.972525618365677*s  z=-0.0988735323009491*s  color=col0Sct  r=RadByBright{0.2807*b},!RadByBright{a}  visible=visSct&vis0  label=labSct
-vertex alphaCru: x=-0.446763786369548*s  y=-0.0550671707790593*s  z=-0.892955612497696*s  color=col0Cru  r=RadByBright{0.8562*b},!RadByBright{a}  visible=visCru&vis0  label=labCru
-vertex betaCru: x=-0.490916891355034*s  y=-0.107270612858129*s  z=-0.86457713444166*s  color=col0Cru  r=RadByBright{0.7667*b},!RadByBright{a}  visible=visCru&vis0  label=labCru
-vertex gammaCru: x=-0.535305038055455*s  y=-0.0768203953664892*s  z=-0.84115821525334*s  color=col0Cru  r=RadByBright{0.6871*b},!RadByBright{a}  visible=visCru&vis0  label=labCru
-vertex deltaCru: x=-0.515218670128213*s  y=-0.0373427172051789*s  z=-0.856244850158557*s  color=col0Cru  r=RadByBright{0.5362*b},!RadByBright{a}  visible=visCru&vis0  label=labCru
-vertex alphaCrA: x=0.241638057264293*s  y=-0.751623926222086*s  z=-0.613736525564541*s  color=col0CrA  r=RadByBright{0.3867*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex betaCrA: x=0.238709931967918*s  y=-0.736151988278346*s  z=-0.633322839106336*s  color=col0CrA  r=RadByBright{0.3739*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex gammaCrA: x=0.234172501776166*s  y=-0.76328615997694*s  z=-0.602127459429935*s  color=col0CrA  r=RadByBright{0.3705*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex deltaCrA: x=0.229475913931335*s  y=-0.72551750167467*s  z=-0.648818279404275*s  color=col0CrA  r=RadByBright{0.3362*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex zetaCrA: x=0.20778923976919*s  y=-0.712842242339504*s  z=-0.669835479332448*s  color=col0CrA  r=RadByBright{0.3361*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex epsilonCrA: x=0.208272883730123*s  y=-0.770239162359246*s  z=-0.602788552206215*s  color=col0CrA  r=RadByBright{0.3221*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex lambdaCrA: x=0.155176807481885*s  y=-0.769336958115321*s  z=-0.619710257537822*s  color=col0CrA  r=RadByBright{0.3058*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex HD170642: x=0.114472225587614*s  y=-0.761030984300323*s  z=-0.638535786392509*s  color=col0CrA  r=RadByBright{0.3025*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex V686CrA: x=0.20078568452603*s  y=-0.769646389234031*s  z=-0.60607717695722*s  color=col0CrA  r=RadByBright{0.2944*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex HD175219: x=0.184657549640582*s  y=-0.711654206847513*s  z=-0.677827322580739*s  color=col0CrA  r=RadByBright{0.2813*b},!RadByBright{a}  visible=visCrA&vis0  label=labCrA
-vertex alphaPsA: x=0.839996750270895*s  y=-0.228527591064617*s  z=-0.492118481319833*s  color=col0PsA  r=RadByBright{0.7619*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex epsilonPsA: x=0.840787566270596*s  y=-0.297205691195506*s  z=-0.452487619196117*s  color=col0PsA  r=RadByBright{0.3838*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex betaPsA: x=0.785907996386805*s  y=-0.313470847289978*s  z=-0.532995918478351*s  color=col0PsA  r=RadByBright{0.3715*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex deltaPsA: x=0.813084130577389*s  y=-0.227694977325881*s  z=-0.535769720965806*s  color=col0PsA  r=RadByBright{0.3658*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex tauPsA: x=0.751676140163131*s  y=-0.384214154978695*s  z=-0.536061995876843*s  color=col0PsA  r=RadByBright{0.3131*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex thetaPsA: x=0.723224078960329*s  y=-0.463863737493183*s  z=-0.511641832389454*s  color=col0PsA  r=RadByBright{0.3130*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex etaPsA: x=0.766847186590373*s  y=-0.432240424550437*s  z=-0.474461387051558*s  color=col0PsA  r=RadByBright{0.2883*b},!RadByBright{a}  visible=visPsA&vis0  label=labPsA
-vertex alphaTrA: x=-0.105144322388054*s  y=-0.341357550070489*s  z=-0.934034097064679*s  color=col0TrA  r=RadByBright{0.6207*b},!RadByBright{a}  visible=visTrA&vis0  label=labTrA
-vertex gammaTrA: x=-0.230948838841704*s  y=-0.278791432853447*s  z=-0.932168424055005*s  color=col0TrA  r=RadByBright{0.5150*b},!RadByBright{a}  visible=visTrA&vis0  label=labTrA
-vertex betaTrA: x=-0.227178658960256*s  y=-0.383849069022622*s  z=-0.895013826219174*s  color=col0TrA  r=RadByBright{0.5119*b},!RadByBright{a}  visible=visTrA&vis0  label=labTrA
-vertex zetaPup: x=-0.395581636705218*s  y=0.654956711790435*s  z=-0.643853146596553*s  color=col0Pup  r=RadByBright{0.6115*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex piPup: x=-0.266361861359417*s  y=0.75126810959413*s  z=-0.603860568608358*s  color=col0Pup  r=RadByBright{0.5212*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex rhoPup: x=-0.484956068879522*s  y=0.770964474262816*s  z=-0.412833369147384*s  color=col0Pup  r=RadByBright{0.5110*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex tauPup: x=-0.138862420188846*s  y=0.618698002933893*s  z=-0.773259341634428*s  color=col0Pup  r=RadByBright{0.4889*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex nuPup: x=-0.122092936157246*s  y=0.718421065959011*s  z=-0.684809818071281*s  color=col0Pup  r=RadByBright{0.4854*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex sigmaPup: x=-0.278479078851407*s  y=0.671649281966568*s  z=-0.686539616246481*s  color=col0Pup  r=RadByBright{0.4596*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex f188Pup: x=-0.419083928300551*s  y=0.803754818174185*s  z=-0.422311322725264*s  color=col0Pup  r=RadByBright{0.2848*b},!RadByBright{a}  visible=visPup&vis0  label=labPup
-vertex alphaCyg: x=0.456999811026759*s  y=-0.533452451421804*s  z=0.71174409361341*s  color=col0Cyg  r=RadByBright{0.7418*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex gammaCyg: x=0.445811305861965*s  y=-0.618195711573587*s  z=0.647368783428485*s  color=col0Cyg  r=RadByBright{0.5814*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex epsilonCyg: x=0.552368187786048*s  y=-0.617277185168752*s  z=0.560230543430203*s  color=col0Cyg  r=RadByBright{0.5441*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex deltaCyg: x=0.313899759589838*s  y=-0.630891559513887*s  z=0.709537018811265*s  color=col0Cyg  r=RadByBright{0.5167*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex beta1Cyg: x=0.344230424800918*s  y=-0.812927075391526*s  z=0.469739273147093*s  color=col0Cyg  r=RadByBright{0.4767*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex zetaCyg: x=0.646586743136965*s  y=-0.571667592534749*s  z=0.505095780268512*s  color=col0Cyg  r=RadByBright{0.4598*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex iotaCyg: x=0.237665129507247*s  y=-0.571097347618404*s  z=0.785724573727669*s  color=col0Cyg  r=RadByBright{0.4155*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex kappaCyg: x=0.198250117055983*s  y=-0.56202158752336*s  z=0.803012220482983*s  color=col0Cyg  r=RadByBright{0.4026*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex etaCyg: x=0.400455944130518*s  y=-0.712801745980632*s  z=0.575802663885378*s  color=col0Cyg  r=RadByBright{0.3925*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex muCyg: x=0.728892400750536*s  y=-0.485466399630535*s  z=0.482740347348225*s  color=col0Cyg  r=RadByBright{0.3465*b},!RadByBright{a}  visible=visCyg&vis0  label=labCyg
-vertex alphaDor: x=0.208919975365207*s  y=0.534320124657641*s  z=-0.819057048244653*s  color=col0Dor  r=RadByBright{0.4746*b},!RadByBright{a}  visible=visDor&vis0  label=labDor
-vertex betaDor: x=0.0525989230848214*s  y=0.45916808172214*s  z=-0.886790858104619*s  color=col0Dor  r=RadByBright{0.4071*b},!RadByBright{a}  visible=visDor&vis0  label=labDor
-vertex gammaDor: x=0.271584054464861*s  y=0.561358393277838*s  z=-0.781740913383041*s  color=col0Dor  r=RadByBright{0.3686*b},!RadByBright{a}  visible=visDor&vis0  label=labDor
-vertex deltaDor: x=0.0272033859442268*s  y=0.410205627635972*s  z=-0.911587252460755*s  color=col0Dor  r=RadByBright{0.3637*b},!RadByBright{a}  visible=visDor&vis0  label=labDor
-vertex f36Dor: x=0.0112452224836929*s  y=0.452581130817502*s  z=-0.891652322937166*s  color=col0Dor  r=RadByBright{0.3311*b},!RadByBright{a}  visible=visDor&vis0  label=labDor
-vertex gammaMen: x=0.0300062945893475*s  y=0.234582717824587*s  z=-0.971632940355074*s  color=col0Men  r=RadByBright{0.2925*b},!RadByBright{a}  visible=visMen&vis0  label=labMen
-vertex muMen: x=0.108232068053307*s  y=0.309120524912255*s  z=-0.944844072068443*s  color=col0Men  r=RadByBright{0.2824*b},!RadByBright{a}  visible=visMen&vis0  label=labMen
-vertex alphaTel: x=0.0876072955087543*s  y=-0.68973527242489*s  z=-0.71874210656299*s  color=col0Tel  r=RadByBright{0.4547*b},!RadByBright{a}  visible=visTel&vis0  label=labTel
-vertex zetaTel: x=0.0880610112336089*s  y=-0.649418177515954*s  z=-0.755315357325913*s  color=col0Tel  r=RadByBright{0.3745*b},!RadByBright{a}  visible=visTel&vis0  label=labTel
-vertex alphaTuc: x=0.451723125738793*s  y=-0.209899050820664*s  z=-0.867115105471793*s  color=col0Tuc  r=RadByBright{0.5000*b},!RadByBright{a}  visible=visTuc&vis0  label=labTuc
-vertex gammaTuc: x=0.520158013587655*s  y=-0.0941252197355912*s  z=-0.848867530248549*s  color=col0Tuc  r=RadByBright{0.3903*b},!RadByBright{a}  visible=visTuc&vis0  label=labTuc
-vertex beta1Tuc: x=0.452264477190582*s  y=0.0650875866436621*s  z=-0.889505732829437*s  color=col0Tuc  r=RadByBright{0.3687*b},!RadByBright{a}  visible=visTuc&vis0  label=labTuc
-vertex zetaTuc: x=0.425207407814876*s  y=0.0399062794606955*s  z=-0.904215764737023*s  color=col0Tuc  r=RadByBright{0.3678*b},!RadByBright{a}  visible=visTuc&vis0  label=labTuc
-vertex betaTri: x=0.687710756653149*s  y=0.442965452136023*s  z=0.575183034691986*s  color=col0Tri  r=RadByBright{0.4941*b},!RadByBright{a}  visible=visTri&vis0  label=labTri
-vertex alphaTri: x=0.762193862218999*s  y=0.41648697603919*s  z=0.495579575028489*s  color=col0Tri  r=RadByBright{0.4445*b},!RadByBright{a}  visible=visTri&vis0  label=labTri
-vertex gammaTri: x=0.681599022338502*s  y=0.472461863102389*s  z=0.55875089320825*s  color=col0Tri  r=RadByBright{0.3962*b},!RadByBright{a}  visible=visTri&vis0  label=labTri
-vertex betaGem: x=-0.397386455745073*s  y=0.788839898561621*s  z=0.468844984219369*s  color=col0Gem  r=RadByBright{0.7422*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex alphaGem: x=-0.346598415799783*s  y=0.775735414776202*s  z=0.527355766468023*s  color=col0Gem  r=RadByBright{0.6949*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex gammaGem: x=-0.163535651593068*s  y=0.945402144491831*s  z=0.281905792505719*s  color=col0Gem  r=RadByBright{0.6414*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex muGem: x=-0.0988920873423544*s  y=0.918589424042601*s  z=0.382640595204109*s  color=col0Gem  r=RadByBright{0.5112*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex epsilonGem: x=-0.178898168675777*s  y=0.887705832648808*s  z=0.424233190504632*s  color=col0Gem  r=RadByBright{0.4796*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex etaGem: x=-0.0664283701257311*s  y=0.921511616173347*s  z=0.38262725059779*s  color=col0Gem  r=RadByBright{0.4683*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex xiGem: x=-0.197655623606409*s  y=0.954652424009657*s  z=0.222645466581398*s  color=col0Gem  r=RadByBright{0.4527*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex deltaGem: x=-0.323797425381774*s  y=0.86928915676091*s  z=0.373485728313734*s  color=col0Gem  r=RadByBright{0.4362*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex lambdaGem: x=-0.32649199506785*s  y=0.90157330218013*s  z=0.283846010985942*s  color=col0Gem  r=RadByBright{0.4350*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex thetaGem: x=-0.195636655154907*s  y=0.806362722216687*s  z=0.558126741322339*s  color=col0Gem  r=RadByBright{0.4324*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex kappaGem: x=-0.406775679409767*s  y=0.815337817976761*s  z=0.412016734147555*s  color=col0Gem  r=RadByBright{0.4238*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex iotaGem: x=-0.329340446013774*s  y=0.821489598191183*s  z=0.465499420711925*s  color=col0Gem  r=RadByBright{0.4026*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex nuGem: x=-0.124739931242438*s  y=0.930210226804964*s  z=0.345179494612715*s  color=col0Gem  r=RadByBright{0.3891*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex upsilonGem: x=-0.368504611406415*s  y=0.812672603596033*s  z=0.451406236927063*s  color=col0Gem  r=RadByBright{0.3830*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex zetaGem: x=-0.264779030766791*s  y=0.898286251567355*s  z=0.35067631102096*s  color=col0Gem  r=RadByBright{0.3829*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex f1Gem: x=-0.0230350047090401*s  y=0.918438626952187*s  z=0.394892234768216*s  color=col0Gem  r=RadByBright{0.3698*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex tauGem: x=-0.270086503469318*s  y=0.821000961459236*s  z=0.503001691773227*s  color=col0Gem  r=RadByBright{0.3499*b},!RadByBright{a}  visible=visGem&vis0  label=labGem
-vertex betaMon: x=-0.130033978842443*s  y=0.983879015748786*s  z=-0.122773151444454*s  color=col0Mon  r=RadByBright{0.4176*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex alphaMon: x=-0.426500025946688*s  y=0.888930791125137*s  z=-0.167032261725432*s  color=col0Mon  r=RadByBright{0.3891*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex gammaMon: x=-0.0700326199845605*s  y=0.991519483135859*s  z=-0.109473954437102*s  color=col0Mon  r=RadByBright{0.3849*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex deltaMon: x=-0.314102726461958*s  y=0.949342379035767*s  z=-0.00940875102627922*s  color=col0Mon  r=RadByBright{0.3842*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex epsilonMonA: x=-0.109322146618156*s  y=0.990797977667142*s  z=0.0797999731171628*s  color=col0Mon  r=RadByBright{0.3584*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex f13Mon: x=-0.148106556218182*s  y=0.980749638702572*s  z=0.127257982814299*s  color=col0Mon  r=RadByBright{0.3547*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex zetaMon: x=-0.536302730085492*s  y=0.842332123766387*s  z=-0.0534413227199287*s  color=col0Mon  r=RadByBright{0.3530*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex f15Mon: x=-0.181442004433322*s  y=0.968350884892888*s  z=0.17139242327005*s  color=col0Mon  r=RadByBright{0.3503*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex f28Mon: x=-0.50955790837189*s  y=0.86005453509844*s  z=-0.0256307368655559*s  color=col0Mon  r=RadByBright{0.3301*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex f17Mon: x=-0.209191468991365*s  y=0.967905000655339*s  z=0.139279714989737*s  color=col0Mon  r=RadByBright{0.3224*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex HD45194: x=-0.119389426212332*s  y=0.966700071901577*s  z=0.226356214613552*s  color=col0Mon  r=RadByBright{0.2122*b},!RadByBright{a}  visible=visMon&vis0  label=labMon
-vertex betaAqr: x=0.797536890680975*s  y=-0.595740652496395*s  z=-0.0950156985244619*s  color=col0Aqr  r=RadByBright{0.4966*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex alphaAqr: x=0.881208815407694*s  y=-0.472715719044747*s  z=-0.00329736497463046*s  color=col0Aqr  r=RadByBright{0.4889*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex deltaAqr: x=0.925575171984998*s  y=-0.265114439237516*s  z=-0.270231262278664*s  color=col0Aqr  r=RadByBright{0.4682*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex zetaAqr: x=0.924224044999034*s  y=-0.381845102882972*s  z=0.00205719467155581*s  color=col0Aqr  r=RadByBright{0.4222*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex epsilonAqr: x=0.663731483432156*s  y=-0.729935929821168*s  z=-0.163260700283491*s  color=col0Aqr  r=RadByBright{0.4186*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex lambdaAqr: x=0.950764734135623*s  y=-0.281591891765266*s  z=-0.12943116632433*s  color=col0Aqr  r=RadByBright{0.4162*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex gammaAqr: x=0.91160982373587*s  y=-0.410475755879823*s  z=-0.0218445211241649*s  color=col0Aqr  r=RadByBright{0.4129*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex c02Aqr: x=0.912046247918087*s  y=-0.198572070258798*s  z=-0.358804646808921*s  color=col0Aqr  r=RadByBright{0.4123*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex etaAqr: x=0.934716957625949*s  y=-0.355392843929074*s  z=0.000368253303744317*s  color=col0Aqr  r=RadByBright{0.3966*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex b01Aqr: x=0.928629843169917*s  y=-0.145537628651611*s  z=-0.341270293199805*s  color=col0Aqr  r=RadByBright{0.3874*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex tauAqr: x=0.928829624622142*s  y=-0.28838767984189*s  z=-0.232611423923466*s  color=col0Aqr  r=RadByBright{0.3847*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex iotaAqr: x=0.857442078646456*s  y=-0.456495109669188*s  z=-0.237497992864277*s  color=col0Aqr  r=RadByBright{0.3745*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex thetaAqr: x=0.895005788825222*s  y=-0.42573118119603*s  z=-0.133107472843469*s  color=col0Aqr  r=RadByBright{0.3687*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex psi1Aqr: x=0.970744150597089*s  y=-0.183024123301792*s  z=-0.155428325510977*s  color=col0Aqr  r=RadByBright{0.3623*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex sigmaAqr: x=0.911635042180402*s  y=-0.368048211610712*s  z=-0.182926389017259*s  color=col0Aqr  r=RadByBright{0.3292*b},!RadByBright{a}  visible=visAqr&vis0  label=labAqr
-vertex alphaHya: x=-0.781172805250154*s  y=0.605385891433741*s  z=-0.152567921892447*s  color=col0Hya  r=RadByBright{0.6116*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex gammaHya: x=-0.862456379960523*s  y=-0.315536029619525*s  z=-0.395734768092641*s  color=col0Hya  r=RadByBright{0.4839*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex nuHya: x=-0.916406308767635*s  y=0.284786835645289*s  z=-0.281239996255906*s  color=col0Hya  r=RadByBright{0.4709*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex zetaHya: x=-0.693561721879154*s  y=0.713169769005519*s  z=0.101789088416377*s  color=col0Hya  r=RadByBright{0.4699*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex piHya: x=-0.757091596916772*s  y=-0.472632771407817*s  z=-0.45103278957231*s  color=col0Hya  r=RadByBright{0.4551*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex epsilonHya: x=-0.665672737477729*s  y=0.738082223149944*s  z=0.110065609746836*s  color=col0Hya  r=RadByBright{0.4467*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex xiHya: x=-0.842677471052782*s  y=0.0948090891555007*s  z=-0.530005581474*s  color=col0Hya  r=RadByBright{0.4263*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex lambdaHya: x=-0.869721146159835*s  y=0.443658605090092*s  z=-0.216222501261866*s  color=col0Hya  r=RadByBright{0.4193*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex thetaHya: x=-0.753448941292189*s  y=0.656384889364697*s  z=0.0383871056394374*s  color=col0Hya  r=RadByBright{0.4101*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex muHya: x=-0.879401835406682*s  y=0.376069873797056*s  z=-0.29193126229581*s  color=col0Hya  r=RadByBright{0.4021*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex deltaHya: x=-0.636611810067001*s  y=0.764966028145285*s  z=0.0977362730353717*s  color=col0Hya  r=RadByBright{0.3845*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex etaHya: x=-0.657009750444706*s  y=0.751679816638476*s  z=0.0575816036502303*s  color=col0Hya  r=RadByBright{0.3778*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex betaHya: x=-0.828222002544118*s  y=0.0207252935452611*s  z=-0.560016764668053*s  color=col0Hya  r=RadByBright{0.3757*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex upsilon1Hya: x=-0.82096007441108*s  y=0.509187622772278*s  z=-0.258365092530842*s  color=col0Hya  r=RadByBright{0.3739*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex rhoHya: x=-0.671718138467667*s  y=0.73403054211738*s  z=0.099969523818003*s  color=col0Hya  r=RadByBright{0.3676*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex EHya: x=-0.645677167074784*s  y=-0.601400007009666*s  z=-0.470551832944103*s  color=col0Hya  r=RadByBright{0.3499*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex tau2Hya: x=-0.80194509829924*s  y=0.596964220976361*s  z=-0.0227547398998113*s  color=col0Hya  r=RadByBright{0.3473*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex sigmaHya: x=-0.642269247860905*s  y=0.764384899355312*s  z=0.0566210110273291*s  color=col0Hya  r=RadByBright{0.3451*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex tau1Hya: x=-0.793681511432662*s  y=0.60624485391316*s  z=-0.0503670081876771*s  color=col0Hya  r=RadByBright{0.3391*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex f26Hya: x=-0.751959347546155*s  y=0.625056751723274*s  z=-0.209430649053832*s  color=col0Hya  r=RadByBright{0.3210*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex kHya: x=-0.713679684699616*s  y=-0.52159205205842*s  z=-0.467550038901233*s  color=col0Hya  r=RadByBright{0.3207*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex chi1Hya: x=-0.863545715741686*s  y=0.204833300045423*s  z=-0.460795091137787*s  color=col0Hya  r=RadByBright{0.3156*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex kappaHya: x=-0.797053406726583*s  y=0.549907161889817*s  z=-0.249615664828622*s  color=col0Hya  r=RadByBright{0.3151*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex psiHya: x=-0.875592312323972*s  y=-0.278179208879935*s  z=-0.39491066122111*s  color=col0Hya  r=RadByBright{0.3088*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex f50Hya: x=-0.739775760588817*s  y=-0.491071458635788*s  z=-0.459978963169574*s  color=col0Hya  r=RadByBright{0.2996*b},!RadByBright{a}  visible=visHya&vis0  label=labHya
-vertex betaCet: x=0.933679887436124*s  y=0.18542624922422*s  z=-0.306364119791964*s  color=col0Cet  r=RadByBright{0.6017*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex alphaCet: x=0.693797439614982*s  y=0.716448846607963*s  z=0.0731174601433592*s  color=col0Cet  r=RadByBright{0.5470*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex gammaCet: x=0.751448450008069*s  y=0.657203517841206*s  z=0.0583846137061289*s  color=col0Cet  r=RadByBright{0.4467*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex etaCet: x=0.939191987619899*s  y=0.295835297240115*s  z=-0.174355634544559*s  color=col0Cet  r=RadByBright{0.4341*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex tauCet: x=0.862419528543877*s  y=0.426753815401471*s  z=-0.272238384190115*s  color=col0Cet  r=RadByBright{0.4336*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex iotaCet: x=0.984492827081541*s  y=0.0895530379740133*s  z=-0.150844710926902*s  color=col0Cet  r=RadByBright{0.4235*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex thetaCet: x=0.922266705496776*s  y=0.360323835824063*s  z=-0.139967343581127*s  color=col0Cet  r=RadByBright{0.4192*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex zetaCet: x=0.867401305188356*s  y=0.465007824489097*s  z=-0.177151626922965*s  color=col0Cet  r=RadByBright{0.4067*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex deltaCet: x=0.763614793787344*s  y=0.645625906419054*s  z=0.00772241346258361*s  color=col0Cet  r=RadByBright{0.3974*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex piCet: x=0.729194528267963*s  y=0.641721996640439*s  z=-0.237630425181353*s  color=col0Cet  r=RadByBright{0.3796*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex xi2Cet: x=0.78556641654824*s  y=0.600529215021307*s  z=0.149164563812754*s  color=col0Cet  r=RadByBright{0.3739*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex muCet: x=0.735942539905283*s  y=0.653355931380846*s  z=0.177523533333549*s  color=col0Cet  r=RadByBright{0.3678*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex xi1Cet: x=0.82268214208728*s  y=0.546698629177192*s  z=0.155931722065984*s  color=col0Cet  r=RadByBright{0.3534*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex lambdaCet: x=0.694856885494967*s  y=0.701880174291182*s  z=0.156646511666282*s  color=col0Cet  r=RadByBright{0.3406*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex sigmaCet: x=0.757171534409674*s  y=0.598812342466577*s  z=-0.260988593600162*s  color=col0Cet  r=RadByBright{0.3279*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex rhoCet: x=0.782621962979243*s  y=0.585707138568888*s  z=-0.210831712254019*s  color=col0Cet  r=RadByBright{0.3253*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex epsilonCet: x=0.747600824996191*s  y=0.632102958131268*s  z=-0.20381083579318*s  color=col0Cet  r=RadByBright{0.3217*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex omicronCet: x=0.816379786851122*s  y=0.575359793729395*s  z=-0.0498512926671345*s  color=col0Cet  r=RadByBright{0.3170*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex nuCet: x=0.769777905480786*s  y=0.630514120886367*s  z=0.099468183840385*s  color=col0Cet  r=RadByBright{0.3148*b},!RadByBright{a}  visible=visCet&vis0  label=labCet
-vertex alphaLup: x=-0.510399418173091*s  y=-0.442598105844271*s  z=-0.737291903272804*s  color=col0Lup  r=RadByBright{0.5984*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex betaLup: x=-0.514457406528401*s  y=-0.51578628184762*s  z=-0.685053347065671*s  color=col0Lup  r=RadByBright{0.5498*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex gammaLup: x=-0.439410943718796*s  y=-0.610003597930518*s  z=-0.659403998359109*s  color=col0Lup  r=RadByBright{0.5370*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex deltaLup: x=-0.479018858008969*s  y=-0.587008446567611*s  z=-0.652657657068439*s  color=col0Lup  r=RadByBright{0.4851*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex etaLup: x=-0.385820753996816*s  y=-0.681259633270757*s  z=-0.622115469877676*s  color=col0Lup  r=RadByBright{0.4634*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex zetaLup: x=-0.405689667340818*s  y=-0.459446839145551*s  z=-0.790142073181816*s  color=col0Lup  r=RadByBright{0.4394*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex phi1Lup: x=-0.508151899041973*s  y=-0.624790174769116*s  z=-0.592805942119353*s  color=col0Lup  r=RadByBright{0.4275*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex chiLup: x=-0.438784788051088*s  y=-0.706762567203354*s  z=-0.554936557973148*s  color=col0Lup  r=RadByBright{0.4023*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex rhoLup: x=-0.497635787029686*s  y=-0.416463331739948*s  z=-0.760865899343246*s  color=col0Lup  r=RadByBright{0.3985*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex tau2Lup: x=-0.559944040458149*s  y=-0.421616874894104*s  z=-0.713233399638528*s  color=col0Lup  r=RadByBright{0.3598*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex omegaLup: x=-0.422203338816708*s  y=-0.602215694805816*s  z=-0.677554866871733*s  color=col0Lup  r=RadByBright{0.3565*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
-vertex HD144415: x=-0.372594339163912*s  y=-0.708455468341662*s  z=-0.599386609626712*s  color=col0Lup  r=RadByBright{0.2634*b},!RadByBright{a}  visible=visLup&vis0  label=labLup
+vertex alphaAnt: -0.787878972260081*s 0.332899625746599*s -0.518097060644212*s  color=col0Ant visible=visAnt&vis0 label=labAnt r=b*0.3622^a
+vertex etaAnt: -0.700491184480606*s 0.404339963768132*s -0.588065722657717*s  color=col0Ant visible=visAnt&vis0 label=labAnt r=b*0.2946^a
+vertex alphaAra: -0.0731696235890633*s -0.640031971359185*s -0.764856379866122*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.5264^a
+vertex betaAra: -0.079876723907555*s -0.559992761818228*s -0.824637990689848*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.5020^a
+vertex zetaAra: -0.142634782221537*s -0.540260117532553*s -0.829321604870105*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.4744^a
+vertex gammaAra: -0.0778515585196622*s -0.547895311794805*s -0.832916479696094*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.4709^a
+vertex deltaAra: -0.05641515245633*s -0.486081174336695*s -0.872090833874998*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.4397^a
+vertex thetaAra: 0.0243876404428531*s -0.641166064555745*s -0.767014550485015*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.4332^a
+vertex etaAra: -0.149976155280045*s -0.491376804779129*s -0.857937053968687*s  color=col0Ara visible=visAra&vis0 label=labAra r=b*0.4096^a
+vertex alphaAnd: 0.871804667172319*s 0.0372110032429284*s 0.488438290405468*s  color=col0And visible=visAnd&vis0 label=labAnd r=b*0.6256^a
+vertex betaAnd: 0.772568661268937*s 0.248188675497734*s 0.58441427513349*s  color=col0And visible=visAnd&vis0 label=labAnd r=b*0.6062^a
+vertex gamma1And: 0.629817525376067*s 0.384265457703552*s 0.675033290101345*s  color=col0And visible=visAnd&vis0 label=labAnd r=b*0.5969^a
+vertex deltaAnd: 0.843581618310615*s 0.151649966604828*s 0.515143029533739*s  color=col0And visible=visAnd&vis0 label=labAnd r=b*0.4536^a
+vertex muAnd: 0.755952781271134*s 0.19637568131594*s 0.624477368906302*s  color=col0And visible=visAnd&vis0 label=labAnd r=b*0.4071^a
+vertex nuAnd: 0.733374710362447*s 0.16695395762283*s 0.659005242949456*s  color=col0And visible=visAnd&vis0 label=labAnd r=b*0.3560^a
+vertex epsilonSgr: 0.0932474501065654*s -0.820132238521186*s -0.564524600338065*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.6608^a
+vertex sigmaSgr: 0.220451162351473*s -0.869269331593688*s -0.442461426757799*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.6295^a
+vertex zetaSgr: 0.240230112008231*s -0.833496303374978*s -0.497567488432232*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.5469^a
+vertex deltaSgr: 0.0858188057855319*s -0.8633884206559*s -0.4971876583855*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.5170^a
+vertex lambdaSgr: 0.116422014438455*s -0.895768313844251*s -0.429004711473801*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.5030^a
+vertex phiSgr: 0.18274948643171*s -0.872381221171207*s -0.453380226914209*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4860^a
+vertex gamma2Sgr: 0.0283144428265955*s -0.861862313773109*s -0.50635130534549*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4857^a
+vertex etaSgr: 0.0678703744911183*s -0.798364838499125*s -0.598337026194018*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4841^a
+vertex tauSgr: 0.261277908930666*s -0.846567524566994*s -0.46374268797829*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4499^a
+vertex xi2Sgr: 0.23885624259997*s -0.902059642587966*s -0.359494223298643*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4278^a
+vertex muSgr: 0.0625137467301933*s -0.931175216981237*s -0.359172307882582*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4099^a
+vertex omicronSgr: 0.264990965447518*s -0.890543463147988*s -0.369746032400052*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4054^a
+vertex alphaSgr: 0.277606956005104*s -0.707153424889143*s -0.650283331821703*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.4046^a
+vertex rho1Sgr: 0.338202404543968*s -0.890069756227772*s -0.305605894264678*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3992^a
+vertex iotaSgr: 0.3645619601384*s -0.650311531312636*s -0.666475422999125*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3735^a
+vertex theta1Sgr: 0.413097442707313*s -0.705016441176162*s -0.576456694383869*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3706^a
+vertex beta2Sgr: 0.257831618246152*s -0.661773080044581*s -0.703973896647368*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3672^a
+vertex cSgr: 0.457276241057159*s -0.75879981587868*s -0.463811684616846*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3588^a
+vertex XSgr: -0.0414812123876013*s -0.883294840651792*s -0.466979157454355*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3414^a
+vertex dSgr: 0.320459212993029*s -0.890141018514304*s -0.323967374848465*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.3128^a
+vertex h01Sgr: 0.375608409491224*s -0.827562067757142*s -0.417204202674178*s  color=col0Sgr visible=visSgr&vis0 label=labSgr r=b*0.2691^a
+vertex gammaSge: 0.470937233269342*s -0.816125462579759*s 0.334899017092604*s  color=col0Sge visible=visSge&vis0 label=labSge r=b*0.4343^a
+vertex deltaSge: 0.432408667702518*s -0.843366410367493*s 0.318991915194699*s  color=col0Sge visible=visSge&vis0 label=labSge r=b*0.4134^a
+vertex alphaSge: 0.406608831045165*s -0.859293617619678*s 0.310296208862066*s  color=col0Sge visible=visSge&vis0 label=labSge r=b*0.3525^a
+vertex betaSge: 0.411435531860501*s -0.860173862608164*s 0.301366436764976*s  color=col0Sge visible=visSge&vis0 label=labSge r=b*0.3506^a
+vertex etaSge: 0.491975127590761*s -0.800127368743589*s 0.343156913990546*s  color=col0Sge visible=visSge&vis0 label=labSge r=b*0.2985^a
+vertex betaCom: -0.840379865677439*s -0.277600641419169*s 0.465510005529027*s  color=col0Com visible=visCom&vis0 label=labCom r=b*0.3664^a
+vertex alphaCom: -0.908504053577909*s -0.292075614348887*s 0.2988515018119*s  color=col0Com visible=visCom&vis0 label=labCom r=b*0.3607^a
+vertex gammaCom: -0.875262296917113*s -0.108505324726658*s 0.471319961492553*s  color=col0Com visible=visCom&vis0 label=labCom r=b*0.3535^a
+vertex alphaAps: -0.137990203008457*s -0.127911473792519*s -0.982139174835171*s  color=col0Aps visible=visAps&vis0 label=labAps r=b*0.3999^a
+vertex gammaAps: -0.067395666470675*s -0.179400575430259*s -0.981464853000995*s  color=col0Aps visible=visAps&vis0 label=labAps r=b*0.3963^a
+vertex betaAps: -0.0674519778643948*s -0.204442214236741*s -0.976551899143184*s  color=col0Aps visible=visAps&vis0 label=labAps r=b*0.3635^a
+vertex alphaBoo: -0.78162199059278*s -0.531598417418933*s 0.326297696006984*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.9748^a
+vertex epsilonBoo: -0.667145744007293*s -0.591046295973603*s 0.453410225148087*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.5601^a
+vertex etaBoo: -0.830639309367636*s -0.460233290215068*s 0.313406535207979*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.5253^a
+vertex gammaBoo: -0.616884641212009*s -0.486985637625463*s 0.618302780345724*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.4900^a
+vertex deltaBoo: -0.547260410627503*s -0.632786710509112*s 0.547801991565268*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.4338^a
+vertex betaBoo: -0.532401577220196*s -0.546304846186316*s 0.646606198243408*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.4318^a
+vertex rhoBoo: -0.678390471781018*s -0.534714408506665*s 0.503852030989352*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.4234^a
+vertex zetaBoo: -0.737859682146237*s -0.632575810725907*s 0.235395270019421*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.4172^a
+vertex upsilonBoo: -0.85256567153811*s -0.447453189752327*s 0.270032254916409*s  color=col0Boo visible=visBoo&vis0 label=labBoo r=b*0.3838^a
+vertex alphaTau: 0.337800064784727*s 0.897021309953837*s 0.28503313091663*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.7940^a
+vertex betaTau: 0.122216765354903*s 0.869203445991717*s 0.479112128569407*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.6894^a
+vertex zetaTau: 0.0843419236577431*s 0.928777235474192*s 0.360914514502574*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.5107^a
+vertex lambdaTau: 0.480017620299682*s 0.8498616080876*s 0.217527771331823*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4595^a
+vertex theta2Tau: 0.367243060331352*s 0.888718854942594*s 0.274429101058887*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4508^a
+vertex f27Tau: 0.487789484639488*s 0.771295505742116*s 0.4088577521549*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4357^a
+vertex epsilonTau: 0.360621267140749*s 0.872578022339449*s 0.329484288875776*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4267^a
+vertex omicronTau: 0.613778502395055*s 0.773399135454981*s 0.15852358586397*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4198^a
+vertex gammaTau: 0.401842082081104*s 0.874864982583619*s 0.270433362064831*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4157^a
+vertex deltaTau: 0.385862305030873*s 0.87158037221424*s 0.302420132145906*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.4045^a
+vertex tauTau: 0.300228150921929*s 0.870126024572626*s 0.390824460282921*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.3770^a
+vertex delta3Tau: 0.375295800758941*s 0.873954466461392*s 0.30879872487575*s  color=col0Tau visible=visTau&vis0 label=labTau r=b*0.3697^a
+vertex deltaCap: 0.807332964997227*s -0.521722222472512*s -0.275716169651199*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.5080^a
+vertex beta1Cap: 0.56346233124485*s -0.786231538685117*s -0.253673350679476*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.4775^a
+vertex alpha2Cap: 0.558444286939627*s -0.800991857255894*s -0.215759178238714*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.4228^a
+vertex gammaCap: 0.789000981609946*s -0.54445403404987*s -0.284687997332806*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.4201^a
+vertex zetaCap: 0.72957545390029*s -0.569038641053674*s -0.379360886299542*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.4050^a
+vertex thetaCap: 0.697353079734317*s -0.653447388492781*s -0.294457454748606*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.3905^a
+vertex omegaCap: 0.612659041112179*s -0.648934035715762*s -0.451146890306428*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.3784^a
+vertex psiCap: 0.604624259021896*s -0.673427689678778*s -0.425352385882726*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.3774^a
+vertex iotaCap: 0.743587185186607*s -0.603587059896572*s -0.287681697630681*s  color=col0Cap visible=visCap&vis0 label=labCap r=b*0.3598^a
+vertex gamma2Nor: -0.265722459099149*s -0.582080442706841*s -0.768488082502591*s  color=col0Nor visible=visNor&vis0 label=labNor r=b*0.3823^a
+vertex epsilonNor: -0.260276827128338*s -0.621863127385329*s -0.73860830218631*s  color=col0Nor visible=visNor&vis0 label=labNor r=b*0.3538^a
+vertex etaNor: -0.313160362875276*s -0.571956078753703*s -0.758153566964182*s  color=col0Nor visible=visNor&vis0 label=labNor r=b*0.3307^a
+vertex kappaNor: -0.254238269081404*s -0.518975753040905*s -0.816104815749862*s  color=col0Nor visible=visNor&vis0 label=labNor r=b*0.3080^a
+vertex gammaCas: 0.47123675418981*s 0.12262875021644*s 0.87344038784625*s  color=col0Cas visible=visCas&vis0 label=labCas r=b*0.6112^a
+vertex betaCas: 0.510036721123741*s 0.0236566631087852*s 0.859827253229334*s  color=col0Cas visible=visCas&vis0 label=labCas r=b*0.5810^a
+vertex alphaCas: 0.540046366318747*s 0.100195736740895*s 0.835649888748193*s  color=col0Cas visible=visCas&vis0 label=labCas r=b*0.5740^a
+vertex deltaCas: 0.45868141750656*s 0.184365746100645*s 0.869264418286476*s  color=col0Cas visible=visCas&vis0 label=labCas r=b*0.5352^a
+vertex epsilonCas: 0.385816774398325*s 0.214633831317128*s 0.897261241248613*s  color=col0Cas visible=visCas&vis0 label=labCas r=b*0.4666^a
+vertex alphaCenA: -0.370062844994226*s -0.314512847170946*s -0.874148248135981*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.9689^a
+vertex betaCen: -0.420148931734818*s -0.256802283486468*s -0.870360535846052*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.8837^a
+vertex gammaCen: -0.643167252952492*s -0.12212486535359*s -0.75592420386697*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.6101^a
+vertex epsilonCen: -0.536040310696109*s -0.254532173694168*s -0.804906303779105*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.6012^a
+vertex thetaCen: -0.681212082532449*s -0.426769065632674*s -0.594826246252482*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.5994^a
+vertex etaCen: -0.572561036438154*s -0.468707078438443*s -0.672671936514797*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.5925^a
+vertex zetaCen: -0.590039696224594*s -0.331190650785317*s -0.73631916293927*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.5699^a
+vertex deltaCen: -0.630493488374539*s -0.0268541410400024*s -0.775729860342058*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.5592^a
+vertex iotaCen: -0.749373727040707*s -0.280588537943506*s -0.59975752566837*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.5282^a
+vertex kappaCen: -0.521658129165631*s -0.525829950077866*s -0.671844967143851*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.4935^a
+vertex lambdaCen: -0.449110782896774*s 0.045164922225148*s -0.892333813371567*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.4890^a
+vertex nuCen: -0.659350533281352*s -0.347343424925348*s -0.666790386420445*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.4652^a
+vertex muCen: -0.651017727703946*s -0.343385995704218*s -0.676950497576753*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.4574^a
+vertex upsilon1Cen: -0.61255769901344*s -0.354887448903856*s -0.706277540340816*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.4180^a
+vertex sigmaCen: -0.632438652311272*s -0.0818553640092531*s -0.77027336085679*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.4127^a
+vertex dCen: -0.7090306553083*s -0.303179689808502*s -0.636677002506533*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.3923^a
+vertex ACen: -0.578775207685011*s 0.0607298591879774*s -0.813222689779485*s  color=col0Cen visible=visCen&vis0 label=labCen r=b*0.3468^a
+vertex alphaCep: 0.350340738988452*s -0.296019165410092*s 0.888613538223978*s  color=col0Cep visible=visCep&vis0 label=labCep r=b*0.5605^a
+vertex betaCep: 0.261610115443316*s -0.202570517972632*s 0.943676497930321*s  color=col0Cep visible=visCep&vis0 label=labCep r=b*0.4848^a
+vertex gammaCep: 0.21087207837546*s -0.0180110184726167*s 0.97734772203919*s  color=col0Cep visible=visCep&vis0 label=labCep r=b*0.4595^a
+vertex zetaCep: 0.467529499906514*s -0.238767396849955*s 0.851120612439072*s  color=col0Cep visible=visCep&vis0 label=labCep r=b*0.4455^a
+vertex iotaCep: 0.383047007951626*s -0.119599851509302*s 0.915953527870416*s  color=col0Cep visible=visCep&vis0 label=labCep r=b*0.4295^a
+vertex alphaCha: -0.127213920678054*s 0.18545611959276*s -0.974383213161697*s  color=col0Cha visible=visCha&vis0 label=labCha r=b*0.3847^a
+vertex betaCha: -0.182218451510183*s -0.0159238006585552*s -0.983129120971308*s  color=col0Cha visible=visCha&vis0 label=labCha r=b*0.3798^a
+vertex gammaCha: -0.182114205021102*s 0.070123192691631*s -0.980773752797384*s  color=col0Cha visible=visCha&vis0 label=labCha r=b*0.3793^a
+vertex alphaAur: 0.124545301077016*s 0.683119600046405*s 0.719608282339826*s  color=col0Aur visible=visAur&vis0 label=labAur r=b*0.9467^a
+vertex betaTauAur: 0.122216765354903*s 0.869203445991717*s 0.479112128569407*s  color=col0Aur visible=visAur&vis0 label=labAur r=b*0.6894^a
+vertex betaAur: -0.00460598776752077*s 0.707744503463336*s 0.706453468173327*s  color=col0Aur visible=visAur&vis0 label=labAur r=b*0.6451^a
+vertex thetaAur: -0.00537136384090922*s 0.796389202778573*s 0.604760602344595*s  color=col0Aur visible=visAur&vis0 label=labAur r=b*0.5483^a
+vertex iotaAur: 0.220996375277866*s 0.806995350670618*s 0.547648706845959*s  color=col0Aur visible=visAur&vis0 label=labAur r=b*0.5207^a
+vertex zetaAur: 0.181144196228536*s 0.731324779775109*s 0.657533912934995*s  color=col0Aur visible=visAur&vis0 label=labAur r=b*0.4116^a
+vertex alphaHor: 0.327815600720467*s 0.663936924504487*s -0.672104673547062*s  color=col0Hor visible=visHor&vis0 label=labHor r=b*0.3970^a
+vertex muHor: 0.35076375559976*s 0.364012336272987*s -0.862820842816534*s  color=col0Hor visible=visHor&vis0 label=labHor r=b*0.3014^a
+vertex zetaHor: 0.443092699598721*s 0.376744958939586*s -0.813469173033574*s  color=col0Hor visible=visHor&vis0 label=labHor r=b*0.2948^a
+vertex betaCnc: -0.559146892958826*s 0.81383902986628*s 0.158179599066393*s  color=col0Cnc visible=visCnc&vis0 label=labCnc r=b*0.4294^a
+vertex deltaCnc: -0.630620165375763*s 0.711526397116672*s 0.30991675209258*s  color=col0Cnc visible=visCnc&vis0 label=labCnc r=b*0.3887^a
+vertex iotaCnc: -0.588029644203938*s 0.651300232177127*s 0.479613537239527*s  color=col0Cnc visible=visCnc&vis0 label=labCnc r=b*0.3803^a
+vertex alphaCnc: -0.692124270785419*s 0.692442229653195*s 0.20368542506194*s  color=col0Cnc visible=visCnc&vis0 label=labCnc r=b*0.3714^a
+vertex gammaCnc: -0.613490439758734*s 0.700602668785444*s 0.364397284313905*s  color=col0Cnc visible=visCnc&vis0 label=labCnc r=b*0.3410^a
+vertex chiCnc: -0.515816356725838*s 0.725259334231772*s 0.455996035337775*s  color=col0Cnc visible=visCnc&vis0 label=labCnc r=b*0.2996^a
+vertex alphaGru: 0.606728392694849*s -0.316161262601292*s -0.72933031853083*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.6764^a
+vertex betaGru: 0.648170971263671*s -0.222386153416726*s -0.728298558820229*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.6209^a
+vertex gammaGru: 0.681591488964097*s -0.411409995438257*s -0.605123836768308*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.5040^a
+vertex epsilonGru: 0.59804891735872*s -0.188116987430433*s -0.779069631988156*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.4447^a
+vertex iotaGru: 0.690341247686006*s -0.147170868121155*s -0.708357040848607*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.3936^a
+vertex delta1Gru: 0.672768054980329*s -0.275727227319377*s -0.686554906990514*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.3856^a
+vertex zetaGru: 0.588187275098722*s -0.150899177833869*s -0.794521974234195*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.3735^a
+vertex thetaGru: 0.708506385512777*s -0.162349731571047*s -0.686775994299764*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.3641^a
+vertex lambdaGru: 0.681706042116741*s -0.363550486767111*s -0.634907800954536*s  color=col0Gru visible=visGru&vis0 label=labGru r=b*0.3447^a
+vertex gammaCrv: -0.950035847199214*s -0.0713732959430255*s -0.303871258368903*s  color=col0Crv visible=visCrv&vis0 label=labCrv r=b*0.5562^a
+vertex betaCrv: -0.905590994703661*s -0.142611159158464*s -0.399458392820971*s  color=col0Crv visible=visCrv&vis0 label=labCrv r=b*0.5236^a
+vertex deltaCrv: -0.949109594707155*s -0.130231337473955*s -0.286759090482872*s  color=col0Crv visible=visCrv&vis0 label=labCrv r=b*0.5076^a
+vertex epsilonCrv: -0.920915097547053*s -0.046268146165313*s -0.387007289027387*s  color=col0Crv visible=visCrv&vis0 label=labCrv r=b*0.4813^a
+vertex alphaCrv: -0.906377068823838*s -0.0387749511074239*s -0.420686477411532*s  color=col0Crv visible=visCrv&vis0 label=labCrv r=b*0.3891^a
+vertex etaCrv: -0.949386167885672*s -0.139569941752612*s -0.281400311987268*s  color=col0Crv visible=visCrv&vis0 label=labCrv r=b*0.3643^a
+vertex deltaCrt: -0.952084004492768*s 0.164965799065858*s -0.257531228257037*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.4248^a
+vertex gammaCrt: -0.941641701382804*s 0.139800405941385*s -0.30621357369575*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3866^a
+vertex alphaCrt: -0.917468322647652*s 0.241207587112744*s -0.316339654260024*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3762^a
+vertex betaCrt: -0.901382283812534*s 0.187582307467629*s -0.390285608694478*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3567^a
+vertex thetaCrt: -0.980439887249342*s 0.0942304192940933*s -0.172795415362089*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3413^a
+vertex zetaCrt: -0.946588563933284*s 0.0573903911072211*s -0.31729549892692*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3254^a
+vertex epsilonCrt: -0.970800224362093*s 0.145249855884151*s -0.19091726937117*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3221^a
+vertex etaCrt: -0.954699796950352*s 0.010904551683576*s -0.297370792875723*s  color=col0Crt visible=visCrt&vis0 label=labCrt r=b*0.3039^a
+vertex betaDel: 0.617900061954013*s -0.744241958400779*s 0.25358119171776*s  color=col0Del visible=visDel&vis0 label=labDel r=b*0.4243^a
+vertex alphaDel: 0.620685675065481*s -0.733961562840547*s 0.275771131631232*s  color=col0Del visible=visDel&vis0 label=labDel r=b*0.4202^a
+vertex epsilonDel: 0.61188244764056*s -0.765872566227161*s 0.197583102946634*s  color=col0Del visible=visDel&vis0 label=labDel r=b*0.3983^a
+vertex gamma2Del: 0.642177350048324*s -0.713838602557911*s 0.279361236722422*s  color=col0Del visible=visDel&vis0 label=labDel r=b*0.3601^a
+vertex deltaDel: 0.635437543061186*s -0.726445613145872*s 0.261717213819576*s  color=col0Del visible=visDel&vis0 label=labDel r=b*0.3545^a
+vertex alphaCol: 0.0699754312314788*s 0.825477144451407*s -0.56008117537757*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.5480^a
+vertex betaCol: 0.0286599466276874*s 0.810968278508752*s -0.584387763999085*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.4696^a
+vertex deltaCol: -0.0839262249386224*s 0.83012150838282*s -0.551230142579108*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.3987^a
+vertex epsilonCol: 0.0986981645557336*s 0.808595931228261*s -0.580026975505821*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.3953^a
+vertex etaCol: 0.000107460415737117*s 0.733552733496718*s -0.67963252985106*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.3872^a
+vertex gammaCol: 0.00539253440146179*s 0.816302066872774*s -0.577600083268663*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.3708^a
+vertex kappaCol: -0.0623899132830968*s 0.815254528928419*s -0.575732187550973*s  color=col0Col visible=visCol&vis0 label=labCol r=b*0.3519^a
+vertex gammaDra: -0.00753099353206965*s -0.622650321337163*s 0.782463968164124*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.5805^a
+vertex etaDra: -0.193679000588262*s -0.436852180456998*s 0.878435323265804*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.5162^a
+vertex betaDra: -0.0771024098082548*s -0.606890164568332*s 0.791037007068558*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.5073^a
+vertex zetaDra: -0.091112223378027*s -0.401596898774064*s 0.911273007197166*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4857^a
+vertex deltaDra: 0.118087756467651*s -0.360467860472809*s 0.925266557992124*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4753^a
+vertex iotaDra: -0.322631001725337*s -0.403894771960639*s 0.856024678329176*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4504^a
+vertex alphaDra: -0.371318118585346*s -0.225575896729958*s 0.900687720369671*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4320^a
+vertex chiDra: 0.0265914636935373*s -0.295451062007645*s 0.954987729773106*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4298^a
+vertex kappaDra: -0.34394077075366*s -0.0523377793060362*s 0.937531601105099*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4130^a
+vertex xiDra: -0.0143251920489128*s -0.546364702609917*s 0.837424862668131*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4078^a
+vertex lambdaDra: -0.35291161894631*s 0.0418303295545671*s 0.934721141700588*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.4058^a
+vertex epsilonDra: 0.152859817069971*s -0.299782870537651*s 0.941681531547445*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.3984^a
+vertex thetaDra: -0.256547736230111*s -0.455272942786345*s 0.852590057766255*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.3873^a
+vertex tauDra: 0.0918335767653193*s -0.270450789733004*s 0.958343865484244*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.3454^a
+vertex nu2Dra: -0.0676609568706382*s -0.567328843107704*s 0.820706999295987*s  color=col0Dra visible=visDra&vis0 label=labDra r=b*0.3206^a
+vertex alphaCir: -0.317038818694295*s -0.277306342494055*s -0.906966140411811*s  color=col0Cir visible=visCir&vis0 label=labCir r=b*0.4735^a
+vertex betaCir: -0.33267277174932*s -0.395167038057781*s -0.856254540991909*s  color=col0Cir visible=visCir&vis0 label=labCir r=b*0.3887^a
+vertex gammaCir: -0.317565741266869*s -0.397559360943065*s -0.860870811736677*s  color=col0Cir visible=visCir&vis0 label=labCir r=b*0.3518^a
+vertex alphaAql: 0.464100746387036*s -0.87204196793127*s 0.155413330733095*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.8266^a
+vertex gammaAql: 0.444332862480691*s -0.876482859422022*s 0.185327020315744*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.5165^a
+vertex zetaAql: 0.278288191415715*s -0.929948839673023*s 0.240314040599729*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.5020^a
+vertex thetaAql: 0.547091441714624*s -0.836973122597052*s -0.0129207760120796*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.4760^a
+vertex lambdaAql: 0.289946814425437*s -0.953315767077806*s -0.0843794586697234*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.4568^a
+vertex deltaAql: 0.36936804874877*s -0.9276363274356*s 0.0552999872090227*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.4528^a
+vertex betaAql: 0.484090486673521*s -0.867720012139636*s 0.11277580079336*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.4105^a
+vertex etaAql: 0.47643871595233*s -0.879007056847451*s 0.0187814790173009*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.3941^a
+vertex epsilonAql: 0.253278185274357*s -0.931628104088915*s 0.260613193326473*s  color=col0Aql visible=visAql&vis0 label=labAql r=b*0.3816^a
+vertex alphaCae: 0.250552110710586*s 0.701936830679667*s -0.666714575777262*s  color=col0Cae visible=visCae&vis0 label=labCae r=b*0.3525^a
+vertex deltaCae: 0.266346379846931*s 0.656389859948149*s -0.705841311981443*s  color=col0Cae visible=visCae&vis0 label=labCae r=b*0.3162^a
+vertex betaCae: 0.262961355451447*s 0.753060921327764*s -0.6031173802073*s  color=col0Cae visible=visCae&vis0 label=labCae r=b*0.3069^a
+vertex alphaEri: 0.493549986315245*s 0.226762364688671*s -0.839635183260577*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.9072^a
+vertex betaEri: 0.219133664245852*s 0.971709968880746*s -0.088091847363792*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.5217^a
+vertex thetaEri: 0.541801054766084*s 0.538385285883764*s -0.645440083197671*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.5084^a
+vertex upsilon4Eri: 0.355046031675112*s 0.752019390082693*s -0.555345975344568*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4449^a
+vertex phiEri: 0.515101168301975*s 0.352248911579557*s -0.781403538963676*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4445^a
+vertex deltaEri: 0.549342597457428*s 0.818523889842245*s -0.168051636041565*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4285^a
+vertex tau4Eri: 0.595192334235273*s 0.713785029826133*s -0.36913008068115*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4236^a
+vertex chiEri: 0.543423860714921*s 0.304320097538501*s -0.782355281083887*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4120^a
+vertex epsilonEri: 0.586220055277095*s 0.793626459168106*s -0.162797696848617*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4107^a
+vertex nuEri: 0.351024237218149*s 0.934595566755308*s -0.0575596341783116*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4101^a
+vertex muEri: 0.313327674027343*s 0.947995173723006*s -0.0559546180980839*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4009^a
+vertex upsilon2Eri: 0.306673945520681*s 0.805118953803934*s -0.507675645825597*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.4006^a
+vertex lEri: 0.333848105162223*s 0.909902942337738*s -0.246215511706149*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3958^a
+vertex etaEri: 0.705665322426257*s 0.691858214572957*s -0.152868125039092*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3928^a
+vertex f43Eri: 0.333921352778696*s 0.759281526169792*s -0.558558944226763*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3896^a
+vertex tau3Eri: 0.638174168406767*s 0.658380556677685*s -0.39908491999462*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3861^a
+vertex lambdaEri: 0.212135337374347*s 0.96540413584397*s -0.151635922961645*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3807^a
+vertex kappaEri: 0.538740571921289*s 0.405841040849974*s -0.738276131083575*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3802^a
+vertex tau5Eri: 0.550092389138929*s 0.750028175859421*s -0.367227584514583*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3771^a
+vertex fEri: 0.427249203093105*s 0.667980318842051*s -0.609311424557245*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3741^a
+vertex iotaEri: 0.585304230731992*s 0.498671673883311*s -0.639332088318464*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3737^a
+vertex tau6Eri: 0.500701363974525*s 0.771011304811369*s -0.393496775040306*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3702^a
+vertex gEri: 0.432662314278109*s 0.682134612760003*s -0.589487652015096*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3691^a
+vertex eEri: 0.467903973747394*s 0.562569852787361*s -0.681601813441107*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3635^a
+vertex omegaEri: 0.281873766036813*s 0.954807964395715*s -0.0942811282640155*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3600^a
+vertex tau1Eri: 0.70944841605972*s 0.629613768972077*s -0.316653512330323*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3490^a
+vertex sEri: 0.560581737736713*s 0.473806270832267*s -0.6791581060667*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3341^a
+vertex zetaEri: 0.644769983999107*s 0.749184307424683*s -0.151639510822178*s  color=col0Eri visible=visEri&vis0 label=labEri r=b*0.3262^a
+vertex etaPsc: 0.885582681118407*s 0.380107200431159*s 0.266949117030795*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.4177^a
+vertex alphaPsc: 0.857344227450378*s 0.51226523956777*s 0.0504499751049536*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.4142^a
+vertex gammaPsc: 0.981930505195839*s -0.179542389752729*s 0.0598081369691769*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.4123^a
+vertex omegaPsc: 0.99251748152043*s 0.00297395391015552*s 0.12206639371458*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3871^a
+vertex iotaPsc: 0.991630714397899*s -0.0809708863626969*s 0.100559643119656*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3770^a
+vertex omicronPsc: 0.8816314495982*s 0.443462442168139*s 0.161452932663505*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3608^a
+vertex epsilonPsc: 0.951428865078735*s 0.274321781582828*s 0.139752190838688*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3608^a
+vertex thetaPsc: 0.98463476088794*s -0.132576312791858*s 0.113656979273885*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3597^a
+vertex lambdaPsc: 0.996817602678913*s -0.0722739999055799*s 0.033632364280739*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3501^a
+vertex nuPsc: 0.896692763965994*s 0.431676964625718*s 0.0979647143748844*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3475^a
+vertex xiPsc: 0.875375074565295*s 0.479966301640875*s 0.0578863379303377*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3335^a
+vertex upsilonPsc: 0.832987412018137*s 0.307072313004036*s 0.460259237827637*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3331^a
+vertex phiPsc: 0.859858614952644*s 0.2927518474177*s 0.418257717352884*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3285^a
+vertex kappaPsc: 0.990155125104931*s -0.13781844549565*s 0.0244725215211289*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3197^a
+vertex f19Psc: 0.996564823253701*s -0.0532761786553763*s 0.0634050616370642*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3192^a
+vertex muPsc: 0.915673494920715*s 0.386747193582596*s 0.10940136633365*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3177^a
+vertex f7Psc: 0.981488080882563*s -0.165537289544063*s 0.0963252451638109*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.3008^a
+vertex sigmaPsc: 0.815367402860272*s 0.234923219775448*s 0.529138053028915*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.2822^a
+vertex dPsc: 0.984883011528644*s 0.0947306478636879*s 0.145022611883787*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.2793^a
+vertex f62Psc: 0.968362734247782*s 0.213265132303963*s 0.129582399512945*s  color=col0Psc visible=visPsc&vis0 label=labPsc r=b*0.2462^a
+vertex alphaMus: -0.348700349894332*s -0.0596199557819695*s -0.935336050228006*s  color=col0Mus visible=visMus&vis0 label=labMus r=b*0.5482^a
+vertex betaMus: -0.362413928365877*s -0.076952722020039*s -0.928834981630278*s  color=col0Mus visible=visMus&vis0 label=labMus r=b*0.5036^a
+vertex lambdaMus: -0.392061559233564*s 0.0224570782660492*s -0.919664837539796*s  color=col0Mus visible=visMus&vis0 label=labMus r=b*0.4282^a
+vertex gammaMus: -0.300996773142084*s -0.04512021179207*s -0.952557142142082*s  color=col0Mus visible=visMus&vis0 label=labMus r=b*0.4178^a
+vertex gamma2Vol: -0.0981046515517484*s 0.318340776493712*s -0.942886327913016*s  color=col0Vol visible=visVol&vis0 label=labVol r=b*0.4046^a
+vertex betaVol: -0.239813865225155*s 0.324031483742147*s -0.915146385880223*s  color=col0Vol visible=visVol&vis0 label=labVol r=b*0.4044^a
+vertex alphaVol: -0.285419850386917*s 0.278378230587885*s -0.917082913230787*s  color=col0Vol visible=visVol&vis0 label=labVol r=b*0.3936^a
+vertex zetaVol: -0.127622449794556*s 0.269152356636131*s -0.954604378381774*s  color=col0Vol visible=visVol&vis0 label=labVol r=b*0.3884^a
+vertex deltaVol: -0.123178813984043*s 0.353671389166697*s -0.92722355894918*s  color=col0Vol visible=visVol&vis0 label=labVol r=b*0.3873^a
+vertex epsilonVol: -0.192538206791396*s 0.308108576426345*s -0.931664179872815*s  color=col0Vol visible=visVol&vis0 label=labVol r=b*0.3706^a
+vertex alphaVul: 0.346949633082867*s -0.839487583146628*s 0.418194392413739*s  color=col0Vul visible=visVul&vis0 label=labVul r=b*0.3514^a
+vertex f15Vul: 0.44951301665063*s -0.761579983408256*s 0.466833992692832*s  color=col0Vul visible=visVul&vis0 label=labVul r=b*0.3377^a
+vertex alphaFor: 0.582438182842472*s 0.653791630922606*s -0.483034436145828*s  color=col0For visible=visFor&vis0 label=labFor r=b*0.3998^a
+vertex betaFor: 0.622705579649675*s 0.571653148235201*s -0.534275620991587*s  color=col0For visible=visFor&vis0 label=labFor r=b*0.3452^a
+vertex alphaCam: 0.109197360115918*s 0.385432775363886*s 0.91625188251867*s  color=col0Cam visible=visCam&vis0 label=labCam r=b*0.3720^a
+vertex HD21291: 0.301917030859507*s 0.397969363197814*s 0.866294691449108*s  color=col0Cam visible=visCam&vis0 label=labCam r=b*0.3708^a
+vertex gammaCam: 0.167475343212818*s 0.271240715523691*s 0.947829353659162*s  color=col0Cam visible=visCam&vis0 label=labCam r=b*0.3438^a
+vertex HD24479: 0.226173912418674*s 0.390990675359901*s 0.892172434635165*s  color=col0Cam visible=visCam&vis0 label=labCam r=b*0.3202^a
+vertex HD33564: 0.0267399722233987*s 0.184508371208599*s 0.982467116416342*s  color=col0Cam visible=visCam&vis0 label=labCam r=b*0.3027^a
+vertex epsilonUMa: -0.545647999811483*s -0.134019494622085*s 0.827228526685926*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.6676^a
+vertex etaUMa: -0.581662996460096*s -0.298266699565221*s 0.756772842059975*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.6608^a
+vertex alphaUMa: -0.462075420531191*s 0.112311010822413*s 0.879700257240482*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.6380^a
+vertex zetaUMa: -0.53742399417484*s -0.208986593057615*s 0.817006765215155*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.5951^a
+vertex betaUMa: -0.538898832720637*s 0.135768167270527*s 0.831357355683064*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.5821^a
+vertex gammaUMa: -0.594048364208791*s 0.0123757480339756*s 0.804334123260638*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.5716^a
+vertex muUMa: -0.685522885653708*s 0.30552961669402*s 0.6608403941708*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4837^a
+vertex psiUMa: -0.698870849945666*s 0.151238832007884*s 0.699075354156556*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4826^a
+vertex iotaUMa: -0.475859487006737*s 0.471618232967602*s 0.742383991582659*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4800^a
+vertex thetaUMa: -0.500837811196012*s 0.368472871918217*s 0.783191693991151*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4702^a
+vertex deltaUMa: -0.544877272127408*s -0.0398654345372517*s 0.837567612463705*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4640^a
+vertex lambdaUMa: -0.66343044037149*s 0.313964267292223*s 0.679180748882172*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4509^a
+vertex omicronUMa: -0.302769067618179*s 0.385913075606717*s 0.871436738822378*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4463^a
+vertex kappaUMa: -0.493102256413622*s 0.470237053361217*s 0.731933930328383*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4387^a
+vertex hUMa: -0.365192568676289*s 0.271197686581228*s 0.890553874045026*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4234^a
+vertex upsilonUMa: -0.438934079422352*s 0.27197068440166*s 0.856369558512997*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4123^a
+vertex chiUMa: -0.672893285847991*s 0.0368766032382923*s 0.738819830536715*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.4116^a
+vertex phiUMa: -0.501793076845435*s 0.307777524184966*s 0.808379059375343*s  color=col0UMa visible=visUMa&vis0 label=labUMa r=b*0.3483^a
+vertex alphaCMa: -0.192242128406119*s 0.938051384163544*s -0.288275154556797*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*1.2847^a
+vertex epsilonCMa: -0.225157465433638*s 0.845052927840993*s -0.484963570700795*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.7218^a
+vertex betaCMa: -0.0989263039637815*s 0.946054448235336*s -0.308536168638621*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.6470^a
+vertex deltaCMa: -0.26731829675268*s 0.854588659910067*s -0.445218093269311*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.6364^a
+vertex etaCMa: -0.31643922104475*s 0.812111014307456*s -0.4902467948137*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.5727^a
+vertex zetaCMa: -0.0804624710066597*s 0.86160502461207*s -0.501161223881833*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.5068^a
+vertex omicron2CMa: -0.252597304950735*s 0.878857362986381*s -0.404727484928131*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.5006^a
+vertex kappaCMa: -0.185478231030402*s 0.822350167148818*s -0.537901504370589*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.4504^a
+vertex sigmaCMa: -0.238926947736328*s 0.850220921581654*s -0.469082400171062*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.4380^a
+vertex omegaCMa: -0.290163486389386*s 0.843933474678492*s -0.451200001643888*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.3995^a
+vertex gammaCMa: -0.269295799739172*s 0.924383892399138*s -0.270174372796271*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.3914^a
+vertex nu2CMa: -0.155186114100394*s 0.931069076082688*s -0.330193345712704*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.3873^a
+vertex thetaCMa: -0.23422172926165*s 0.949413467087682*s -0.209175165959607*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.3794^a
+vertex iotaCMa: -0.236618406991254*s 0.926090231737451*s -0.293885372472663*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.3657^a
+vertex xi2CMa: -0.144718631113366*s 0.909142483110089*s -0.390533562210849*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.3521^a
+vertex HD50896: -0.218480110852263*s 0.887301603535855*s -0.40615551888985*s  color=col0CMa visible=visCMa&vis0 label=labCMa r=b*0.2169^a
+vertex alphaLep: 0.108148400997129*s 0.945940562974216*s -0.305778309698035*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.5441^a
+vertex betaLep: 0.124525590044908*s 0.926870054872644*s -0.354126077554803*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.5050^a
+vertex muLep: 0.190923163734132*s 0.941243950176768*s -0.278582432693419*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.4728^a
+vertex epsilonLep: 0.213595843423663*s 0.899965558691602*s -0.380051060833998*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.4654^a
+vertex zetaLep: 0.049886061077019*s 0.965473489336887*s -0.25568011713443*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.4387^a
+vertex gammaLep: 0.0581199429035295*s 0.922441252193914*s -0.381738403213266*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.4268^a
+vertex etaLep: 0.0100519086423294*s 0.969544054710712*s -0.24471061502877*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.4179^a
+vertex deltaLep: 0.0306825096351394*s 0.933833392605129*s -0.356389924742669*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.4049^a
+vertex lambdaLep: 0.165708613657622*s 0.959570398546363*s -0.227519901532248*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.3800^a
+vertex kappaLep: 0.192377596841545*s 0.955543126382362*s -0.223446176644162*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.3687^a
+vertex iotaLep: 0.197020436698613*s 0.958692215481707*s -0.205163796752408*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.3609^a
+vertex thetaLep: -0.0310516174572825*s 0.965699218884561*s -0.257799952868565*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.3397^a
+vertex nuLep: 0.164518583018743*s 0.963132274924543*s -0.21286112101598*s  color=col0Lep visible=visLep&vis0 label=labLep r=b*0.2981^a
+vertex zetaHer: -0.283411894672764*s -0.803623319433042*s 0.523323282896351*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.5089^a
+vertex betaHer: -0.351068590132234*s -0.862104492052868*s 0.365413040003818*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.5084^a
+vertex deltaHer: -0.172687628815877*s -0.891130909848569*s 0.41960062484035*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4842^a
+vertex piHer: -0.152894834139084*s -0.786206615013827*s 0.598750639416846*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4664^a
+vertex mu1Her: -0.0482353814650113*s -0.884024615686077*s 0.464944971836463*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4406^a
+vertex etaHer: -0.254064889791648*s -0.735919899000361*s 0.627592968436116*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4324^a
+vertex iotaHer: -0.0598839103221436*s -0.692156847409699*s 0.719258518106248*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4217^a
+vertex gammaHer: -0.387745959357064*s -0.861781663276807*s 0.327086281953448*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4157^a
+vertex omicronHer: 0.0328338074553471*s -0.875962144579993*s 0.481261116599715*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4132^a
+vertex tauHer: -0.290747521488816*s -0.627408881654778*s 0.722373846404209*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4124^a
+vertex xiHer: -0.0045502490959014*s -0.87251283939009*s 0.488569995325754*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4118^a
+vertex epsilonHer: -0.217354192566738*s -0.830185631583819*s 0.513370209581191*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.4063^a
+vertex thetaHer: -0.00982567620554203*s -0.795957660182722*s 0.605272549587003*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.3955^a
+vertex rhoHer: -0.12264866992715*s -0.787854264423994*s 0.603525444197698*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.3843^a
+vertex sigmaHer: -0.267815409375223*s -0.688391180327588*s 0.674086410891343*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.3800^a
+vertex lambdaHer: -0.110148105890836*s -0.891307432819295*s 0.439816387791244*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.3511^a
+vertex eHer: -0.143001754351411*s -0.782891084897694*s 0.60550148425923*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.3443^a
+vertex chiHer: -0.387073014823641*s -0.629185372728262*s 0.674017987846122*s  color=col0Her visible=visHer&vis0 label=labHer r=b*0.3373^a
+vertex alpha2CVn: -0.761711895844409*s -0.194422331297001*s 0.618057396058129*s  color=col0CVn visible=visCVn&vis0 label=labCVn r=b*0.5192^a
+vertex betaCVn: -0.743513057074794*s -0.114461107839891*s 0.658852782305243*s  color=col0CVn visible=visCVn&vis0 label=labCVn r=b*0.3658^a
+vertex alphaInd: 0.435487074026394*s -0.52159401440407*s -0.733682964565606*s  color=col0Ind visible=visInd&vis0 label=labInd r=b*0.4709^a
+vertex betaInd: 0.365941815725684*s -0.376047515785178*s -0.85127836421184*s  color=col0Ind visible=visInd&vis0 label=labInd r=b*0.4136^a
+vertex thetaInd: 0.460353454110839*s -0.380311064366814*s -0.80214599145567*s  color=col0Ind visible=visInd&vis0 label=labInd r=b*0.3593^a
+vertex alphaCar: -0.0647620454370783*s 0.60236121288918*s -0.795592135882125*s  color=col0Car visible=visCar&vis0 label=labCar r=b*1.1361^a
+vertex betaCar: -0.257757527967799*s 0.22908421747581*s -0.938659404725391*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.6819^a
+vertex epsilonCar: -0.29579160119905*s 0.410652384968032*s -0.862480114194043*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.6310^a
+vertex zetaPupCar: -0.395581636705218*s 0.654956711790435*s -0.643853146596553*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.6115^a
+vertex iotaCar: -0.386933199394324*s 0.331039942541735*s -0.860636540967462*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.5913^a
+vertex thetaCar: -0.406484109309907*s 0.14012751026976*s -0.902848242920221*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.5428^a
+vertex nuPupCar: -0.122092936157246*s 0.718421065959011*s -0.684809818071281*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.4854^a
+vertex omegaCar: -0.303817074338483*s 0.150864560589597*s -0.940709875412453*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.4701^a
+vertex aCar: -0.381397317807323*s 0.344401613263676*s -0.857859903918325*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.4606^a
+vertex qCar: -0.431122074712188*s 0.205681137010083*s -0.878538005196188*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.4436^a
+vertex sCar: -0.476553827103369*s 0.200163685154017*s -0.856055459078847*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.4078^a
+vertex uCar: -0.494265438502825*s 0.145027282460991*s -0.857128207238328*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.4036^a
+vertex xCar: -0.500946478552915*s 0.111649330118346*s -0.858246498804136*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.3900^a
+vertex dCar: -0.324800616820795*s 0.382971586239449*s -0.86477588047197*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.3732^a
+vertex wCar: -0.463004257184982*s 0.158152563973241*s -0.87213234336153*s  color=col0Car visible=visCar&vis0 label=labCar r=b*0.3407^a
+vertex alphaUMi: 0.00747881669798246*s 0.00795740221340561*s 0.999940371747642*s  color=PolarisCol visible=visUMi&vis0 label=labUMi r=b*0.6155^a
+vertex betaUMi: -0.202118744619829*s -0.186273863159433*s 0.961483260892755*s  color=col0UMi visible=visUMi&vis0 label=labUMi r=b*0.6020^a
+vertex gammaUMi: -0.200675137671035*s -0.240660061011917*s 0.949637943720896*s  color=col0UMi visible=visUMi&vis0 label=labUMi r=b*0.4960^a
+vertex zetaUMi: -0.119665827805961*s -0.176017085795438*s 0.977086523888031*s  color=col0UMi visible=visUMi&vis0 label=labUMi r=b*0.3710^a
+vertex deltaUMi: -0.00943869763710869*s -0.0591481227844988*s 0.998204593536808*s  color=col0UMi visible=visUMi&vis0 label=labUMi r=b*0.3661^a
+vertex epsilonUMi: -0.0457571395059932*s -0.131633527380396*s 0.990241838468575*s  color=col0UMi visible=visUMi&vis0 label=labUMi r=b*0.3658^a
+vertex etaUMi: -0.107598814899899*s -0.222469125761181*s 0.968983995283303*s  color=col0UMi visible=visUMi&vis0 label=labUMi r=b*0.3133^a
+vertex alphaCMi: -0.423665709335884*s 0.901352466482414*s 0.0898392892836448*s  color=col0CMi visible=visCMi&vis0 label=labCMi r=b*0.8993^a
+vertex betaCMi: -0.373146758390436*s 0.916653662119678*s 0.14320461034929*s  color=col0CMi visible=visCMi&vis0 label=labCMi r=b*0.5182^a
+vertex f46LMi: -0.79505886530525*s 0.232490212800091*s 0.560205053218637*s  color=col0LMi visible=visLMi&vis0 label=labLMi r=b*0.4024^a
+vertex betaLMi: -0.741224300746764*s 0.309220689304937*s 0.595792834203509*s  color=col0LMi visible=visLMi&vis0 label=labLMi r=b*0.3664^a
+vertex f21LMi: -0.723933271724138*s 0.380884882488818*s 0.57519329306092*s  color=col0LMi visible=visLMi&vis0 label=labLMi r=b*0.3518^a
+vertex f10LMi: -0.651895128710104*s 0.474268906380758*s 0.591693962791946*s  color=col0LMi visible=visLMi&vis0 label=labLMi r=b*0.3391^a
+vertex betaHyi: 0.221622646019981*s 0.0263462773736707*s -0.974776526409849*s  color=col0Hyi visible=visHyi&vis0 label=labHyi r=b*0.5092^a
+vertex alphaHyi: 0.414426501796247*s 0.238334199277938*s -0.878320832078728*s  color=col0Hyi visible=visHyi&vis0 label=labHyi r=b*0.5092^a
+vertex gammaHyi: 0.149834036720675*s 0.228220315067504*s -0.962011044235188*s  color=col0Hyi visible=visHyi&vis0 label=labHyi r=b*0.4632^a
+vertex epsilonHyi: 0.285059052353578*s 0.239215008863487*s -0.928179678836874*s  color=col0Hyi visible=visHyi&vis0 label=labHyi r=b*0.3897^a
+vertex deltaHyi: 0.297653017282108*s 0.212771233027511*s -0.930661637599192*s  color=col0Hyi visible=visHyi&vis0 label=labHyi r=b*0.3892^a
+vertex alphaLeo: -0.867745786796211*s 0.452714579155405*s 0.205101826704612*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.7374^a
+vertex betaLeo: -0.96763991705959*s 0.0404632987255403*s 0.249069693799059*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.6080^a
+vertex gammaLeo: -0.855721972385363*s 0.392490814760647*s 0.337180762063063*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.6070^a
+vertex deltaLeo: -0.919829215488336*s 0.180767210352023*s 0.348191656987441*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.5504^a
+vertex epsilonLeo: -0.766847321770447*s 0.501026385580233*s 0.401145542223643*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.4879^a
+vertex thetaLeo: -0.946623164950129*s 0.185544830991278*s 0.263586227394793*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.4646^a
+vertex etaLeo: -0.847550901892228*s 0.446924518137134*s 0.286209615124234*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.4464^a
+vertex zetaLeo: -0.829379817096732*s 0.394826498265112*s 0.395273519553613*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.4457^a
+vertex muLeo: -0.767702341644307*s 0.469163934187615*s 0.436484040362813*s  color=col0Leo visible=visLeo&vis0 label=labLeo r=b*0.3936^a
+vertex alphaEqu: 0.754706845650482*s -0.649378491904104*s 0.0934085187798817*s  color=col0Equ visible=visEqu&vis0 label=labEqu r=b*0.3943^a
+vertex deltaEqu: 0.74236239066271*s -0.646563026471871*s 0.175654017116262*s  color=col0Equ visible=visEqu&vis0 label=labEqu r=b*0.3473^a
+vertex gammaEqu: 0.73027655812872*s -0.659613042456577*s 0.177782965631828*s  color=col0Equ visible=visEqu&vis0 label=labEqu r=b*0.3326^a
+vertex betaEqu: 0.772074706131137*s -0.623984124312347*s 0.120600417738383*s  color=col0Equ visible=visEqu&vis0 label=labEqu r=b*0.3032^a
+vertex alphaLac: 0.591166783350143*s -0.237650027156207*s 0.770742693028029*s  color=col0Lac visible=visLac&vis0 label=labLac r=b*0.4186^a
+vertex f1Lac: 0.711101517263534*s -0.3424629916716*s 0.614047010806858*s  color=col0Lac visible=visLac&vis0 label=labLac r=b*0.3724^a
+vertex f5Lac: 0.620784012789315*s -0.255076222828309*s 0.741325387406123*s  color=col0Lac visible=visLac&vis0 label=labLac r=b*0.3607^a
+vertex f6Lac: 0.674788810507811*s -0.273842953090151*s 0.685324812228711*s  color=col0Lac visible=visLac&vis0 label=labLac r=b*0.3555^a
+vertex betaLac: 0.558520868199724*s -0.246868802523024*s 0.791902919634898*s  color=col0Lac visible=visLac&vis0 label=labLac r=b*0.3478^a
+vertex f4Lac: 0.593765257749329*s -0.259391505846345*s 0.761681603680067*s  color=col0Lac visible=visLac&vis0 label=labLac r=b*0.3459^a
+vertex alphaLyn: -0.63915474291306*s 0.523717106468687*s 0.563206540270802*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.4729^a
+vertex f38Lyn: -0.615416465696868*s 0.514112674613681*s 0.597453539240285*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.4140^a
+vertex f10UMa: -0.533575322764045*s 0.522677125416827*s 0.664910518418266*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.3927^a
+vertex f31Lyn: -0.430869548277654*s 0.589481329769234*s 0.683273879363543*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.3660^a
+vertex f2Lyn: -0.0493244557785264*s 0.512706265750638*s 0.857146068720022*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.3582^a
+vertex f15Lyn: -0.134760085530005*s 0.506602099886163*s 0.851583250034238*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.3547^a
+vertex f21Lyn: -0.246910166978676*s 0.605608342099219*s 0.756487875264632*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.3452^a
+vertex HD77912: -0.574122691288764*s 0.534339366177707*s 0.620374545819018*s  color=col0Lyn visible=visLyn&vis0 label=labLyn r=b*0.3367^a
+vertex alphaLyr: 0.128089547737062*s -0.768628721918727*s 0.626739942561586*s  color=col0Lyr visible=visLyr&vis0 label=labLyr r=b*0.9802^a
+vertex gammaLyr: 0.21753494805454*s -0.812636675202435*s 0.540647926557423*s  color=col0Lyr visible=visLyr&vis0 label=labLyr r=b*0.4749^a
+vertex betaLyr: 0.18449987916901*s -0.814252489066446*s 0.550411372189672*s  color=col0Lyr visible=visLyr&vis0 label=labLyr r=b*0.4404^a
+vertex delta2Lyr: 0.191481115020845*s -0.776054250148126*s 0.600894985348857*s  color=col0Lyr visible=visLyr&vis0 label=labLyr r=b*0.3786^a
+vertex zeta1Lyr: 0.156848800173732*s -0.776233695699168*s 0.61062239030785*s  color=col0Lyr visible=visLyr&vis0 label=labLyr r=b*0.3632^a
+vertex alphaVir: -0.911427771141219*s -0.361806418915613*s -0.195947781880811*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.8149^a
+vertex gammaVir: -0.982056549566099*s -0.186520552983548*s -0.0278391229933774*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.5223^a
+vertex epsilonVir: -0.944763860168003*s -0.268713190034241*s 0.187655189169063*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.5014^a
+vertex zetaVir: -0.913367418768363*s -0.406936002188486*s -0.0127690428486064*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.4555^a
+vertex deltaVir: -0.967721206895667*s -0.245553130357022*s 0.0567391037668113*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.4528^a
+vertex f109Vir: -0.743941976783187*s -0.667520595646008*s 0.031090023614048*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.4230^a
+vertex etaVir: -0.995593355997728*s -0.0926898541705065*s -0.0142288589504567*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.4075^a
+vertex muVir: -0.749532402094929*s -0.654280699312454*s -0.100587994895076*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.4019^a
+vertex nuVir: -0.992266441604536*s 0.0553312054097993*s 0.111111505135026*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.3856^a
+vertex iotaVir: -0.820841548855179*s -0.561095296834946*s -0.106729656341313*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.3815^a
+vertex tauVir: -0.85912171150562*s -0.511174198349452*s 0.0247148490072196*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.3734^a
+vertex kappaVir: -0.819420151179482*s -0.54404257804113*s -0.180466864325163*s  color=col0Vir visible=visVir&vis0 label=labVir r=b*0.3694^a
+vertex alphaPyx: -0.550276101056742*s 0.629305575876559*s -0.548790219279155*s  color=col0Pyx visible=visPyx&vis0 label=labPyx r=b*0.4346^a
+vertex betaPyx: -0.52705249761819*s 0.621751067329291*s -0.579345557529628*s  color=col0Pyx visible=visPyx&vis0 label=labPyx r=b*0.3867^a
+vertex gammaPyx: -0.602288268745643*s 0.647752938216274*s -0.466545788067538*s  color=col0Pyx visible=visPyx&vis0 label=labPyx r=b*0.3820^a
+vertex epsilonMic: 0.648157974307594*s -0.546029276264961*s -0.530794941387951*s  color=col0Mic visible=visMic&vis0 label=labMic r=b*0.3354^a
+vertex gammaMic: 0.606257744196389*s -0.590979918078123*s -0.532160017316484*s  color=col0Mic visible=visMic&vis0 label=labMic r=b*0.3301^a
+vertex alphaMic: 0.566549825501819*s -0.609515207474718*s -0.554538102460878*s  color=col0Mic visible=visMic&vis0 label=labMic r=b*0.3121^a
+vertex alphaCrB: -0.526015116616504*s -0.722810212478011*s 0.448166814733552*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.5997^a
+vertex betaCrB: -0.535584451851698*s -0.69129496905098*s 0.485036659129515*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.4230^a
+vertex gammaCrB: -0.502119607200627*s -0.743489947885517*s 0.441699668845109*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.4147^a
+vertex thetaCrB: -0.508385247784212*s -0.687099339528538*s 0.519075078822738*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.3880^a
+vertex epsilonCrB: -0.450676449548308*s -0.770436771940694*s 0.450907882237751*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.3716^a
+vertex deltaCrB: -0.480597514040222*s -0.759619501151374*s 0.438182887581082*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.3358^a
+vertex iotaCrB: -0.425704396412567*s -0.756391687897996*s 0.496636065297147*s  color=col0CrB visible=visCrB&vis0 label=labCrB r=b*0.3186^a
+vertex nuOct: 0.182888859640805*s -0.122955421391451*s -0.975414593580461*s  color=col0Oct visible=visOct&vis0 label=labOct r=b*0.4076^a
+vertex betaOct: 0.144969208364888*s -0.0466610107350398*s -0.988335306818107*s  color=col0Oct visible=visOct&vis0 label=labOct r=b*0.3805^a
+vertex deltaOct: -0.0854213749192179*s -0.0664683422203523*s -0.994125318151282*s  color=col0Oct visible=visOct&vis0 label=labOct r=b*0.3575^a
+vertex betaOri: 0.189614907617964*s 0.971512959663226*s -0.142157504252961*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.9565^a
+vertex alphaOri: 0.0146212784802442*s 0.991541307770782*s 0.128965317817664*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.8913^a
+vertex gammaOri: 0.144463497830846*s 0.983267079735545*s 0.110978140653062*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.7000^a
+vertex epsilonOri: 0.0976837584439217*s 0.995001903037003*s -0.0207146394854582*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.6882^a
+vertex zetaOri: 0.0779384983426728*s 0.996388850545151*s -0.0336875197276541*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.6790^a
+vertex kappaOri: 0.0471861708062695*s 0.984684819898254*s -0.167837036278007*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.6299^a
+vertex deltaOri: 0.115913567959323*s 0.993247160645338*s -0.00491147970715561*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.6115^a
+vertex pi3Ori: 0.293109669809919*s 0.94826696085266*s 0.121969227345178*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.4692^a
+vertex lambdaOri: 0.10033818724727*s 0.979835535612771*s 0.172784754334302*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.4645^a
+vertex pi4Ori: 0.288323147899845*s 0.952460810259232*s 0.0984284882818593*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.4341^a
+vertex pi5Ori: 0.276858002298893*s 0.959934230436175*s 0.0433118898222465*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.4318^a
+vertex muOri: -0.0165842417621652*s 0.985725403769581*s 0.16754220748358*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3820^a
+vertex nuOri: -0.0383848533914917*s 0.966226434294089*s 0.254819702341567*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3665^a
+vertex pi2Ori: 0.288519467964108*s 0.944767952680477*s 0.155467141845623*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3658^a
+vertex xiOri: -0.0569079856178519*s 0.967772061477743*s 0.245313510015324*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3632^a
+vertex chi1Ori: 0.0164992543904019*s 0.937873564748583*s 0.346584695493536*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3530^a
+vertex pi6Ori: 0.258965729577483*s 0.965401984383925*s 0.0305901855499841*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3443^a
+vertex pi1Ori: 0.26976049928782*s 0.946532709563433*s 0.176932480767359*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3399^a
+vertex chi2Ori: -0.0225655750401848*s 0.938610721774612*s 0.344239317616171*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3392^a
+vertex f01Ori: -0.0569633565507247*s 0.958982549510485*s 0.27768263493572*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.3227^a
+vertex f5Ori: 0.280487628981379*s 0.958825690803856*s 0.044497018359797*s  color=col0Ori visible=visOri&vis0 label=labOri r=b*0.2881^a
+vertex alphaPic: -0.0986332592481691*s 0.459454408565029*s -0.882707837633859*s  color=col0Pic visible=visPic&vis0 label=labPic r=b*0.4666^a
+vertex betaPic: 0.0331148488509002*s 0.627662442087651*s -0.777780988182501*s  color=col0Pic visible=visPic&vis0 label=labPic r=b*0.4066^a
+vertex gammaPic: 0.023525060008732*s 0.556367600556177*s -0.830603193229443*s  color=col0Pic visible=visPic&vis0 label=labPic r=b*0.3418^a
+vertex alphaPav: 0.330389468792519*s -0.439455774804618*s -0.835297205132323*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.6519^a
+vertex betaPav: 0.270170019563394*s -0.301812638201324*s -0.91428512617841*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.4495^a
+vertex deltaPav: 0.219560506283849*s -0.340291348295403*s -0.914327612158616*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.4278^a
+vertex etaPav: -0.0216649840695858*s -0.426291718291943*s -0.904326268213507*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.4198^a
+vertex epsilonPav: 0.151591399029094*s -0.253199800661522*s -0.955463190649105*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.4024^a
+vertex lambdaPav: 0.110402060149414*s -0.45387354361903*s -0.884200311873656*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.3832^a
+vertex zetaPav: 0.0637851187854551*s -0.312508037247333*s -0.947771167148139*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.3831^a
+vertex gammaPav: 0.330689714932738*s -0.256927547217134*s -0.908092807987538*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.3690^a
+vertex piPav: 0.021583293338062*s -0.443114073469051*s -0.896205377880733*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.3632^a
+vertex xiPav: 0.0534080001672389*s -0.47449898244702*s -0.878634338718263*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.3558^a
+vertex kappaPav: 0.0998113279272503*s -0.374509468778762*s -0.921835319681584*s  color=col0Pav visible=visPav&vis0 label=labPav r=b*0.3548^a
+vertex alphaAndPeg: 0.871804667172319*s 0.0372110032429284*s 0.488438290405468*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.6256^a
+vertex alphaPeg: 0.93777725791622*s -0.224728915997662*s 0.264708762321257*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.5652^a
+vertex betaPeg: 0.855888296598443*s -0.209138508826154*s 0.472986583183698*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.5642^a
+vertex epsilonPeg: 0.820031207682687*s -0.54534627933419*s 0.173626766493046*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.5564^a
+vertex gammaPeg: 0.962448592171687*s 0.0614649292547694*s 0.264414012295951*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.5304^a
+vertex etaPeg: 0.816159660701881*s -0.279992345644883*s 0.505457905886599*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.4909^a
+vertex f42Peg: 0.926545153400371*s -0.324485889320408*s 0.190323373084408*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.4582^a
+vertex thetaPeg: 0.884683867054064*s -0.452964395336325*s 0.110262014909327*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.4413^a
+vertex muPeg: 0.867689362545816*s -0.268191759332485*s 0.418555074453748*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.4297^a
+vertex iotaPeg: 0.797567472916743*s -0.422921610359146*s 0.43014350818817*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.4104^a
+vertex lambdaPeg: 0.870580531105394*s -0.283614855901414*s 0.402059886549592*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.3862^a
+vertex kappaPeg: 0.750652861282972*s -0.497511348065785*s 0.43474445412616*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.3771^a
+vertex xiPeg: 0.929228006476604*s -0.301787400977916*s 0.213212749596528*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.3710^a
+vertex pi1Peg: 0.74203550756393*s -0.384571892840908*s 0.549079015034359*s  color=col0Peg visible=visPeg&vis0 label=labPeg r=b*0.2663^a
+vertex alphaPer: 0.399984491676516*s 0.503962934421287*s 0.765528423474768*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.6461^a
+vertex betaPer: 0.509629728881243*s 0.555773751895379*s 0.656805204108923*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.6170^a
+vertex epsilonPer: 0.383534461847624*s 0.662012862977746*s 0.643925683466082*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.5206^a
+vertex zetaPer: 0.437534308616128*s 0.726886468865*s 0.529339012509732*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.5131^a
+vertex deltaPer: 0.373065888092486*s 0.557499091494297*s 0.741631044472114*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.5047^a
+vertex gammaPer: 0.406981920697764*s 0.431696629228143*s 0.804986792772539*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.4944^a
+vertex rhoPer: 0.53316910100412*s 0.566283771969958*s 0.628532735295414*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.4689^a
+vertex omicronPer: 0.466156017729326*s 0.704307690929865*s 0.535396342564813*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.4113^a
+vertex etaPer: 0.407806911340741*s 0.382516271369277*s 0.829080710908456*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.4078^a
+vertex xiPer: 0.403026599139763*s 0.703070199729644*s 0.585885530319665*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.3953^a
+vertex f16Per: 0.572282632089105*s 0.534985904142717*s 0.621516428888059*s  color=col0Per visible=visPer&vis0 label=labPer r=b*0.3709^a
+vertex alphaPhe: 0.735895236589357*s 0.0890557304641148*s -0.671213287738404*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.5558^a
+vertex betaPhe: 0.65799845826652*s 0.198881452558731*s -0.726281072827188*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.4503^a
+vertex gammaPhe: 0.67425699272236*s 0.27764500446644*s -0.68431773267966*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.4433^a
+vertex zetaPhe: 0.545991677107922*s 0.170849097363788*s -0.820185146451006*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.4053^a
+vertex kappaPhe: 0.71977556528971*s 0.0868222381338457*s -0.688756150300894*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.3986^a
+vertex epsilonPhe: 0.698892173019455*s 0.0328357789983083*s -0.714472912089548*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.3940^a
+vertex deltaPhe: 0.604294138773263*s 0.257633314026665*s -0.753958665543356*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.3891^a
+vertex psiPhe: 0.607536862255021*s 0.332324607490811*s -0.72142866331842*s  color=col0Phe visible=visPhe&vis0 label=labPhe r=b*0.3622^a
+vertex alphaAri: 0.775732661286478*s 0.487973624011675*s 0.400150697215824*s  color=col0Ari visible=visAri&vis0 label=labAri r=b*0.6063^a
+vertex betaAri: 0.816624296404636*s 0.453238113810084*s 0.35735132672415*s  color=col0Ari visible=visAri&vis0 label=labAri r=b*0.5365^a
+vertex f41Ari: 0.650636041411171*s 0.604425266211234*s 0.459720392393332*s  color=col0Ari visible=visAri&vis0 label=labAri r=b*0.4382^a
+vertex gammaAri: 0.826820115457238*s 0.453625508735649*s 0.332554348189289*s  color=col0Ari visible=visAri&vis0 label=labAri r=b*0.4113^a
+vertex alphaRet: 0.205266638608202*s 0.415213875285696*s -0.886263530133518*s  color=col0Ret visible=visRet&vis0 label=labRet r=b*0.4472^a
+vertex betaRet: 0.237930683672939*s 0.354555773539933*s -0.904256154646695*s  color=col0Ret visible=visRet&vis0 label=labRet r=b*0.3979^a
+vertex epsilonRet: 0.222304114351335*s 0.460626771796493*s -0.85930428711069*s  color=col0Ret visible=visRet&vis0 label=labRet r=b*0.3469^a
+vertex deltaRet: 0.241412465720621*s 0.414684419287997*s -0.877357882391482*s  color=col0Ret visible=visRet&vis0 label=labRet r=b*0.3428^a
+vertex gamma2Vel: -0.364460174513565*s 0.570125613315069*s -0.736291767056822*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.6756^a
+vertex delta1Vel: -0.380830643542707*s 0.432566813711365*s -0.817223330928851*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.6381^a
+vertex lambdaVel: -0.532251485190685*s 0.492088645852479*s -0.688881064578918*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.5836^a
+vertex kappaVel: -0.442690623317376*s 0.361877329582723*s -0.820408319290431*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.5737^a
+vertex muVel: -0.616812451932969*s 0.200634794431792*s -0.761109767644425*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.5212^a
+vertex phiVel: -0.497699759517051*s 0.293739710861883*s -0.816095540754541*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.4464^a
+vertex omicronVel: -0.388806803140363*s 0.459035992663034*s -0.798821148487966*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.4429^a
+vertex psiVel: -0.606033471234518*s 0.45768650452193*s -0.650573973750824*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.4307^a
+vertex qVel: -0.665054088295099*s 0.324862528995*s -0.672433934968296*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.4107^a
+vertex pVel: -0.622746364097895*s 0.231496177137603*s -0.747393126790398*s  color=col0Vel visible=visVel&vis0 label=labVel r=b*0.4064^a
+vertex betaLib: -0.639105623293641*s -0.751277230999072*s -0.164701318928577*s  color=col0Lib visible=visLib&vis0 label=labLib r=b*0.5528^a
+vertex alpha2Lib: -0.701448958290809*s -0.656191895787553*s -0.278175402966323*s  color=col0Lib visible=visLib&vis0 label=labLib r=b*0.5261^a
+vertex sigmaLib: -0.622913095806461*s -0.654364320959097*s -0.428703406247898*s  color=col0Lib visible=visLib&vis0 label=labLib r=b*0.4668^a
+vertex gammaLib: -0.564574063665745*s -0.784435836864017*s -0.256742175108408*s  color=col0Lib visible=visLib&vis0 label=labLib r=b*0.3920^a
+vertex thetaLib: -0.495356694921903*s -0.819162265728281*s -0.289127873445225*s  color=col0Lib visible=visLib&vis0 label=labLib r=b*0.3721^a
+vertex alphaSco: -0.33871033986931*s -0.828453991646402*s -0.446026108418285*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.7987^a
+vertex lambdaSco: -0.0853303719949077*s -0.792788398326055*s -0.603494227888568*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.7040^a
+vertex thetaSco: -0.0661358588356493*s -0.728214618726617*s -0.682150655829721*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.6417^a
+vertex deltaSco: -0.454574748730689*s -0.802801883402435*s -0.385837963168392*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5940^a
+vertex kappaSco: -0.0530300650374706*s -0.774883720750843*s -0.629875409519574*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5867^a
+vertex epsilonSco: -0.241758122432442*s -0.78952719268481*s -0.564092033492039*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5685^a
+vertex beta1Sco: -0.445134743814384*s -0.82840735570268*s -0.339994577702344*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5503^a
+vertex tauSco: -0.310051418771719*s -0.824353415299981*s -0.473613306824144*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5325^a
+vertex piSco: -0.447059363183758*s -0.778051098298973*s -0.441332543809647*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5216^a
+vertex mu1Sco: -0.224559644556241*s -0.754320418484586*s -0.616906534488016*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.5100^a
+vertex iota1Sco: -0.0351587154994052*s -0.763724667625043*s -0.644583971865148*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.4888^a
+vertex etaSco: -0.144933092184284*s -0.713542431391823*s -0.685457217770261*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.4555^a
+vertex zeta1Sco: -0.203881044766791*s -0.709706701877317*s -0.674350737298643*s  color=col0Sco visible=visSco&vis0 label=labSco r=b*0.3282^a
+vertex alphaScl: 0.843173519865134*s 0.225501735969251*s -0.488064936738028*s  color=col0Scl visible=visScl&vis0 label=labScl r=b*0.3747^a
+vertex betaScl: 0.786609135795666*s -0.0882389964440916*s -0.611113693995917*s  color=col0Scl visible=visScl&vis0 label=labScl r=b*0.3671^a
+vertex gammaScl: 0.831796392743778*s -0.145688144769059*s -0.535620878506605*s  color=col0Scl visible=visScl&vis0 label=labScl r=b*0.3485^a
+vertex alphaSer: -0.550049833019731*s -0.827791328264833*s 0.110483926634194*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.5252^a
+vertex deltaOph: -0.438406032541462*s -0.896379957850792*s -0.0655981843854471*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.5214^a
+vertex etaSer: 0.0987355836442298*s -0.993835832062156*s -0.0504145160817405*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4572^a
+vertex nuOph: 0.00214802986267838*s -0.985480778158772*s -0.169773442703183*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4480^a
+vertex muSer: -0.532545923608899*s -0.844183723070198*s -0.0612264726313978*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4425^a
+vertex xiSer: -0.0877104205704163*s -0.960036615357897*s -0.265775430195333*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4357^a
+vertex betaSer: -0.527268955353374*s -0.807467852265766*s 0.264543221946571*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4282^a
+vertex epsilonSer: -0.527799185310288*s -0.845898831486256*s 0.0767019352818601*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4212^a
+vertex deltaSer: -0.577749598662748*s -0.795802002037229*s 0.181396181874295*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4104^a
+vertex gammaSer: -0.490020276576193*s -0.829324399266992*s 0.268516609029377*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.4031^a
+vertex kappaSer: -0.511019591243351*s -0.801713979674913*s 0.310022051085549*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.3808^a
+vertex omicronSer: -0.0725861221682466*s -0.972104502027032*s -0.223033836014523*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.3736^a
+vertex nuSer: -0.159499760517743*s -0.961734908897595*s -0.222768470395874*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.3673^a
+vertex theta1Ser: 0.247793576983192*s -0.965987143275631*s 0.0739403964829768*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.3399^a
+vertex dSer: 0.124366693507619*s -0.992229287368867*s 0.00373722269238057*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.2948^a
+vertex HD165402: 0.0327241664514492*s -0.988935019664042*s -0.144695044186522*s  color=col0Ser visible=visSer&vis0 label=labSer r=b*0.2572^a
+vertex alphaOph: -0.101285575664306*s -0.97086599264896*s 0.217164583853124*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.6129^a
+vertex etaOph: -0.200452921927211*s -0.941321987861005*s -0.271535524858627*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.5703^a
+vertex zetaOph: -0.341659781092861*s -0.921580063123053*s -0.184279085187899*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.5532^a
+vertex betaOph: -0.0660877609367001*s -0.994643990348579*s 0.0794716321578329*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.5096^a
+vertex kappaOph: -0.259814994245086*s -0.951936537504343*s 0.162212814936642*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.4612^a
+vertex epsilonOph: -0.422190816683931*s -0.902707762769405*s -0.0829072333612173*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.4582^a
+vertex cOph: -0.107195226810106*s -0.907371572015842*s -0.40643082270742*s  color=col0Oph visible=visOph&vis0 label=labOph r=b*0.3308^a
+vertex alphaSex: -0.885573987220738*s 0.464415272629127*s -0.00878451517035782*s  color=col0Sex visible=visSex&vis0 label=labSex r=b*0.3565^a
+vertex betaSex: -0.926539198840963*s 0.375955005401301*s -0.0135257874023885*s  color=col0Sex visible=visSex&vis0 label=labSex r=b*0.3140^a
+vertex alphaSct: 0.157650989375412*s -0.977081855488392*s -0.14302871468455*s  color=col0Sct visible=visSct&vis0 label=labSct r=b*0.3975^a
+vertex betaSct: 0.209730055427322*s -0.97429489763955*s -0.0822359792547677*s  color=col0Sct visible=visSct&vis0 label=labSct r=b*0.3648^a
+vertex gammaSct: 0.1293634032878*s -0.959260927560944*s -0.251164453585127*s  color=col0Sct visible=visSct&vis0 label=labSct r=b*0.3381^a
+vertex HD175156: 0.234068567245525*s -0.934445635981444*s -0.268371494803121*s  color=col0Sct visible=visSct&vis0 label=labSct r=b*0.3068^a
+vertex RSct: 0.210755655280687*s -0.972525618365677*s -0.0988735323009491*s  color=col0Sct visible=visSct&vis0 label=labSct r=b*0.2807^a
+vertex alphaCru: -0.446763786369548*s -0.0550671707790593*s -0.892955612497696*s  color=col0Cru visible=visCru&vis0 label=labCru r=b*0.8562^a
+vertex betaCru: -0.490916891355034*s -0.107270612858129*s -0.86457713444166*s  color=col0Cru visible=visCru&vis0 label=labCru r=b*0.7667^a
+vertex gammaCru: -0.535305038055455*s -0.0768203953664892*s -0.84115821525334*s  color=col0Cru visible=visCru&vis0 label=labCru r=b*0.6871^a
+vertex deltaCru: -0.515218670128213*s -0.0373427172051789*s -0.856244850158557*s  color=col0Cru visible=visCru&vis0 label=labCru r=b*0.5362^a
+vertex alphaCrA: 0.241638057264293*s -0.751623926222086*s -0.613736525564541*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3867^a
+vertex betaCrA: 0.238709931967918*s -0.736151988278346*s -0.633322839106336*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3739^a
+vertex gammaCrA: 0.234172501776166*s -0.76328615997694*s -0.602127459429935*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3705^a
+vertex deltaCrA: 0.229475913931335*s -0.72551750167467*s -0.648818279404275*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3362^a
+vertex zetaCrA: 0.20778923976919*s -0.712842242339504*s -0.669835479332448*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3361^a
+vertex epsilonCrA: 0.208272883730123*s -0.770239162359246*s -0.602788552206215*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3221^a
+vertex lambdaCrA: 0.155176807481885*s -0.769336958115321*s -0.619710257537822*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3058^a
+vertex HD170642: 0.114472225587614*s -0.761030984300323*s -0.638535786392509*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.3025^a
+vertex V686CrA: 0.20078568452603*s -0.769646389234031*s -0.60607717695722*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.2944^a
+vertex HD175219: 0.184657549640582*s -0.711654206847513*s -0.677827322580739*s  color=col0CrA visible=visCrA&vis0 label=labCrA r=b*0.2813^a
+vertex alphaPsA: 0.839996750270895*s -0.228527591064617*s -0.492118481319833*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.7619^a
+vertex epsilonPsA: 0.840787566270596*s -0.297205691195506*s -0.452487619196117*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.3838^a
+vertex betaPsA: 0.785907996386805*s -0.313470847289978*s -0.532995918478351*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.3715^a
+vertex deltaPsA: 0.813084130577389*s -0.227694977325881*s -0.535769720965806*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.3658^a
+vertex tauPsA: 0.751676140163131*s -0.384214154978695*s -0.536061995876843*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.3131^a
+vertex thetaPsA: 0.723224078960329*s -0.463863737493183*s -0.511641832389454*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.3130^a
+vertex etaPsA: 0.766847186590373*s -0.432240424550437*s -0.474461387051558*s  color=col0PsA visible=visPsA&vis0 label=labPsA r=b*0.2883^a
+vertex alphaTrA: -0.105144322388054*s -0.341357550070489*s -0.934034097064679*s  color=col0TrA visible=visTrA&vis0 label=labTrA r=b*0.6207^a
+vertex gammaTrA: -0.230948838841704*s -0.278791432853447*s -0.932168424055005*s  color=col0TrA visible=visTrA&vis0 label=labTrA r=b*0.5150^a
+vertex betaTrA: -0.227178658960256*s -0.383849069022622*s -0.895013826219174*s  color=col0TrA visible=visTrA&vis0 label=labTrA r=b*0.5119^a
+vertex zetaPup: -0.395581636705218*s 0.654956711790435*s -0.643853146596553*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.6115^a
+vertex piPup: -0.266361861359417*s 0.75126810959413*s -0.603860568608358*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.5212^a
+vertex rhoPup: -0.484956068879522*s 0.770964474262816*s -0.412833369147384*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.5110^a
+vertex tauPup: -0.138862420188846*s 0.618698002933893*s -0.773259341634428*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.4889^a
+vertex nuPup: -0.122092936157246*s 0.718421065959011*s -0.684809818071281*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.4854^a
+vertex sigmaPup: -0.278479078851407*s 0.671649281966568*s -0.686539616246481*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.4596^a
+vertex f188Pup: -0.419083928300551*s 0.803754818174185*s -0.422311322725264*s  color=col0Pup visible=visPup&vis0 label=labPup r=b*0.2848^a
+vertex alphaCyg: 0.456999811026759*s -0.533452451421804*s 0.71174409361341*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.7418^a
+vertex gammaCyg: 0.445811305861965*s -0.618195711573587*s 0.647368783428485*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.5814^a
+vertex epsilonCyg: 0.552368187786048*s -0.617277185168752*s 0.560230543430203*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.5441^a
+vertex deltaCyg: 0.313899759589838*s -0.630891559513887*s 0.709537018811265*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.5167^a
+vertex beta1Cyg: 0.344230424800918*s -0.812927075391526*s 0.469739273147093*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.4767^a
+vertex zetaCyg: 0.646586743136965*s -0.571667592534749*s 0.505095780268512*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.4598^a
+vertex iotaCyg: 0.237665129507247*s -0.571097347618404*s 0.785724573727669*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.4155^a
+vertex kappaCyg: 0.198250117055983*s -0.56202158752336*s 0.803012220482983*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.4026^a
+vertex etaCyg: 0.400455944130518*s -0.712801745980632*s 0.575802663885378*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.3925^a
+vertex muCyg: 0.728892400750536*s -0.485466399630535*s 0.482740347348225*s  color=col0Cyg visible=visCyg&vis0 label=labCyg r=b*0.3465^a
+vertex alphaDor: 0.208919975365207*s 0.534320124657641*s -0.819057048244653*s  color=col0Dor visible=visDor&vis0 label=labDor r=b*0.4746^a
+vertex betaDor: 0.0525989230848214*s 0.45916808172214*s -0.886790858104619*s  color=col0Dor visible=visDor&vis0 label=labDor r=b*0.4071^a
+vertex gammaDor: 0.271584054464861*s 0.561358393277838*s -0.781740913383041*s  color=col0Dor visible=visDor&vis0 label=labDor r=b*0.3686^a
+vertex deltaDor: 0.0272033859442268*s 0.410205627635972*s -0.911587252460755*s  color=col0Dor visible=visDor&vis0 label=labDor r=b*0.3637^a
+vertex f36Dor: 0.0112452224836929*s 0.452581130817502*s -0.891652322937166*s  color=col0Dor visible=visDor&vis0 label=labDor r=b*0.3311^a
+vertex gammaMen: 0.0300062945893475*s 0.234582717824587*s -0.971632940355074*s  color=col0Men visible=visMen&vis0 label=labMen r=b*0.2925^a
+vertex muMen: 0.108232068053307*s 0.309120524912255*s -0.944844072068443*s  color=col0Men visible=visMen&vis0 label=labMen r=b*0.2824^a
+vertex alphaTel: 0.0876072955087543*s -0.68973527242489*s -0.71874210656299*s  color=col0Tel visible=visTel&vis0 label=labTel r=b*0.4547^a
+vertex zetaTel: 0.0880610112336089*s -0.649418177515954*s -0.755315357325913*s  color=col0Tel visible=visTel&vis0 label=labTel r=b*0.3745^a
+vertex alphaTuc: 0.451723125738793*s -0.209899050820664*s -0.867115105471793*s  color=col0Tuc visible=visTuc&vis0 label=labTuc r=b*0.5000^a
+vertex gammaTuc: 0.520158013587655*s -0.0941252197355912*s -0.848867530248549*s  color=col0Tuc visible=visTuc&vis0 label=labTuc r=b*0.3903^a
+vertex beta1Tuc: 0.452264477190582*s 0.0650875866436621*s -0.889505732829437*s  color=col0Tuc visible=visTuc&vis0 label=labTuc r=b*0.3687^a
+vertex zetaTuc: 0.425207407814876*s 0.0399062794606955*s -0.904215764737023*s  color=col0Tuc visible=visTuc&vis0 label=labTuc r=b*0.3678^a
+vertex betaTri: 0.687710756653149*s 0.442965452136023*s 0.575183034691986*s  color=col0Tri visible=visTri&vis0 label=labTri r=b*0.4941^a
+vertex alphaTri: 0.762193862218999*s 0.41648697603919*s 0.495579575028489*s  color=col0Tri visible=visTri&vis0 label=labTri r=b*0.4445^a
+vertex gammaTri: 0.681599022338502*s 0.472461863102389*s 0.55875089320825*s  color=col0Tri visible=visTri&vis0 label=labTri r=b*0.3962^a
+vertex betaGem: -0.397386455745073*s 0.788839898561621*s 0.468844984219369*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.7422^a
+vertex alphaGem: -0.346598415799783*s 0.775735414776202*s 0.527355766468023*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.6949^a
+vertex gammaGem: -0.163535651593068*s 0.945402144491831*s 0.281905792505719*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.6414^a
+vertex muGem: -0.0988920873423544*s 0.918589424042601*s 0.382640595204109*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.5112^a
+vertex epsilonGem: -0.178898168675777*s 0.887705832648808*s 0.424233190504632*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4796^a
+vertex etaGem: -0.0664283701257311*s 0.921511616173347*s 0.38262725059779*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4683^a
+vertex xiGem: -0.197655623606409*s 0.954652424009657*s 0.222645466581398*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4527^a
+vertex deltaGem: -0.323797425381774*s 0.86928915676091*s 0.373485728313734*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4362^a
+vertex lambdaGem: -0.32649199506785*s 0.90157330218013*s 0.283846010985942*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4350^a
+vertex thetaGem: -0.195636655154907*s 0.806362722216687*s 0.558126741322339*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4324^a
+vertex kappaGem: -0.406775679409767*s 0.815337817976761*s 0.412016734147555*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4238^a
+vertex iotaGem: -0.329340446013774*s 0.821489598191183*s 0.465499420711925*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.4026^a
+vertex nuGem: -0.124739931242438*s 0.930210226804964*s 0.345179494612715*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.3891^a
+vertex upsilonGem: -0.368504611406415*s 0.812672603596033*s 0.451406236927063*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.3830^a
+vertex zetaGem: -0.264779030766791*s 0.898286251567355*s 0.35067631102096*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.3829^a
+vertex f1Gem: -0.0230350047090401*s 0.918438626952187*s 0.394892234768216*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.3698^a
+vertex tauGem: -0.270086503469318*s 0.821000961459236*s 0.503001691773227*s  color=col0Gem visible=visGem&vis0 label=labGem r=b*0.3499^a
+vertex betaMon: -0.130033978842443*s 0.983879015748786*s -0.122773151444454*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.4176^a
+vertex alphaMon: -0.426500025946688*s 0.888930791125137*s -0.167032261725432*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3891^a
+vertex gammaMon: -0.0700326199845605*s 0.991519483135859*s -0.109473954437102*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3849^a
+vertex deltaMon: -0.314102726461958*s 0.949342379035767*s -0.00940875102627922*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3842^a
+vertex epsilonMonA: -0.109322146618156*s 0.990797977667142*s 0.0797999731171628*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3584^a
+vertex f13Mon: -0.148106556218182*s 0.980749638702572*s 0.127257982814299*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3547^a
+vertex zetaMon: -0.536302730085492*s 0.842332123766387*s -0.0534413227199287*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3530^a
+vertex f15Mon: -0.181442004433322*s 0.968350884892888*s 0.17139242327005*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3503^a
+vertex f28Mon: -0.50955790837189*s 0.86005453509844*s -0.0256307368655559*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3301^a
+vertex f17Mon: -0.209191468991365*s 0.967905000655339*s 0.139279714989737*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.3224^a
+vertex HD45194: -0.119389426212332*s 0.966700071901577*s 0.226356214613552*s  color=col0Mon visible=visMon&vis0 label=labMon r=b*0.2122^a
+vertex betaAqr: 0.797536890680975*s -0.595740652496395*s -0.0950156985244619*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4966^a
+vertex alphaAqr: 0.881208815407694*s -0.472715719044747*s -0.00329736497463046*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4889^a
+vertex deltaAqr: 0.925575171984998*s -0.265114439237516*s -0.270231262278664*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4682^a
+vertex zetaAqr: 0.924224044999034*s -0.381845102882972*s 0.00205719467155581*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4222^a
+vertex epsilonAqr: 0.663731483432156*s -0.729935929821168*s -0.163260700283491*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4186^a
+vertex lambdaAqr: 0.950764734135623*s -0.281591891765266*s -0.12943116632433*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4162^a
+vertex gammaAqr: 0.91160982373587*s -0.410475755879823*s -0.0218445211241649*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4129^a
+vertex c02Aqr: 0.912046247918087*s -0.198572070258798*s -0.358804646808921*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.4123^a
+vertex etaAqr: 0.934716957625949*s -0.355392843929074*s 0.000368253303744317*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3966^a
+vertex b01Aqr: 0.928629843169917*s -0.145537628651611*s -0.341270293199805*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3874^a
+vertex tauAqr: 0.928829624622142*s -0.28838767984189*s -0.232611423923466*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3847^a
+vertex iotaAqr: 0.857442078646456*s -0.456495109669188*s -0.237497992864277*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3745^a
+vertex thetaAqr: 0.895005788825222*s -0.42573118119603*s -0.133107472843469*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3687^a
+vertex psi1Aqr: 0.970744150597089*s -0.183024123301792*s -0.155428325510977*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3623^a
+vertex sigmaAqr: 0.911635042180402*s -0.368048211610712*s -0.182926389017259*s  color=col0Aqr visible=visAqr&vis0 label=labAqr r=b*0.3292^a
+vertex alphaHya: -0.781172805250154*s 0.605385891433741*s -0.152567921892447*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.6116^a
+vertex gammaHya: -0.862456379960523*s -0.315536029619525*s -0.395734768092641*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4839^a
+vertex nuHya: -0.916406308767635*s 0.284786835645289*s -0.281239996255906*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4709^a
+vertex zetaHya: -0.693561721879154*s 0.713169769005519*s 0.101789088416377*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4699^a
+vertex piHya: -0.757091596916772*s -0.472632771407817*s -0.45103278957231*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4551^a
+vertex epsilonHya: -0.665672737477729*s 0.738082223149944*s 0.110065609746836*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4467^a
+vertex xiHya: -0.842677471052782*s 0.0948090891555007*s -0.530005581474*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4263^a
+vertex lambdaHya: -0.869721146159835*s 0.443658605090092*s -0.216222501261866*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4193^a
+vertex thetaHya: -0.753448941292189*s 0.656384889364697*s 0.0383871056394374*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4101^a
+vertex muHya: -0.879401835406682*s 0.376069873797056*s -0.29193126229581*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.4021^a
+vertex deltaHya: -0.636611810067001*s 0.764966028145285*s 0.0977362730353717*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3845^a
+vertex etaHya: -0.657009750444706*s 0.751679816638476*s 0.0575816036502303*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3778^a
+vertex betaHya: -0.828222002544118*s 0.0207252935452611*s -0.560016764668053*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3757^a
+vertex upsilon1Hya: -0.82096007441108*s 0.509187622772278*s -0.258365092530842*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3739^a
+vertex rhoHya: -0.671718138467667*s 0.73403054211738*s 0.099969523818003*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3676^a
+vertex EHya: -0.645677167074784*s -0.601400007009666*s -0.470551832944103*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3499^a
+vertex tau2Hya: -0.80194509829924*s 0.596964220976361*s -0.0227547398998113*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3473^a
+vertex sigmaHya: -0.642269247860905*s 0.764384899355312*s 0.0566210110273291*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3451^a
+vertex tau1Hya: -0.793681511432662*s 0.60624485391316*s -0.0503670081876771*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3391^a
+vertex f26Hya: -0.751959347546155*s 0.625056751723274*s -0.209430649053832*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3210^a
+vertex kHya: -0.713679684699616*s -0.52159205205842*s -0.467550038901233*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3207^a
+vertex chi1Hya: -0.863545715741686*s 0.204833300045423*s -0.460795091137787*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3156^a
+vertex kappaHya: -0.797053406726583*s 0.549907161889817*s -0.249615664828622*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3151^a
+vertex psiHya: -0.875592312323972*s -0.278179208879935*s -0.39491066122111*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.3088^a
+vertex f50Hya: -0.739775760588817*s -0.491071458635788*s -0.459978963169574*s  color=col0Hya visible=visHya&vis0 label=labHya r=b*0.2996^a
+vertex betaCet: 0.933679887436124*s 0.18542624922422*s -0.306364119791964*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.6017^a
+vertex alphaCet: 0.693797439614982*s 0.716448846607963*s 0.0731174601433592*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.5470^a
+vertex gammaCet: 0.751448450008069*s 0.657203517841206*s 0.0583846137061289*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.4467^a
+vertex etaCet: 0.939191987619899*s 0.295835297240115*s -0.174355634544559*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.4341^a
+vertex tauCet: 0.862419528543877*s 0.426753815401471*s -0.272238384190115*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.4336^a
+vertex iotaCet: 0.984492827081541*s 0.0895530379740133*s -0.150844710926902*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.4235^a
+vertex thetaCet: 0.922266705496776*s 0.360323835824063*s -0.139967343581127*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.4192^a
+vertex zetaCet: 0.867401305188356*s 0.465007824489097*s -0.177151626922965*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.4067^a
+vertex deltaCet: 0.763614793787344*s 0.645625906419054*s 0.00772241346258361*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3974^a
+vertex piCet: 0.729194528267963*s 0.641721996640439*s -0.237630425181353*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3796^a
+vertex xi2Cet: 0.78556641654824*s 0.600529215021307*s 0.149164563812754*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3739^a
+vertex muCet: 0.735942539905283*s 0.653355931380846*s 0.177523533333549*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3678^a
+vertex xi1Cet: 0.82268214208728*s 0.546698629177192*s 0.155931722065984*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3534^a
+vertex lambdaCet: 0.694856885494967*s 0.701880174291182*s 0.156646511666282*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3406^a
+vertex sigmaCet: 0.757171534409674*s 0.598812342466577*s -0.260988593600162*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3279^a
+vertex rhoCet: 0.782621962979243*s 0.585707138568888*s -0.210831712254019*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3253^a
+vertex epsilonCet: 0.747600824996191*s 0.632102958131268*s -0.20381083579318*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3217^a
+vertex omicronCet: 0.816379786851122*s 0.575359793729395*s -0.0498512926671345*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3170^a
+vertex nuCet: 0.769777905480786*s 0.630514120886367*s 0.099468183840385*s  color=col0Cet visible=visCet&vis0 label=labCet r=b*0.3148^a
+vertex alphaLup: -0.510399418173091*s -0.442598105844271*s -0.737291903272804*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.5984^a
+vertex betaLup: -0.514457406528401*s -0.51578628184762*s -0.685053347065671*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.5498^a
+vertex gammaLup: -0.439410943718796*s -0.610003597930518*s -0.659403998359109*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.5370^a
+vertex deltaLup: -0.479018858008969*s -0.587008446567611*s -0.652657657068439*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.4851^a
+vertex etaLup: -0.385820753996816*s -0.681259633270757*s -0.622115469877676*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.4634^a
+vertex zetaLup: -0.405689667340818*s -0.459446839145551*s -0.790142073181816*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.4394^a
+vertex phi1Lup: -0.508151899041973*s -0.624790174769116*s -0.592805942119353*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.4275^a
+vertex chiLup: -0.438784788051088*s -0.706762567203354*s -0.554936557973148*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.4023^a
+vertex rhoLup: -0.497635787029686*s -0.416463331739948*s -0.760865899343246*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.3985^a
+vertex tau2Lup: -0.559944040458149*s -0.421616874894104*s -0.713233399638528*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.3598^a
+vertex omegaLup: -0.422203338816708*s -0.602215694805816*s -0.677554866871733*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.3565^a
+vertex HD144415: -0.372594339163912*s -0.708455468341662*s -0.599386609626712*s  color=col0Lup visible=visLup&vis0 label=labLup r=b*0.2634^a
 
-#-------- SEGMENTS --------
 
-set segment: color=#4d4d4d
-set segment: w=1.5
-set segment: visible=true
-set segment: naming=S
 
-segment S0:  alphaAnt  etaAnt  color=col1Ant  w=wid  visible=visAnt&vis1
-segment S1:  thetaAra  alphaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S2:  alphaAra  zetaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S3:  zetaAra  etaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S4:  etaAra  deltaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S5:  deltaAra  gammaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S6:  gammaAra  betaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S7:  betaAra  thetaAra  color=col1Ara  w=wid  visible=visAra&vis1
-segment S8:  alphaAnd  deltaAnd  color=col1And  w=wid  visible=visAnd&vis1
-segment S9:  deltaAnd  betaAnd  color=col1And  w=wid  visible=visAnd&vis1
-segment S10:  gamma1And  betaAnd  color=col1And  w=wid  visible=visAnd&vis1
-segment S11:  betaAnd  muAnd  color=col1And  w=wid  visible=visAnd&vis1
-segment S12:  muAnd  nuAnd  color=col1And  w=wid  visible=visAnd&vis1
-segment S13:  deltaSgr  lambdaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S14:  etaSgr  epsilonSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S15:  epsilonSgr  gamma2Sgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S16:  gamma2Sgr  XSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S17:  gamma2Sgr  deltaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S18:  deltaSgr  epsilonSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S19:  epsilonSgr  zetaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S20:  zetaSgr  phiSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S21:  phiSgr  deltaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S22:  phiSgr  lambdaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S23:  lambdaSgr  muSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S24:  zetaSgr  tauSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S25:  tauSgr  sigmaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S26:  sigmaSgr  phiSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S27:  sigmaSgr  xi2Sgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S28:  xi2Sgr  omicronSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S29:  omicronSgr  dSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S30:  dSgr  rho1Sgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S31:  tauSgr  h01Sgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S32:  h01Sgr  cSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S33:  cSgr  theta1Sgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S34:  theta1Sgr  iotaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S35:  iotaSgr  alphaSgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S36:  iotaSgr  beta2Sgr  color=col1Sgr  w=wid  visible=visSgr&vis1
-segment S37:  betaSge  deltaSge  color=col1Sge  w=wid  visible=visSge&vis1
-segment S38:  deltaSge  alphaSge  color=col1Sge  w=wid  visible=visSge&vis1
-segment S39:  deltaSge  gammaSge  color=col1Sge  w=wid  visible=visSge&vis1
-segment S40:  gammaSge  etaSge  color=col1Sge  w=wid  visible=visSge&vis1
-segment S41:  alphaCom  betaCom  color=col1Com  w=wid  visible=visCom&vis1
-segment S42:  betaCom  gammaCom  color=col1Com  w=wid  visible=visCom&vis1
-segment S43:  alphaAps  gammaAps  color=col1Aps  w=wid  visible=visAps&vis1
-segment S44:  gammaAps  betaAps  color=col1Aps  w=wid  visible=visAps&vis1
-segment S45:  zetaBoo  alphaBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S46:  alphaBoo  epsilonBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S47:  epsilonBoo  deltaBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S48:  deltaBoo  betaBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S49:  betaBoo  gammaBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S50:  gammaBoo  rhoBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S51:  rhoBoo  alphaBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S52:  alphaBoo  etaBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S53:  etaBoo  upsilonBoo  color=col1Boo  w=wid  visible=visBoo&vis1
-segment S54:  betaTau  tauTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S55:  tauTau  epsilonTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S56:  alphaTau  zetaTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S57:  gammaTau  deltaTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S58:  gammaTau  lambdaTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S59:  lambdaTau  omicronTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S60:  alphaTau  epsilonTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S61:  alphaTau  theta2Tau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S62:  theta2Tau  gammaTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S63:  epsilonTau  delta3Tau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S64:  delta3Tau  deltaTau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S65:  deltaTau  f27Tau  color=col1Tau  w=wid  visible=visTau&vis1
-segment S66:  alpha2Cap  beta1Cap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S67:  beta1Cap  thetaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S68:  thetaCap  iotaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S69:  iotaCap  gammaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S70:  gammaCap  deltaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S71:  iotaCap  zetaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S72:  zetaCap  thetaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S73:  beta1Cap  psiCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S74:  thetaCap  omegaCap  color=col1Cap  w=wid  visible=visCap&vis1
-segment S75:  kappaNor  gamma2Nor  color=col1Nor  w=wid  visible=visNor&vis1
-segment S76:  gamma2Nor  epsilonNor  color=col1Nor  w=wid  visible=visNor&vis1
-segment S77:  epsilonNor  etaNor  color=col1Nor  w=wid  visible=visNor&vis1
-segment S78:  etaNor  gamma2Nor  color=col1Nor  w=wid  visible=visNor&vis1
-segment S79:  etaNor  kappaNor  color=col1Nor  w=wid  visible=visNor&vis1
-segment S80:  epsilonCas  deltaCas  color=col1Cas  w=wid  visible=visCas&vis1
-segment S81:  deltaCas  gammaCas  color=col1Cas  w=wid  visible=visCas&vis1
-segment S82:  gammaCas  alphaCas  color=col1Cas  w=wid  visible=visCas&vis1
-segment S83:  alphaCas  betaCas  color=col1Cas  w=wid  visible=visCas&vis1
-segment S84:  alphaCenA  betaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S85:  betaCen  epsilonCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S86:  epsilonCen  zetaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S87:  zetaCen  upsilon1Cen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S88:  upsilon1Cen  muCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S89:  muCen  nuCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S90:  nuCen  dCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S91:  dCen  iotaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S92:  nuCen  thetaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S93:  muCen  etaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S94:  etaCen  kappaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S95:  zetaCen  gammaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S96:  gammaCen  sigmaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S97:  sigmaCen  deltaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S98:  deltaCen  ACen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S99:  ACen  lambdaCen  color=col1Cen  w=wid  visible=visCen&vis1
-segment S100:  zetaCep  iotaCep  color=col1Cep  w=wid  visible=visCep&vis1
-segment S101:  iotaCep  betaCep  color=col1Cep  w=wid  visible=visCep&vis1
-segment S102:  betaCep  alphaCep  color=col1Cep  w=wid  visible=visCep&vis1
-segment S103:  alphaCep  zetaCep  color=col1Cep  w=wid  visible=visCep&vis1
-segment S104:  iotaCep  gammaCep  color=col1Cep  w=wid  visible=visCep&vis1
-segment S105:  gammaCep  betaCep  color=col1Cep  w=wid  visible=visCep&vis1
-segment S106:  alphaCha  gammaCha  color=col1Cha  w=wid  visible=visCha&vis1
-segment S107:  gammaCha  betaCha  color=col1Cha  w=wid  visible=visCha&vis1
-segment S108:  thetaAur  betaAur  color=col1Aur  w=wid  visible=visAur&vis1
-segment S109:  betaAur  alphaAur  color=col1Aur  w=wid  visible=visAur&vis1
-segment S110:  alphaAur  zetaAur  color=col1Aur  w=wid  visible=visAur&vis1
-segment S111:  zetaAur  iotaAur  color=col1Aur  w=wid  visible=visAur&vis1
-segment S112:  betaTauAur  iotaAur  color=col1Aur  w=wid  visible=visAur&vis1
-segment S113:  betaTauAur  thetaAur  color=col1Aur  w=wid  visible=visAur&vis1
-segment S114:  alphaHor  zetaHor  color=col1Hor  w=wid  visible=visHor&vis1
-segment S115:  zetaHor  muHor  color=col1Hor  w=wid  visible=visHor&vis1
-segment S116:  iotaCnc  gammaCnc  color=col1Cnc  w=wid  visible=visCnc&vis1
-segment S117:  gammaCnc  chiCnc  color=col1Cnc  w=wid  visible=visCnc&vis1
-segment S118:  gammaCnc  deltaCnc  color=col1Cnc  w=wid  visible=visCnc&vis1
-segment S119:  deltaCnc  betaCnc  color=col1Cnc  w=wid  visible=visCnc&vis1
-segment S120:  deltaCnc  alphaCnc  color=col1Cnc  w=wid  visible=visCnc&vis1
-segment S121:  thetaGru  delta1Gru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S122:  delta1Gru  alphaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S123:  alphaGru  betaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S124:  betaGru  iotaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S125:  iotaGru  thetaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S126:  betaGru  zetaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S127:  betaGru  epsilonGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S128:  alphaGru  lambdaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S129:  lambdaGru  gammaGru  color=col1Gru  w=wid  visible=visGru&vis1
-segment S130:  etaCrv  deltaCrv  color=col1Crv  w=wid  visible=visCrv&vis1
-segment S131:  deltaCrv  gammaCrv  color=col1Crv  w=wid  visible=visCrv&vis1
-segment S132:  gammaCrv  epsilonCrv  color=col1Crv  w=wid  visible=visCrv&vis1
-segment S133:  epsilonCrv  alphaCrv  color=col1Crv  w=wid  visible=visCrv&vis1
-segment S134:  epsilonCrv  betaCrv  color=col1Crv  w=wid  visible=visCrv&vis1
-segment S135:  betaCrv  deltaCrv  color=col1Crv  w=wid  visible=visCrv&vis1
-segment S136:  alphaCrt  betaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S137:  betaCrt  gammaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S138:  gammaCrt  deltaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S139:  deltaCrt  alphaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S140:  deltaCrt  epsilonCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S141:  epsilonCrt  thetaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S142:  thetaCrt  etaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S143:  etaCrt  zetaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S144:  zetaCrt  gammaCrt  color=col1Crt  w=wid  visible=visCrt&vis1
-segment S145:  epsilonDel  betaDel  color=col1Del  w=wid  visible=visDel&vis1
-segment S146:  betaDel  alphaDel  color=col1Del  w=wid  visible=visDel&vis1
-segment S147:  alphaDel  gamma2Del  color=col1Del  w=wid  visible=visDel&vis1
-segment S148:  gamma2Del  deltaDel  color=col1Del  w=wid  visible=visDel&vis1
-segment S149:  deltaDel  betaDel  color=col1Del  w=wid  visible=visDel&vis1
-segment S150:  deltaCol  kappaCol  color=col1Col  w=wid  visible=visCol&vis1
-segment S151:  kappaCol  gammaCol  color=col1Col  w=wid  visible=visCol&vis1
-segment S152:  gammaCol  betaCol  color=col1Col  w=wid  visible=visCol&vis1
-segment S153:  betaCol  etaCol  color=col1Col  w=wid  visible=visCol&vis1
-segment S154:  betaCol  alphaCol  color=col1Col  w=wid  visible=visCol&vis1
-segment S155:  alphaCol  epsilonCol  color=col1Col  w=wid  visible=visCol&vis1
-segment S156:  xiDra  gammaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S157:  gammaDra  betaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S158:  betaDra  nu2Dra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S159:  nu2Dra  xiDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S160:  xiDra  deltaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S161:  deltaDra  epsilonDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S162:  epsilonDra  tauDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S163:  tauDra  chiDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S164:  chiDra  zetaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S165:  zetaDra  etaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S166:  etaDra  thetaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S167:  thetaDra  iotaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S168:  iotaDra  alphaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S169:  alphaDra  kappaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S170:  kappaDra  lambdaDra  color=col1Dra  w=wid  visible=visDra&vis1
-segment S171:  alphaCir  gammaCir  color=col1Cir  w=wid  visible=visCir&vis1
-segment S172:  alphaCir  betaCir  color=col1Cir  w=wid  visible=visCir&vis1
-segment S173:  betaAql  alphaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S174:  alphaAql  gammaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S175:  alphaAql  deltaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S176:  deltaAql  etaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S177:  thetaAql  etaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S178:  deltaAql  zetaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S179:  zetaAql  epsilonAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S180:  deltaAql  lambdaAql  color=col1Aql  w=wid  visible=visAql&vis1
-segment S181:  deltaCae  alphaCae  color=col1Cae  w=wid  visible=visCae&vis1
-segment S182:  alphaCae  betaCae  color=col1Cae  w=wid  visible=visCae&vis1
-segment S183:  alphaEri  chiEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S184:  chiEri  phiEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S185:  phiEri  kappaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S186:  kappaEri  sEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S187:  sEri  iotaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S188:  iotaEri  thetaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S189:  thetaEri  eEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S190:  eEri  fEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S191:  fEri  gEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S192:  gEri  upsilon4Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S193:  upsilon4Eri  f43Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S194:  f43Eri  upsilon2Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S195:  upsilon2Eri  tau6Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S196:  tau6Eri  tau5Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S197:  tau5Eri  tau4Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S198:  tau4Eri  tau3Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S199:  tau3Eri  tau1Eri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S200:  tau1Eri  etaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S201:  etaEri  zetaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S202:  zetaEri  epsilonEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S203:  epsilonEri  deltaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S204:  deltaEri  nuEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S205:  nuEri  muEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S206:  muEri  omegaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S207:  omegaEri  betaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S208:  betaEri  lambdaEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S209:  lambdaEri  lEri  color=col1Eri  w=wid  visible=visEri&vis1
-segment S210:  sigmaPsc  phiPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S211:  sigmaPsc  upsilonPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S212:  upsilonPsc  phiPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S213:  phiPsc  etaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S214:  etaPsc  omicronPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S215:  omicronPsc  alphaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S216:  alphaPsc  xiPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S217:  xiPsc  nuPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S218:  nuPsc  muPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S219:  muPsc  epsilonPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S220:  epsilonPsc  f62Psc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S221:  f62Psc  dPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S222:  dPsc  omegaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S223:  omegaPsc  iotaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S224:  iotaPsc  f19Psc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S225:  f19Psc  lambdaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S226:  lambdaPsc  kappaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S227:  kappaPsc  gammaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S228:  gammaPsc  f7Psc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S229:  f7Psc  thetaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S230:  thetaPsc  iotaPsc  color=col1Psc  w=wid  visible=visPsc&vis1
-segment S231:  betaMus  lambdaMus  color=col1Mus  w=wid  visible=visMus&vis1
-segment S232:  lambdaMus  gammaMus  color=col1Mus  w=wid  visible=visMus&vis1
-segment S233:  gammaMus  alphaMus  color=col1Mus  w=wid  visible=visMus&vis1
-segment S234:  alphaMus  betaMus  color=col1Mus  w=wid  visible=visMus&vis1
-segment S235:  zetaVol  gamma2Vol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S236:  gamma2Vol  epsilonVol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S237:  epsilonVol  zetaVol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S238:  epsilonVol  deltaVol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S239:  epsilonVol  betaVol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S240:  betaVol  alphaVol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S241:  alphaVol  epsilonVol  color=col1Vol  w=wid  visible=visVol&vis1
-segment S242:  alphaVul  f15Vul  color=col1Vul  w=wid  visible=visVul&vis1
-segment S243:  betaFor  alphaFor  color=col1For  w=wid  visible=visFor&vis1
-segment S244:  HD21291  HD24479  color=col1Cam  w=wid  visible=visCam&vis1
-segment S245:  HD24479  alphaCam  color=col1Cam  w=wid  visible=visCam&vis1
-segment S246:  HD21291  gammaCam  color=col1Cam  w=wid  visible=visCam&vis1
-segment S247:  gammaCam  alphaCam  color=col1Cam  w=wid  visible=visCam&vis1
-segment S248:  gammaCam  HD33564  color=col1Cam  w=wid  visible=visCam&vis1
-segment S249:  etaUMa  zetaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S250:  zetaUMa  epsilonUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S251:  epsilonUMa  deltaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S252:  deltaUMa  alphaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S253:  alphaUMa  betaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S254:  betaUMa  gammaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S255:  gammaUMa  deltaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S256:  gammaUMa  chiUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S257:  chiUMa  psiUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S258:  psiUMa  lambdaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S259:  psiUMa  muUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S260:  betaUMa  phiUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S261:  phiUMa  thetaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S262:  thetaUMa  kappaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S263:  thetaUMa  iotaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S264:  phiUMa  upsilonUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S265:  upsilonUMa  omicronUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S266:  omicronUMa  hUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S267:  hUMa  alphaUMa  color=col1UMa  w=wid  visible=visUMa&vis1
-segment S268:  thetaCMa  gammaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S269:  gammaCMa  iotaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S270:  iotaCMa  alphaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S271:  alphaCMa  omicron2CMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S272:  omicron2CMa  deltaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S273:  deltaCMa  omegaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S274:  omegaCMa  etaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S275:  epsilonCMa  sigmaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S276:  sigmaCMa  deltaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S277:  sigmaCMa  HD50896  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S278:  HD50896  nu2CMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S279:  nu2CMa  xi2CMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S280:  nu2CMa  betaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S281:  nu2CMa  alphaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S282:  epsilonCMa  kappaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S283:  zetaCMa  epsilonCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S284:  iotaCMa  thetaCMa  color=col1CMa  w=wid  visible=visCMa&vis1
-segment S285:  thetaLep  etaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S286:  etaLep  zetaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S287:  zetaLep  alphaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S288:  alphaLep  muLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S289:  alphaLep  deltaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S290:  deltaLep  gammaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S291:  gammaLep  betaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S292:  betaLep  epsilonLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S293:  alphaLep  betaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S294:  muLep  lambdaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S295:  muLep  kappaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S296:  epsilonLep  muLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S297:  kappaLep  iotaLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S298:  lambdaLep  nuLep  color=col1Lep  w=wid  visible=visLep&vis1
-segment S299:  iotaHer  thetaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S300:  thetaHer  rhoHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S301:  rhoHer  eHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S302:  eHer  piHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S303:  piHer  etaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S304:  etaHer  sigmaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S305:  sigmaHer  tauHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S306:  tauHer  chiHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S307:  etaHer  zetaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S308:  zetaHer  betaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S309:  betaHer  gammaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S310:  zetaHer  epsilonHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S311:  epsilonHer  lambdaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S312:  lambdaHer  deltaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S313:  mu1Her  xiHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S314:  xiHer  omicronHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S315:  epsilonHer  piHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S316:  mu1Her  lambdaHer  color=col1Her  w=wid  visible=visHer&vis1
-segment S317:  betaCVn  alpha2CVn  color=col1CVn  w=wid  visible=visCVn&vis1
-segment S318:  thetaInd  alphaInd  color=col1Ind  w=wid  visible=visInd&vis1
-segment S319:  alphaInd  betaInd  color=col1Ind  w=wid  visible=visInd&vis1
-segment S320:  betaInd  thetaInd  color=col1Ind  w=wid  visible=visInd&vis1
-segment S321:  betaCar  omegaCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S322:  omegaCar  thetaCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S323:  thetaCar  wCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S324:  wCar  xCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S325:  xCar  uCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S326:  uCar  sCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S327:  sCar  qCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S328:  qCar  iotaCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S329:  dCar  epsilonCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S330:  epsilonCar  alphaCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S331:  aCar  iotaCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S332:  aCar  dCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S333:  alphaCar  nuPupCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S334:  epsilonCar  zetaPupCar  color=col1Car  w=wid  visible=visCar&vis1
-segment S335:  alphaUMi  deltaUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S336:  deltaUMi  epsilonUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S337:  epsilonUMi  zetaUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S338:  zetaUMi  etaUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S339:  etaUMi  gammaUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S340:  gammaUMi  betaUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S341:  betaUMi  zetaUMi  color=col1UMi  w=wid  visible=visUMi&vis1
-segment S342:  alphaCMi  betaCMi  color=col1CMi  w=wid  visible=visCMi&vis1
-segment S343:  f46LMi  betaLMi  color=col1LMi  w=wid  visible=visLMi&vis1
-segment S344:  betaLMi  f21LMi  color=col1LMi  w=wid  visible=visLMi&vis1
-segment S345:  f21LMi  f10LMi  color=col1LMi  w=wid  visible=visLMi&vis1
-segment S346:  f21LMi  f46LMi  color=col1LMi  w=wid  visible=visLMi&vis1
-segment S347:  betaHyi  gammaHyi  color=col1Hyi  w=wid  visible=visHyi&vis1
-segment S348:  gammaHyi  epsilonHyi  color=col1Hyi  w=wid  visible=visHyi&vis1
-segment S349:  epsilonHyi  deltaHyi  color=col1Hyi  w=wid  visible=visHyi&vis1
-segment S350:  deltaHyi  alphaHyi  color=col1Hyi  w=wid  visible=visHyi&vis1
-segment S351:  betaLeo  thetaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S352:  thetaLeo  alphaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S353:  alphaLeo  etaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S354:  etaLeo  gammaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S355:  gammaLeo  deltaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S356:  deltaLeo  betaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S357:  gammaLeo  zetaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S358:  zetaLeo  muLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S359:  muLeo  epsilonLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S360:  deltaLeo  thetaLeo  color=col1Leo  w=wid  visible=visLeo&vis1
-segment S361:  gammaEqu  deltaEqu  color=col1Equ  w=wid  visible=visEqu&vis1
-segment S362:  deltaEqu  betaEqu  color=col1Equ  w=wid  visible=visEqu&vis1
-segment S363:  betaEqu  alphaEqu  color=col1Equ  w=wid  visible=visEqu&vis1
-segment S364:  alphaEqu  gammaEqu  color=col1Equ  w=wid  visible=visEqu&vis1
-segment S365:  f1Lac  f6Lac  color=col1Lac  w=wid  visible=visLac&vis1
-segment S366:  f6Lac  f5Lac  color=col1Lac  w=wid  visible=visLac&vis1
-segment S367:  f5Lac  f4Lac  color=col1Lac  w=wid  visible=visLac&vis1
-segment S368:  f4Lac  betaLac  color=col1Lac  w=wid  visible=visLac&vis1
-segment S369:  betaLac  alphaLac  color=col1Lac  w=wid  visible=visLac&vis1
-segment S370:  alphaLac  f5Lac  color=col1Lac  w=wid  visible=visLac&vis1
-segment S371:  alphaLyn  f38Lyn  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S372:  f38Lyn  HD77912  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S373:  HD77912  f10UMa  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S374:  f10UMa  f31Lyn  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S375:  f31Lyn  f21Lyn  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S376:  f21Lyn  f15Lyn  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S377:  f15Lyn  f2Lyn  color=col1Lyn  w=wid  visible=visLyn&vis1
-segment S378:  alphaLyr  zeta1Lyr  color=col1Lyr  w=wid  visible=visLyr&vis1
-segment S379:  zeta1Lyr  betaLyr  color=col1Lyr  w=wid  visible=visLyr&vis1
-segment S380:  betaLyr  gammaLyr  color=col1Lyr  w=wid  visible=visLyr&vis1
-segment S381:  gammaLyr  delta2Lyr  color=col1Lyr  w=wid  visible=visLyr&vis1
-segment S382:  delta2Lyr  zeta1Lyr  color=col1Lyr  w=wid  visible=visLyr&vis1
-segment S383:  nuVir  etaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S384:  etaVir  gammaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S385:  gammaVir  alphaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S386:  alphaVir  kappaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S387:  kappaVir  iotaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S388:  iotaVir  muVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S389:  alphaVir  zetaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S390:  zetaVir  tauVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S391:  tauVir  f109Vir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S392:  zetaVir  deltaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S393:  deltaVir  epsilonVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S394:  deltaVir  gammaVir  color=col1Vir  w=wid  visible=visVir&vis1
-segment S395:  betaPyx  alphaPyx  color=col1Pyx  w=wid  visible=visPyx&vis1
-segment S396:  alphaPyx  gammaPyx  color=col1Pyx  w=wid  visible=visPyx&vis1
-segment S397:  epsilonMic  gammaMic  color=col1Mic  w=wid  visible=visMic&vis1
-segment S398:  gammaMic  alphaMic  color=col1Mic  w=wid  visible=visMic&vis1
-segment S399:  thetaCrB  betaCrB  color=col1CrB  w=wid  visible=visCrB&vis1
-segment S400:  betaCrB  alphaCrB  color=col1CrB  w=wid  visible=visCrB&vis1
-segment S401:  alphaCrB  gammaCrB  color=col1CrB  w=wid  visible=visCrB&vis1
-segment S402:  gammaCrB  deltaCrB  color=col1CrB  w=wid  visible=visCrB&vis1
-segment S403:  deltaCrB  epsilonCrB  color=col1CrB  w=wid  visible=visCrB&vis1
-segment S404:  epsilonCrB  iotaCrB  color=col1CrB  w=wid  visible=visCrB&vis1
-segment S405:  nuOct  betaOct  color=col1Oct  w=wid  visible=visOct&vis1
-segment S406:  betaOct  deltaOct  color=col1Oct  w=wid  visible=visOct&vis1
-segment S407:  deltaOct  nuOct  color=col1Oct  w=wid  visible=visOct&vis1
-segment S408:  zetaOri  epsilonOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S409:  epsilonOri  deltaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S410:  f01Ori  xiOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S411:  f01Ori  chi2Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S412:  chi2Ori  chi1Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S413:  xiOri  nuOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S414:  nuOri  chi1Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S415:  xiOri  muOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S416:  muOri  alphaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S417:  alphaOri  zetaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S418:  zetaOri  kappaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S419:  kappaOri  betaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S420:  betaOri  deltaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S421:  deltaOri  gammaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S422:  gammaOri  lambdaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S423:  lambdaOri  alphaOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S424:  gammaOri  pi3Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S425:  pi3Ori  pi4Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S426:  pi4Ori  f5Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S427:  f5Ori  pi5Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S428:  pi5Ori  pi6Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S429:  pi3Ori  pi2Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S430:  pi2Ori  pi1Ori  color=col1Ori  w=wid  visible=visOri&vis1
-segment S431:  nuOri  muOri  color=col1Ori  w=wid  visible=visOri&vis1
-segment S432:  alphaPic  gammaPic  color=col1Pic  w=wid  visible=visPic&vis1
-segment S433:  gammaPic  betaPic  color=col1Pic  w=wid  visible=visPic&vis1
-segment S434:  alphaPav  gammaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S435:  gammaPav  betaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S436:  betaPav  deltaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S437:  deltaPav  alphaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S438:  deltaPav  epsilonPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S439:  epsilonPav  zetaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S440:  zetaPav  kappaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S441:  kappaPav  deltaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S442:  kappaPav  lambdaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S443:  lambdaPav  xiPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S444:  xiPav  piPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S445:  piPav  lambdaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S446:  piPav  etaPav  color=col1Pav  w=wid  visible=visPav&vis1
-segment S447:  gammaPeg  alphaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S448:  betaPeg  etaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S449:  etaPeg  pi1Peg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S450:  betaPeg  muPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S451:  muPeg  lambdaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S452:  lambdaPeg  iotaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S453:  iotaPeg  kappaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S454:  alphaPeg  xiPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S455:  xiPeg  f42Peg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S456:  f42Peg  thetaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S457:  thetaPeg  epsilonPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S458:  alphaAndPeg  betaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S459:  alphaAndPeg  gammaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S460:  betaPeg  alphaPeg  color=col1Peg  w=wid  visible=visPeg&vis1
-segment S461:  omicronPer  zetaPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S462:  zetaPer  xiPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S463:  xiPer  epsilonPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S464:  epsilonPer  deltaPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S465:  deltaPer  alphaPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S466:  alphaPer  gammaPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S467:  gammaPer  etaPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S468:  alphaPer  betaPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S469:  betaPer  rhoPer  color=col1Per  w=wid  visible=visPer&vis1
-segment S470:  rhoPer  f16Per  color=col1Per  w=wid  visible=visPer&vis1
-segment S471:  zetaPhe  betaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S472:  betaPhe  kappaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S473:  kappaPhe  zetaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S474:  betaPhe  deltaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S475:  deltaPhe  psiPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S476:  psiPhe  betaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S477:  betaPhe  gammaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S478:  gammaPhe  kappaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S479:  kappaPhe  alphaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S480:  alphaPhe  epsilonPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S481:  epsilonPhe  kappaPhe  color=col1Phe  w=wid  visible=visPhe&vis1
-segment S482:  f41Ari  alphaAri  color=col1Ari  w=wid  visible=visAri&vis1
-segment S483:  alphaAri  betaAri  color=col1Ari  w=wid  visible=visAri&vis1
-segment S484:  betaAri  gammaAri  color=col1Ari  w=wid  visible=visAri&vis1
-segment S485:  alphaRet  epsilonRet  color=col1Ret  w=wid  visible=visRet&vis1
-segment S486:  epsilonRet  deltaRet  color=col1Ret  w=wid  visible=visRet&vis1
-segment S487:  deltaRet  betaRet  color=col1Ret  w=wid  visible=visRet&vis1
-segment S488:  betaRet  alphaRet  color=col1Ret  w=wid  visible=visRet&vis1
-segment S489:  gamma2Vel  omicronVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S490:  omicronVel  delta1Vel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S491:  delta1Vel  kappaVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S492:  kappaVel  phiVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S493:  phiVel  muVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S494:  muVel  pVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S495:  pVel  qVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S496:  qVel  psiVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S497:  psiVel  lambdaVel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S498:  lambdaVel  gamma2Vel  color=col1Vel  w=wid  visible=visVel&vis1
-segment S499:  thetaLib  gammaLib  color=col1Lib  w=wid  visible=visLib&vis1
-segment S500:  gammaLib  betaLib  color=col1Lib  w=wid  visible=visLib&vis1
-segment S501:  betaLib  alpha2Lib  color=col1Lib  w=wid  visible=visLib&vis1
-segment S502:  alpha2Lib  sigmaLib  color=col1Lib  w=wid  visible=visLib&vis1
-segment S503:  sigmaLib  gammaLib  color=col1Lib  w=wid  visible=visLib&vis1
-segment S504:  lambdaSco  kappaSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S505:  kappaSco  iota1Sco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S506:  iota1Sco  thetaSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S507:  thetaSco  etaSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S508:  etaSco  zeta1Sco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S509:  zeta1Sco  mu1Sco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S510:  mu1Sco  epsilonSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S511:  epsilonSco  tauSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S512:  tauSco  alphaSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S513:  alphaSco  deltaSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S514:  alphaSco  piSco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S515:  alphaSco  beta1Sco  color=col1Sco  w=wid  visible=visSco&vis1
-segment S516:  betaScl  alphaScl  color=col1Scl  w=wid  visible=visScl&vis1
-segment S517:  alphaScl  gammaScl  color=col1Scl  w=wid  visible=visScl&vis1
-segment S518:  gammaScl  betaScl  color=col1Scl  w=wid  visible=visScl&vis1
-segment S519:  deltaOph  muSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S520:  muSer  epsilonSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S521:  epsilonSer  alphaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S522:  alphaSer  deltaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S523:  deltaSer  betaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S524:  betaSer  gammaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S525:  gammaSer  kappaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S526:  kappaSer  betaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S527:  theta1Ser  dSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S528:  dSer  etaSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S529:  etaSer  HD165402  color=col1Ser  w=wid  visible=visSer&vis1
-segment S530:  HD165402  nuOph  color=col1Ser  w=wid  visible=visSer&vis1
-segment S531:  nuOph  omicronSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S532:  omicronSer  xiSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S533:  xiSer  nuSer  color=col1Ser  w=wid  visible=visSer&vis1
-segment S534:  alphaOph  betaOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S535:  etaOph  betaOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S536:  alphaOph  kappaOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S537:  kappaOph  epsilonOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S538:  epsilonOph  zetaOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S539:  zetaOph  etaOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S540:  etaOph  cOph  color=col1Oph  w=wid  visible=visOph&vis1
-segment S541:  betaSex  alphaSex  color=col1Sex  w=wid  visible=visSex&vis1
-segment S542:  betaSct  RSct  color=col1Sct  w=wid  visible=visSct&vis1
-segment S543:  RSct  HD175156  color=col1Sct  w=wid  visible=visSct&vis1
-segment S544:  HD175156  gammaSct  color=col1Sct  w=wid  visible=visSct&vis1
-segment S545:  gammaSct  alphaSct  color=col1Sct  w=wid  visible=visSct&vis1
-segment S546:  alphaSct  betaSct  color=col1Sct  w=wid  visible=visSct&vis1
-segment S547:  gammaCru  alphaCru  color=col1Cru  w=wid  visible=visCru&vis1
-segment S548:  betaCru  deltaCru  color=col1Cru  w=wid  visible=visCru&vis1
-segment S549:  lambdaCrA  V686CrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S550:  V686CrA  epsilonCrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S551:  epsilonCrA  gammaCrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S552:  gammaCrA  alphaCrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S553:  alphaCrA  betaCrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S554:  betaCrA  deltaCrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S555:  deltaCrA  zetaCrA  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S556:  zetaCrA  HD175219  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S557:  lambdaCrA  HD170642  color=col1CrA  w=wid  visible=visCrA&vis1
-segment S558:  alphaPsA  epsilonPsA  color=col1PsA  w=wid  visible=visPsA&vis1
-segment S559:  epsilonPsA  etaPsA  color=col1PsA  w=wid  visible=visPsA&vis1
-segment S560:  etaPsA  thetaPsA  color=col1PsA  w=wid  visible=visPsA&vis1
-segment S561:  thetaPsA  tauPsA  color=col1PsA  w=wid  visible=visPsA&vis1
-segment S562:  tauPsA  betaPsA  color=col1PsA  w=wid  visible=visPsA&vis1
-segment S563:  betaPsA  deltaPsA  color=col1PsA  w=wid  visible=visPsA&vis1
-segment S564:  alphaTrA  gammaTrA  color=col1TrA  w=wid  visible=visTrA&vis1
-segment S565:  gammaTrA  betaTrA  color=col1TrA  w=wid  visible=visTrA&vis1
-segment S566:  betaTrA  alphaTrA  color=col1TrA  w=wid  visible=visTrA&vis1
-segment S567:  rhoPup  f188Pup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S568:  f188Pup  piPup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S569:  piPup  nuPup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S570:  nuPup  tauPup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S571:  tauPup  sigmaPup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S572:  sigmaPup  zetaPup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S573:  zetaPup  rhoPup  color=col1Pup  w=wid  visible=visPup&vis1
-segment S574:  kappaCyg  iotaCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S575:  iotaCyg  deltaCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S576:  deltaCyg  gammaCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S577:  gammaCyg  alphaCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S578:  gammaCyg  epsilonCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S579:  epsilonCyg  zetaCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S580:  zetaCyg  muCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S581:  gammaCyg  etaCyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S582:  etaCyg  beta1Cyg  color=col1Cyg  w=wid  visible=visCyg&vis1
-segment S583:  deltaDor  f36Dor  color=col1Dor  w=wid  visible=visDor&vis1
-segment S584:  f36Dor  betaDor  color=col1Dor  w=wid  visible=visDor&vis1
-segment S585:  betaDor  deltaDor  color=col1Dor  w=wid  visible=visDor&vis1
-segment S586:  betaDor  alphaDor  color=col1Dor  w=wid  visible=visDor&vis1
-segment S587:  alphaDor  gammaDor  color=col1Dor  w=wid  visible=visDor&vis1
-segment S588:  gammaMen  muMen  color=col1Men  w=wid  visible=visMen&vis1
-segment S589:  zetaTel  alphaTel  color=col1Tel  w=wid  visible=visTel&vis1
-segment S590:  alphaTuc  gammaTuc  color=col1Tuc  w=wid  visible=visTuc&vis1
-segment S591:  gammaTuc  zetaTuc  color=col1Tuc  w=wid  visible=visTuc&vis1
-segment S592:  gammaTuc  beta1Tuc  color=col1Tuc  w=wid  visible=visTuc&vis1
-segment S593:  gammaTri  betaTri  color=col1Tri  w=wid  visible=visTri&vis1
-segment S594:  betaTri  alphaTri  color=col1Tri  w=wid  visible=visTri&vis1
-segment S595:  alphaTri  gammaTri  color=col1Tri  w=wid  visible=visTri&vis1
-segment S596:  gammaGem  zetaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S597:  zetaGem  deltaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S598:  deltaGem  lambdaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S599:  lambdaGem  xiGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S600:  deltaGem  upsilonGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S601:  upsilonGem  kappaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S602:  upsilonGem  betaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S603:  upsilonGem  iotaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S604:  iotaGem  tauGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S605:  tauGem  alphaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S606:  tauGem  thetaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S607:  tauGem  epsilonGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S608:  epsilonGem  nuGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S609:  epsilonGem  muGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S610:  muGem  etaGem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S611:  etaGem  f1Gem  color=col1Gem  w=wid  visible=visGem&vis1
-segment S612:  gammaMon  deltaMon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S613:  betaMon  deltaMon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S614:  deltaMon  f17Mon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S615:  f17Mon  epsilonMonA  color=col1Mon  w=wid  visible=visMon&vis1
-segment S616:  epsilonMonA  f13Mon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S617:  f13Mon  f15Mon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S618:  f17Mon  f15Mon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S619:  f15Mon  HD45194  color=col1Mon  w=wid  visible=visMon&vis1
-segment S620:  deltaMon  f28Mon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S621:  f28Mon  zetaMon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S622:  f28Mon  alphaMon  color=col1Mon  w=wid  visible=visMon&vis1
-segment S623:  betaAqr  alphaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S624:  alphaAqr  gammaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S625:  gammaAqr  zetaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S626:  zetaAqr  etaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S627:  etaAqr  lambdaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S628:  lambdaAqr  psi1Aqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S629:  psi1Aqr  b01Aqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S630:  alphaAqr  thetaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S631:  thetaAqr  iotaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S632:  thetaAqr  sigmaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S633:  sigmaAqr  tauAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S634:  tauAqr  deltaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S635:  deltaAqr  c02Aqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S636:  epsilonAqr  betaAqr  color=col1Aqr  w=wid  visible=visAqr&vis1
-segment S637:  etaHya  sigmaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S638:  sigmaHya  deltaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S639:  deltaHya  epsilonHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S640:  epsilonHya  rhoHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S641:  rhoHya  etaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S642:  rhoHya  zetaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S643:  zetaHya  thetaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S644:  thetaHya  tau2Hya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S645:  tau2Hya  tau1Hya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S646:  tau1Hya  alphaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S647:  alphaHya  f26Hya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S648:  f26Hya  kappaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S649:  kappaHya  upsilon1Hya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S650:  upsilon1Hya  lambdaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S651:  lambdaHya  muHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S652:  muHya  nuHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S653:  nuHya  chi1Hya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S654:  chi1Hya  xiHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S655:  xiHya  betaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S656:  betaHya  psiHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S657:  psiHya  gammaHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S658:  gammaHya  piHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S659:  piHya  f50Hya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S660:  f50Hya  kHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S661:  kHya  EHya  color=col1Hya  w=wid  visible=visHya&vis1
-segment S662:  xi1Cet  xi2Cet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S663:  tauCet  betaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S664:  betaCet  iotaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S665:  betaCet  etaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S666:  etaCet  thetaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S667:  thetaCet  zetaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S668:  zetaCet  rhoCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S669:  rhoCet  epsilonCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S670:  epsilonCet  piCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S671:  piCet  sigmaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S672:  sigmaCet  tauCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S673:  omicronCet  epsilonCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S674:  omicronCet  deltaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S675:  deltaCet  gammaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S676:  gammaCet  alphaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S677:  alphaCet  lambdaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S678:  lambdaCet  muCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S679:  muCet  xi2Cet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S680:  xi2Cet  nuCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S681:  nuCet  gammaCet  color=col1Cet  w=wid  visible=visCet&vis1
-segment S682:  chiLup  HD144415  color=col1Lup  w=wid  visible=visLup&vis1
-segment S683:  HD144415  etaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S684:  etaLup  chiLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S685:  etaLup  gammaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S686:  gammaLup  deltaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S687:  deltaLup  phi1Lup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S688:  deltaLup  betaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S689:  gammaLup  omegaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S690:  omegaLup  zetaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S691:  zetaLup  alphaLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S692:  zetaLup  rhoLup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S693:  alphaLup  tau2Lup  color=col1Lup  w=wid  visible=visLup&vis1
-segment S694:  alphaLup  betaLup  color=col1Lup  w=wid  visible=visLup&vis1
+segment: alphaAnt etaAnt color=col1Ant visible=visAnt&vis1 w=wid
+segment: thetaAra alphaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: alphaAra zetaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: zetaAra etaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: etaAra deltaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: deltaAra gammaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: gammaAra betaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: betaAra thetaAra color=col1Ara visible=visAra&vis1 w=wid
+segment: alphaAnd deltaAnd color=col1And visible=visAnd&vis1 w=wid
+segment: deltaAnd betaAnd color=col1And visible=visAnd&vis1 w=wid
+segment: gamma1And betaAnd color=col1And visible=visAnd&vis1 w=wid
+segment: betaAnd muAnd color=col1And visible=visAnd&vis1 w=wid
+segment: muAnd nuAnd color=col1And visible=visAnd&vis1 w=wid
+segment: deltaSgr lambdaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: etaSgr epsilonSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: epsilonSgr gamma2Sgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: gamma2Sgr XSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: gamma2Sgr deltaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: deltaSgr epsilonSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: epsilonSgr zetaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: zetaSgr phiSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: phiSgr deltaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: phiSgr lambdaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: lambdaSgr muSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: zetaSgr tauSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: tauSgr sigmaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: sigmaSgr phiSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: sigmaSgr xi2Sgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: xi2Sgr omicronSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: omicronSgr dSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: dSgr rho1Sgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: tauSgr h01Sgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: h01Sgr cSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: cSgr theta1Sgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: theta1Sgr iotaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: iotaSgr alphaSgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: iotaSgr beta2Sgr color=col1Sgr visible=visSgr&vis1 w=wid
+segment: betaSge deltaSge color=col1Sge visible=visSge&vis1 w=wid
+segment: deltaSge alphaSge color=col1Sge visible=visSge&vis1 w=wid
+segment: deltaSge gammaSge color=col1Sge visible=visSge&vis1 w=wid
+segment: gammaSge etaSge color=col1Sge visible=visSge&vis1 w=wid
+segment: alphaCom betaCom color=col1Com visible=visCom&vis1 w=wid
+segment: betaCom gammaCom color=col1Com visible=visCom&vis1 w=wid
+segment: alphaAps gammaAps color=col1Aps visible=visAps&vis1 w=wid
+segment: gammaAps betaAps color=col1Aps visible=visAps&vis1 w=wid
+segment: zetaBoo alphaBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: alphaBoo epsilonBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: epsilonBoo deltaBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: deltaBoo betaBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: betaBoo gammaBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: gammaBoo rhoBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: rhoBoo alphaBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: alphaBoo etaBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: etaBoo upsilonBoo color=col1Boo visible=visBoo&vis1 w=wid
+segment: betaTau tauTau color=col1Tau visible=visTau&vis1 w=wid
+segment: tauTau epsilonTau color=col1Tau visible=visTau&vis1 w=wid
+segment: alphaTau zetaTau color=col1Tau visible=visTau&vis1 w=wid
+segment: gammaTau deltaTau color=col1Tau visible=visTau&vis1 w=wid
+segment: gammaTau lambdaTau color=col1Tau visible=visTau&vis1 w=wid
+segment: lambdaTau omicronTau color=col1Tau visible=visTau&vis1 w=wid
+segment: alphaTau epsilonTau color=col1Tau visible=visTau&vis1 w=wid
+segment: alphaTau theta2Tau color=col1Tau visible=visTau&vis1 w=wid
+segment: theta2Tau gammaTau color=col1Tau visible=visTau&vis1 w=wid
+segment: epsilonTau delta3Tau color=col1Tau visible=visTau&vis1 w=wid
+segment: delta3Tau deltaTau color=col1Tau visible=visTau&vis1 w=wid
+segment: deltaTau f27Tau color=col1Tau visible=visTau&vis1 w=wid
+segment: alpha2Cap beta1Cap color=col1Cap visible=visCap&vis1 w=wid
+segment: beta1Cap thetaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: thetaCap iotaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: iotaCap gammaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: gammaCap deltaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: iotaCap zetaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: zetaCap thetaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: beta1Cap psiCap color=col1Cap visible=visCap&vis1 w=wid
+segment: thetaCap omegaCap color=col1Cap visible=visCap&vis1 w=wid
+segment: kappaNor gamma2Nor color=col1Nor visible=visNor&vis1 w=wid
+segment: gamma2Nor epsilonNor color=col1Nor visible=visNor&vis1 w=wid
+segment: epsilonNor etaNor color=col1Nor visible=visNor&vis1 w=wid
+segment: etaNor gamma2Nor color=col1Nor visible=visNor&vis1 w=wid
+segment: etaNor kappaNor color=col1Nor visible=visNor&vis1 w=wid
+segment: epsilonCas deltaCas color=col1Cas visible=visCas&vis1 w=wid
+segment: deltaCas gammaCas color=col1Cas visible=visCas&vis1 w=wid
+segment: gammaCas alphaCas color=col1Cas visible=visCas&vis1 w=wid
+segment: alphaCas betaCas color=col1Cas visible=visCas&vis1 w=wid
+segment: alphaCenA betaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: betaCen epsilonCen color=col1Cen visible=visCen&vis1 w=wid
+segment: epsilonCen zetaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: zetaCen upsilon1Cen color=col1Cen visible=visCen&vis1 w=wid
+segment: upsilon1Cen muCen color=col1Cen visible=visCen&vis1 w=wid
+segment: muCen nuCen color=col1Cen visible=visCen&vis1 w=wid
+segment: nuCen dCen color=col1Cen visible=visCen&vis1 w=wid
+segment: dCen iotaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: nuCen thetaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: muCen etaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: etaCen kappaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: zetaCen gammaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: gammaCen sigmaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: sigmaCen deltaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: deltaCen ACen color=col1Cen visible=visCen&vis1 w=wid
+segment: ACen lambdaCen color=col1Cen visible=visCen&vis1 w=wid
+segment: zetaCep iotaCep color=col1Cep visible=visCep&vis1 w=wid
+segment: iotaCep betaCep color=col1Cep visible=visCep&vis1 w=wid
+segment: betaCep alphaCep color=col1Cep visible=visCep&vis1 w=wid
+segment: alphaCep zetaCep color=col1Cep visible=visCep&vis1 w=wid
+segment: iotaCep gammaCep color=col1Cep visible=visCep&vis1 w=wid
+segment: gammaCep betaCep color=col1Cep visible=visCep&vis1 w=wid
+segment: alphaCha gammaCha color=col1Cha visible=visCha&vis1 w=wid
+segment: gammaCha betaCha color=col1Cha visible=visCha&vis1 w=wid
+segment: thetaAur betaAur color=col1Aur visible=visAur&vis1 w=wid
+segment: betaAur alphaAur color=col1Aur visible=visAur&vis1 w=wid
+segment: alphaAur zetaAur color=col1Aur visible=visAur&vis1 w=wid
+segment: zetaAur iotaAur color=col1Aur visible=visAur&vis1 w=wid
+segment: betaTauAur iotaAur color=col1Aur visible=visAur&vis1 w=wid
+segment: betaTauAur thetaAur color=col1Aur visible=visAur&vis1 w=wid
+segment: alphaHor zetaHor color=col1Hor visible=visHor&vis1 w=wid
+segment: zetaHor muHor color=col1Hor visible=visHor&vis1 w=wid
+segment: iotaCnc gammaCnc color=col1Cnc visible=visCnc&vis1 w=wid
+segment: gammaCnc chiCnc color=col1Cnc visible=visCnc&vis1 w=wid
+segment: gammaCnc deltaCnc color=col1Cnc visible=visCnc&vis1 w=wid
+segment: deltaCnc betaCnc color=col1Cnc visible=visCnc&vis1 w=wid
+segment: deltaCnc alphaCnc color=col1Cnc visible=visCnc&vis1 w=wid
+segment: thetaGru delta1Gru color=col1Gru visible=visGru&vis1 w=wid
+segment: delta1Gru alphaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: alphaGru betaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: betaGru iotaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: iotaGru thetaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: betaGru zetaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: betaGru epsilonGru color=col1Gru visible=visGru&vis1 w=wid
+segment: alphaGru lambdaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: lambdaGru gammaGru color=col1Gru visible=visGru&vis1 w=wid
+segment: etaCrv deltaCrv color=col1Crv visible=visCrv&vis1 w=wid
+segment: deltaCrv gammaCrv color=col1Crv visible=visCrv&vis1 w=wid
+segment: gammaCrv epsilonCrv color=col1Crv visible=visCrv&vis1 w=wid
+segment: epsilonCrv alphaCrv color=col1Crv visible=visCrv&vis1 w=wid
+segment: epsilonCrv betaCrv color=col1Crv visible=visCrv&vis1 w=wid
+segment: betaCrv deltaCrv color=col1Crv visible=visCrv&vis1 w=wid
+segment: alphaCrt betaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: betaCrt gammaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: gammaCrt deltaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: deltaCrt alphaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: deltaCrt epsilonCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: epsilonCrt thetaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: thetaCrt etaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: etaCrt zetaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: zetaCrt gammaCrt color=col1Crt visible=visCrt&vis1 w=wid
+segment: epsilonDel betaDel color=col1Del visible=visDel&vis1 w=wid
+segment: betaDel alphaDel color=col1Del visible=visDel&vis1 w=wid
+segment: alphaDel gamma2Del color=col1Del visible=visDel&vis1 w=wid
+segment: gamma2Del deltaDel color=col1Del visible=visDel&vis1 w=wid
+segment: deltaDel betaDel color=col1Del visible=visDel&vis1 w=wid
+segment: deltaCol kappaCol color=col1Col visible=visCol&vis1 w=wid
+segment: kappaCol gammaCol color=col1Col visible=visCol&vis1 w=wid
+segment: gammaCol betaCol color=col1Col visible=visCol&vis1 w=wid
+segment: betaCol etaCol color=col1Col visible=visCol&vis1 w=wid
+segment: betaCol alphaCol color=col1Col visible=visCol&vis1 w=wid
+segment: alphaCol epsilonCol color=col1Col visible=visCol&vis1 w=wid
+segment: xiDra gammaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: gammaDra betaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: betaDra nu2Dra color=col1Dra visible=visDra&vis1 w=wid
+segment: nu2Dra xiDra color=col1Dra visible=visDra&vis1 w=wid
+segment: xiDra deltaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: deltaDra epsilonDra color=col1Dra visible=visDra&vis1 w=wid
+segment: epsilonDra tauDra color=col1Dra visible=visDra&vis1 w=wid
+segment: tauDra chiDra color=col1Dra visible=visDra&vis1 w=wid
+segment: chiDra zetaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: zetaDra etaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: etaDra thetaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: thetaDra iotaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: iotaDra alphaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: alphaDra kappaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: kappaDra lambdaDra color=col1Dra visible=visDra&vis1 w=wid
+segment: alphaCir gammaCir color=col1Cir visible=visCir&vis1 w=wid
+segment: alphaCir betaCir color=col1Cir visible=visCir&vis1 w=wid
+segment: betaAql alphaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: alphaAql gammaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: alphaAql deltaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: deltaAql etaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: thetaAql etaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: deltaAql zetaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: zetaAql epsilonAql color=col1Aql visible=visAql&vis1 w=wid
+segment: deltaAql lambdaAql color=col1Aql visible=visAql&vis1 w=wid
+segment: deltaCae alphaCae color=col1Cae visible=visCae&vis1 w=wid
+segment: alphaCae betaCae color=col1Cae visible=visCae&vis1 w=wid
+segment: alphaEri chiEri color=col1Eri visible=visEri&vis1 w=wid
+segment: chiEri phiEri color=col1Eri visible=visEri&vis1 w=wid
+segment: phiEri kappaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: kappaEri sEri color=col1Eri visible=visEri&vis1 w=wid
+segment: sEri iotaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: iotaEri thetaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: thetaEri eEri color=col1Eri visible=visEri&vis1 w=wid
+segment: eEri fEri color=col1Eri visible=visEri&vis1 w=wid
+segment: fEri gEri color=col1Eri visible=visEri&vis1 w=wid
+segment: gEri upsilon4Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: upsilon4Eri f43Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: f43Eri upsilon2Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: upsilon2Eri tau6Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: tau6Eri tau5Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: tau5Eri tau4Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: tau4Eri tau3Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: tau3Eri tau1Eri color=col1Eri visible=visEri&vis1 w=wid
+segment: tau1Eri etaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: etaEri zetaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: zetaEri epsilonEri color=col1Eri visible=visEri&vis1 w=wid
+segment: epsilonEri deltaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: deltaEri nuEri color=col1Eri visible=visEri&vis1 w=wid
+segment: nuEri muEri color=col1Eri visible=visEri&vis1 w=wid
+segment: muEri omegaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: omegaEri betaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: betaEri lambdaEri color=col1Eri visible=visEri&vis1 w=wid
+segment: lambdaEri lEri color=col1Eri visible=visEri&vis1 w=wid
+segment: sigmaPsc phiPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: sigmaPsc upsilonPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: upsilonPsc phiPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: phiPsc etaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: etaPsc omicronPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: omicronPsc alphaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: alphaPsc xiPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: xiPsc nuPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: nuPsc muPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: muPsc epsilonPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: epsilonPsc f62Psc color=col1Psc visible=visPsc&vis1 w=wid
+segment: f62Psc dPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: dPsc omegaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: omegaPsc iotaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: iotaPsc f19Psc color=col1Psc visible=visPsc&vis1 w=wid
+segment: f19Psc lambdaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: lambdaPsc kappaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: kappaPsc gammaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: gammaPsc f7Psc color=col1Psc visible=visPsc&vis1 w=wid
+segment: f7Psc thetaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: thetaPsc iotaPsc color=col1Psc visible=visPsc&vis1 w=wid
+segment: betaMus lambdaMus color=col1Mus visible=visMus&vis1 w=wid
+segment: lambdaMus gammaMus color=col1Mus visible=visMus&vis1 w=wid
+segment: gammaMus alphaMus color=col1Mus visible=visMus&vis1 w=wid
+segment: alphaMus betaMus color=col1Mus visible=visMus&vis1 w=wid
+segment: zetaVol gamma2Vol color=col1Vol visible=visVol&vis1 w=wid
+segment: gamma2Vol epsilonVol color=col1Vol visible=visVol&vis1 w=wid
+segment: epsilonVol zetaVol color=col1Vol visible=visVol&vis1 w=wid
+segment: epsilonVol deltaVol color=col1Vol visible=visVol&vis1 w=wid
+segment: epsilonVol betaVol color=col1Vol visible=visVol&vis1 w=wid
+segment: betaVol alphaVol color=col1Vol visible=visVol&vis1 w=wid
+segment: alphaVol epsilonVol color=col1Vol visible=visVol&vis1 w=wid
+segment: alphaVul f15Vul color=col1Vul visible=visVul&vis1 w=wid
+segment: betaFor alphaFor color=col1For visible=visFor&vis1 w=wid
+segment: HD21291 HD24479 color=col1Cam visible=visCam&vis1 w=wid
+segment: HD24479 alphaCam color=col1Cam visible=visCam&vis1 w=wid
+segment: HD21291 gammaCam color=col1Cam visible=visCam&vis1 w=wid
+segment: gammaCam alphaCam color=col1Cam visible=visCam&vis1 w=wid
+segment: gammaCam HD33564 color=col1Cam visible=visCam&vis1 w=wid
+segment: etaUMa zetaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: zetaUMa epsilonUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: epsilonUMa deltaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: deltaUMa alphaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: alphaUMa betaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: betaUMa gammaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: gammaUMa deltaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: gammaUMa chiUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: chiUMa psiUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: psiUMa lambdaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: psiUMa muUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: betaUMa phiUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: phiUMa thetaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: thetaUMa kappaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: thetaUMa iotaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: phiUMa upsilonUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: upsilonUMa omicronUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: omicronUMa hUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: hUMa alphaUMa color=col1UMa visible=visUMa&vis1 w=wid
+segment: thetaCMa gammaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: gammaCMa iotaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: iotaCMa alphaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: alphaCMa omicron2CMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: omicron2CMa deltaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: deltaCMa omegaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: omegaCMa etaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: epsilonCMa sigmaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: sigmaCMa deltaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: sigmaCMa HD50896 color=col1CMa visible=visCMa&vis1 w=wid
+segment: HD50896 nu2CMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: nu2CMa xi2CMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: nu2CMa betaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: nu2CMa alphaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: epsilonCMa kappaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: zetaCMa epsilonCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: iotaCMa thetaCMa color=col1CMa visible=visCMa&vis1 w=wid
+segment: thetaLep etaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: etaLep zetaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: zetaLep alphaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: alphaLep muLep color=col1Lep visible=visLep&vis1 w=wid
+segment: alphaLep deltaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: deltaLep gammaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: gammaLep betaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: betaLep epsilonLep color=col1Lep visible=visLep&vis1 w=wid
+segment: alphaLep betaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: muLep lambdaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: muLep kappaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: epsilonLep muLep color=col1Lep visible=visLep&vis1 w=wid
+segment: kappaLep iotaLep color=col1Lep visible=visLep&vis1 w=wid
+segment: lambdaLep nuLep color=col1Lep visible=visLep&vis1 w=wid
+segment: iotaHer thetaHer color=col1Her visible=visHer&vis1 w=wid
+segment: thetaHer rhoHer color=col1Her visible=visHer&vis1 w=wid
+segment: rhoHer eHer color=col1Her visible=visHer&vis1 w=wid
+segment: eHer piHer color=col1Her visible=visHer&vis1 w=wid
+segment: piHer etaHer color=col1Her visible=visHer&vis1 w=wid
+segment: etaHer sigmaHer color=col1Her visible=visHer&vis1 w=wid
+segment: sigmaHer tauHer color=col1Her visible=visHer&vis1 w=wid
+segment: tauHer chiHer color=col1Her visible=visHer&vis1 w=wid
+segment: etaHer zetaHer color=col1Her visible=visHer&vis1 w=wid
+segment: zetaHer betaHer color=col1Her visible=visHer&vis1 w=wid
+segment: betaHer gammaHer color=col1Her visible=visHer&vis1 w=wid
+segment: zetaHer epsilonHer color=col1Her visible=visHer&vis1 w=wid
+segment: epsilonHer lambdaHer color=col1Her visible=visHer&vis1 w=wid
+segment: lambdaHer deltaHer color=col1Her visible=visHer&vis1 w=wid
+segment: mu1Her xiHer color=col1Her visible=visHer&vis1 w=wid
+segment: xiHer omicronHer color=col1Her visible=visHer&vis1 w=wid
+segment: epsilonHer piHer color=col1Her visible=visHer&vis1 w=wid
+segment: mu1Her lambdaHer color=col1Her visible=visHer&vis1 w=wid
+segment: betaCVn alpha2CVn color=col1CVn visible=visCVn&vis1 w=wid
+segment: thetaInd alphaInd color=col1Ind visible=visInd&vis1 w=wid
+segment: alphaInd betaInd color=col1Ind visible=visInd&vis1 w=wid
+segment: betaInd thetaInd color=col1Ind visible=visInd&vis1 w=wid
+segment: betaCar omegaCar color=col1Car visible=visCar&vis1 w=wid
+segment: omegaCar thetaCar color=col1Car visible=visCar&vis1 w=wid
+segment: thetaCar wCar color=col1Car visible=visCar&vis1 w=wid
+segment: wCar xCar color=col1Car visible=visCar&vis1 w=wid
+segment: xCar uCar color=col1Car visible=visCar&vis1 w=wid
+segment: uCar sCar color=col1Car visible=visCar&vis1 w=wid
+segment: sCar qCar color=col1Car visible=visCar&vis1 w=wid
+segment: qCar iotaCar color=col1Car visible=visCar&vis1 w=wid
+segment: dCar epsilonCar color=col1Car visible=visCar&vis1 w=wid
+segment: epsilonCar alphaCar color=col1Car visible=visCar&vis1 w=wid
+segment: aCar iotaCar color=col1Car visible=visCar&vis1 w=wid
+segment: aCar dCar color=col1Car visible=visCar&vis1 w=wid
+segment: alphaCar nuPupCar color=col1Car visible=visCar&vis1 w=wid
+segment: epsilonCar zetaPupCar color=col1Car visible=visCar&vis1 w=wid
+segment: alphaUMi deltaUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: deltaUMi epsilonUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: epsilonUMi zetaUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: zetaUMi etaUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: etaUMi gammaUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: gammaUMi betaUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: betaUMi zetaUMi color=col1UMi visible=visUMi&vis1 w=wid
+segment: alphaCMi betaCMi color=col1CMi visible=visCMi&vis1 w=wid
+segment: f46LMi betaLMi color=col1LMi visible=visLMi&vis1 w=wid
+segment: betaLMi f21LMi color=col1LMi visible=visLMi&vis1 w=wid
+segment: f21LMi f10LMi color=col1LMi visible=visLMi&vis1 w=wid
+segment: f21LMi f46LMi color=col1LMi visible=visLMi&vis1 w=wid
+segment: betaHyi gammaHyi color=col1Hyi visible=visHyi&vis1 w=wid
+segment: gammaHyi epsilonHyi color=col1Hyi visible=visHyi&vis1 w=wid
+segment: epsilonHyi deltaHyi color=col1Hyi visible=visHyi&vis1 w=wid
+segment: deltaHyi alphaHyi color=col1Hyi visible=visHyi&vis1 w=wid
+segment: betaLeo thetaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: thetaLeo alphaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: alphaLeo etaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: etaLeo gammaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: gammaLeo deltaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: deltaLeo betaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: gammaLeo zetaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: zetaLeo muLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: muLeo epsilonLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: deltaLeo thetaLeo color=col1Leo visible=visLeo&vis1 w=wid
+segment: gammaEqu deltaEqu color=col1Equ visible=visEqu&vis1 w=wid
+segment: deltaEqu betaEqu color=col1Equ visible=visEqu&vis1 w=wid
+segment: betaEqu alphaEqu color=col1Equ visible=visEqu&vis1 w=wid
+segment: alphaEqu gammaEqu color=col1Equ visible=visEqu&vis1 w=wid
+segment: f1Lac f6Lac color=col1Lac visible=visLac&vis1 w=wid
+segment: f6Lac f5Lac color=col1Lac visible=visLac&vis1 w=wid
+segment: f5Lac f4Lac color=col1Lac visible=visLac&vis1 w=wid
+segment: f4Lac betaLac color=col1Lac visible=visLac&vis1 w=wid
+segment: betaLac alphaLac color=col1Lac visible=visLac&vis1 w=wid
+segment: alphaLac f5Lac color=col1Lac visible=visLac&vis1 w=wid
+segment: alphaLyn f38Lyn color=col1Lyn visible=visLyn&vis1 w=wid
+segment: f38Lyn HD77912 color=col1Lyn visible=visLyn&vis1 w=wid
+segment: HD77912 f10UMa color=col1Lyn visible=visLyn&vis1 w=wid
+segment: f10UMa f31Lyn color=col1Lyn visible=visLyn&vis1 w=wid
+segment: f31Lyn f21Lyn color=col1Lyn visible=visLyn&vis1 w=wid
+segment: f21Lyn f15Lyn color=col1Lyn visible=visLyn&vis1 w=wid
+segment: f15Lyn f2Lyn color=col1Lyn visible=visLyn&vis1 w=wid
+segment: alphaLyr zeta1Lyr color=col1Lyr visible=visLyr&vis1 w=wid
+segment: zeta1Lyr betaLyr color=col1Lyr visible=visLyr&vis1 w=wid
+segment: betaLyr gammaLyr color=col1Lyr visible=visLyr&vis1 w=wid
+segment: gammaLyr delta2Lyr color=col1Lyr visible=visLyr&vis1 w=wid
+segment: delta2Lyr zeta1Lyr color=col1Lyr visible=visLyr&vis1 w=wid
+segment: nuVir etaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: etaVir gammaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: gammaVir alphaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: alphaVir kappaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: kappaVir iotaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: iotaVir muVir color=col1Vir visible=visVir&vis1 w=wid
+segment: alphaVir zetaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: zetaVir tauVir color=col1Vir visible=visVir&vis1 w=wid
+segment: tauVir f109Vir color=col1Vir visible=visVir&vis1 w=wid
+segment: zetaVir deltaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: deltaVir epsilonVir color=col1Vir visible=visVir&vis1 w=wid
+segment: deltaVir gammaVir color=col1Vir visible=visVir&vis1 w=wid
+segment: betaPyx alphaPyx color=col1Pyx visible=visPyx&vis1 w=wid
+segment: alphaPyx gammaPyx color=col1Pyx visible=visPyx&vis1 w=wid
+segment: epsilonMic gammaMic color=col1Mic visible=visMic&vis1 w=wid
+segment: gammaMic alphaMic color=col1Mic visible=visMic&vis1 w=wid
+segment: thetaCrB betaCrB color=col1CrB visible=visCrB&vis1 w=wid
+segment: betaCrB alphaCrB color=col1CrB visible=visCrB&vis1 w=wid
+segment: alphaCrB gammaCrB color=col1CrB visible=visCrB&vis1 w=wid
+segment: gammaCrB deltaCrB color=col1CrB visible=visCrB&vis1 w=wid
+segment: deltaCrB epsilonCrB color=col1CrB visible=visCrB&vis1 w=wid
+segment: epsilonCrB iotaCrB color=col1CrB visible=visCrB&vis1 w=wid
+segment: nuOct betaOct color=col1Oct visible=visOct&vis1 w=wid
+segment: betaOct deltaOct color=col1Oct visible=visOct&vis1 w=wid
+segment: deltaOct nuOct color=col1Oct visible=visOct&vis1 w=wid
+segment: zetaOri epsilonOri color=col1Ori visible=visOri&vis1 w=wid
+segment: epsilonOri deltaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: f01Ori xiOri color=col1Ori visible=visOri&vis1 w=wid
+segment: f01Ori chi2Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: chi2Ori chi1Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: xiOri nuOri color=col1Ori visible=visOri&vis1 w=wid
+segment: nuOri chi1Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: xiOri muOri color=col1Ori visible=visOri&vis1 w=wid
+segment: muOri alphaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: alphaOri zetaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: zetaOri kappaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: kappaOri betaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: betaOri deltaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: deltaOri gammaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: gammaOri lambdaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: lambdaOri alphaOri color=col1Ori visible=visOri&vis1 w=wid
+segment: gammaOri pi3Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: pi3Ori pi4Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: pi4Ori f5Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: f5Ori pi5Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: pi5Ori pi6Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: pi3Ori pi2Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: pi2Ori pi1Ori color=col1Ori visible=visOri&vis1 w=wid
+segment: nuOri muOri color=col1Ori visible=visOri&vis1 w=wid
+segment: alphaPic gammaPic color=col1Pic visible=visPic&vis1 w=wid
+segment: gammaPic betaPic color=col1Pic visible=visPic&vis1 w=wid
+segment: alphaPav gammaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: gammaPav betaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: betaPav deltaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: deltaPav alphaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: deltaPav epsilonPav color=col1Pav visible=visPav&vis1 w=wid
+segment: epsilonPav zetaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: zetaPav kappaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: kappaPav deltaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: kappaPav lambdaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: lambdaPav xiPav color=col1Pav visible=visPav&vis1 w=wid
+segment: xiPav piPav color=col1Pav visible=visPav&vis1 w=wid
+segment: piPav lambdaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: piPav etaPav color=col1Pav visible=visPav&vis1 w=wid
+segment: gammaPeg alphaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: betaPeg etaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: etaPeg pi1Peg color=col1Peg visible=visPeg&vis1 w=wid
+segment: betaPeg muPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: muPeg lambdaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: lambdaPeg iotaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: iotaPeg kappaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: alphaPeg xiPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: xiPeg f42Peg color=col1Peg visible=visPeg&vis1 w=wid
+segment: f42Peg thetaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: thetaPeg epsilonPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: alphaAndPeg betaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: alphaAndPeg gammaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: betaPeg alphaPeg color=col1Peg visible=visPeg&vis1 w=wid
+segment: omicronPer zetaPer color=col1Per visible=visPer&vis1 w=wid
+segment: zetaPer xiPer color=col1Per visible=visPer&vis1 w=wid
+segment: xiPer epsilonPer color=col1Per visible=visPer&vis1 w=wid
+segment: epsilonPer deltaPer color=col1Per visible=visPer&vis1 w=wid
+segment: deltaPer alphaPer color=col1Per visible=visPer&vis1 w=wid
+segment: alphaPer gammaPer color=col1Per visible=visPer&vis1 w=wid
+segment: gammaPer etaPer color=col1Per visible=visPer&vis1 w=wid
+segment: alphaPer betaPer color=col1Per visible=visPer&vis1 w=wid
+segment: betaPer rhoPer color=col1Per visible=visPer&vis1 w=wid
+segment: rhoPer f16Per color=col1Per visible=visPer&vis1 w=wid
+segment: zetaPhe betaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: betaPhe kappaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: kappaPhe zetaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: betaPhe deltaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: deltaPhe psiPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: psiPhe betaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: betaPhe gammaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: gammaPhe kappaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: kappaPhe alphaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: alphaPhe epsilonPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: epsilonPhe kappaPhe color=col1Phe visible=visPhe&vis1 w=wid
+segment: f41Ari alphaAri color=col1Ari visible=visAri&vis1 w=wid
+segment: alphaAri betaAri color=col1Ari visible=visAri&vis1 w=wid
+segment: betaAri gammaAri color=col1Ari visible=visAri&vis1 w=wid
+segment: alphaRet epsilonRet color=col1Ret visible=visRet&vis1 w=wid
+segment: epsilonRet deltaRet color=col1Ret visible=visRet&vis1 w=wid
+segment: deltaRet betaRet color=col1Ret visible=visRet&vis1 w=wid
+segment: betaRet alphaRet color=col1Ret visible=visRet&vis1 w=wid
+segment: gamma2Vel omicronVel color=col1Vel visible=visVel&vis1 w=wid
+segment: omicronVel delta1Vel color=col1Vel visible=visVel&vis1 w=wid
+segment: delta1Vel kappaVel color=col1Vel visible=visVel&vis1 w=wid
+segment: kappaVel phiVel color=col1Vel visible=visVel&vis1 w=wid
+segment: phiVel muVel color=col1Vel visible=visVel&vis1 w=wid
+segment: muVel pVel color=col1Vel visible=visVel&vis1 w=wid
+segment: pVel qVel color=col1Vel visible=visVel&vis1 w=wid
+segment: qVel psiVel color=col1Vel visible=visVel&vis1 w=wid
+segment: psiVel lambdaVel color=col1Vel visible=visVel&vis1 w=wid
+segment: lambdaVel gamma2Vel color=col1Vel visible=visVel&vis1 w=wid
+segment: thetaLib gammaLib color=col1Lib visible=visLib&vis1 w=wid
+segment: gammaLib betaLib color=col1Lib visible=visLib&vis1 w=wid
+segment: betaLib alpha2Lib color=col1Lib visible=visLib&vis1 w=wid
+segment: alpha2Lib sigmaLib color=col1Lib visible=visLib&vis1 w=wid
+segment: sigmaLib gammaLib color=col1Lib visible=visLib&vis1 w=wid
+segment: lambdaSco kappaSco color=col1Sco visible=visSco&vis1 w=wid
+segment: kappaSco iota1Sco color=col1Sco visible=visSco&vis1 w=wid
+segment: iota1Sco thetaSco color=col1Sco visible=visSco&vis1 w=wid
+segment: thetaSco etaSco color=col1Sco visible=visSco&vis1 w=wid
+segment: etaSco zeta1Sco color=col1Sco visible=visSco&vis1 w=wid
+segment: zeta1Sco mu1Sco color=col1Sco visible=visSco&vis1 w=wid
+segment: mu1Sco epsilonSco color=col1Sco visible=visSco&vis1 w=wid
+segment: epsilonSco tauSco color=col1Sco visible=visSco&vis1 w=wid
+segment: tauSco alphaSco color=col1Sco visible=visSco&vis1 w=wid
+segment: alphaSco deltaSco color=col1Sco visible=visSco&vis1 w=wid
+segment: alphaSco piSco color=col1Sco visible=visSco&vis1 w=wid
+segment: alphaSco beta1Sco color=col1Sco visible=visSco&vis1 w=wid
+segment: betaScl alphaScl color=col1Scl visible=visScl&vis1 w=wid
+segment: alphaScl gammaScl color=col1Scl visible=visScl&vis1 w=wid
+segment: gammaScl betaScl color=col1Scl visible=visScl&vis1 w=wid
+segment: deltaOph muSer color=col1Ser visible=visSer&vis1 w=wid
+segment: muSer epsilonSer color=col1Ser visible=visSer&vis1 w=wid
+segment: epsilonSer alphaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: alphaSer deltaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: deltaSer betaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: betaSer gammaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: gammaSer kappaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: kappaSer betaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: theta1Ser dSer color=col1Ser visible=visSer&vis1 w=wid
+segment: dSer etaSer color=col1Ser visible=visSer&vis1 w=wid
+segment: etaSer HD165402 color=col1Ser visible=visSer&vis1 w=wid
+segment: HD165402 nuOph color=col1Ser visible=visSer&vis1 w=wid
+segment: nuOph omicronSer color=col1Ser visible=visSer&vis1 w=wid
+segment: omicronSer xiSer color=col1Ser visible=visSer&vis1 w=wid
+segment: xiSer nuSer color=col1Ser visible=visSer&vis1 w=wid
+segment: alphaOph betaOph color=col1Oph visible=visOph&vis1 w=wid
+segment: etaOph betaOph color=col1Oph visible=visOph&vis1 w=wid
+segment: alphaOph kappaOph color=col1Oph visible=visOph&vis1 w=wid
+segment: kappaOph epsilonOph color=col1Oph visible=visOph&vis1 w=wid
+segment: epsilonOph zetaOph color=col1Oph visible=visOph&vis1 w=wid
+segment: zetaOph etaOph color=col1Oph visible=visOph&vis1 w=wid
+segment: etaOph cOph color=col1Oph visible=visOph&vis1 w=wid
+segment: betaSex alphaSex color=col1Sex visible=visSex&vis1 w=wid
+segment: betaSct RSct color=col1Sct visible=visSct&vis1 w=wid
+segment: RSct HD175156 color=col1Sct visible=visSct&vis1 w=wid
+segment: HD175156 gammaSct color=col1Sct visible=visSct&vis1 w=wid
+segment: gammaSct alphaSct color=col1Sct visible=visSct&vis1 w=wid
+segment: alphaSct betaSct color=col1Sct visible=visSct&vis1 w=wid
+segment: gammaCru alphaCru color=col1Cru visible=visCru&vis1 w=wid
+segment: betaCru deltaCru color=col1Cru visible=visCru&vis1 w=wid
+segment: lambdaCrA V686CrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: V686CrA epsilonCrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: epsilonCrA gammaCrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: gammaCrA alphaCrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: alphaCrA betaCrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: betaCrA deltaCrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: deltaCrA zetaCrA color=col1CrA visible=visCrA&vis1 w=wid
+segment: zetaCrA HD175219 color=col1CrA visible=visCrA&vis1 w=wid
+segment: lambdaCrA HD170642 color=col1CrA visible=visCrA&vis1 w=wid
+segment: alphaPsA epsilonPsA color=col1PsA visible=visPsA&vis1 w=wid
+segment: epsilonPsA etaPsA color=col1PsA visible=visPsA&vis1 w=wid
+segment: etaPsA thetaPsA color=col1PsA visible=visPsA&vis1 w=wid
+segment: thetaPsA tauPsA color=col1PsA visible=visPsA&vis1 w=wid
+segment: tauPsA betaPsA color=col1PsA visible=visPsA&vis1 w=wid
+segment: betaPsA deltaPsA color=col1PsA visible=visPsA&vis1 w=wid
+segment: alphaTrA gammaTrA color=col1TrA visible=visTrA&vis1 w=wid
+segment: gammaTrA betaTrA color=col1TrA visible=visTrA&vis1 w=wid
+segment: betaTrA alphaTrA color=col1TrA visible=visTrA&vis1 w=wid
+segment: rhoPup f188Pup color=col1Pup visible=visPup&vis1 w=wid
+segment: f188Pup piPup color=col1Pup visible=visPup&vis1 w=wid
+segment: piPup nuPup color=col1Pup visible=visPup&vis1 w=wid
+segment: nuPup tauPup color=col1Pup visible=visPup&vis1 w=wid
+segment: tauPup sigmaPup color=col1Pup visible=visPup&vis1 w=wid
+segment: sigmaPup zetaPup color=col1Pup visible=visPup&vis1 w=wid
+segment: zetaPup rhoPup color=col1Pup visible=visPup&vis1 w=wid
+segment: kappaCyg iotaCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: iotaCyg deltaCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: deltaCyg gammaCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: gammaCyg alphaCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: gammaCyg epsilonCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: epsilonCyg zetaCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: zetaCyg muCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: gammaCyg etaCyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: etaCyg beta1Cyg color=col1Cyg visible=visCyg&vis1 w=wid
+segment: deltaDor f36Dor color=col1Dor visible=visDor&vis1 w=wid
+segment: f36Dor betaDor color=col1Dor visible=visDor&vis1 w=wid
+segment: betaDor deltaDor color=col1Dor visible=visDor&vis1 w=wid
+segment: betaDor alphaDor color=col1Dor visible=visDor&vis1 w=wid
+segment: alphaDor gammaDor color=col1Dor visible=visDor&vis1 w=wid
+segment: gammaMen muMen color=col1Men visible=visMen&vis1 w=wid
+segment: zetaTel alphaTel color=col1Tel visible=visTel&vis1 w=wid
+segment: alphaTuc gammaTuc color=col1Tuc visible=visTuc&vis1 w=wid
+segment: gammaTuc zetaTuc color=col1Tuc visible=visTuc&vis1 w=wid
+segment: gammaTuc beta1Tuc color=col1Tuc visible=visTuc&vis1 w=wid
+segment: gammaTri betaTri color=col1Tri visible=visTri&vis1 w=wid
+segment: betaTri alphaTri color=col1Tri visible=visTri&vis1 w=wid
+segment: alphaTri gammaTri color=col1Tri visible=visTri&vis1 w=wid
+segment: gammaGem zetaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: zetaGem deltaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: deltaGem lambdaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: lambdaGem xiGem color=col1Gem visible=visGem&vis1 w=wid
+segment: deltaGem upsilonGem color=col1Gem visible=visGem&vis1 w=wid
+segment: upsilonGem kappaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: upsilonGem betaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: upsilonGem iotaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: iotaGem tauGem color=col1Gem visible=visGem&vis1 w=wid
+segment: tauGem alphaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: tauGem thetaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: tauGem epsilonGem color=col1Gem visible=visGem&vis1 w=wid
+segment: epsilonGem nuGem color=col1Gem visible=visGem&vis1 w=wid
+segment: epsilonGem muGem color=col1Gem visible=visGem&vis1 w=wid
+segment: muGem etaGem color=col1Gem visible=visGem&vis1 w=wid
+segment: etaGem f1Gem color=col1Gem visible=visGem&vis1 w=wid
+segment: gammaMon deltaMon color=col1Mon visible=visMon&vis1 w=wid
+segment: betaMon deltaMon color=col1Mon visible=visMon&vis1 w=wid
+segment: deltaMon f17Mon color=col1Mon visible=visMon&vis1 w=wid
+segment: f17Mon epsilonMonA color=col1Mon visible=visMon&vis1 w=wid
+segment: epsilonMonA f13Mon color=col1Mon visible=visMon&vis1 w=wid
+segment: f13Mon f15Mon color=col1Mon visible=visMon&vis1 w=wid
+segment: f17Mon f15Mon color=col1Mon visible=visMon&vis1 w=wid
+segment: f15Mon HD45194 color=col1Mon visible=visMon&vis1 w=wid
+segment: deltaMon f28Mon color=col1Mon visible=visMon&vis1 w=wid
+segment: f28Mon zetaMon color=col1Mon visible=visMon&vis1 w=wid
+segment: f28Mon alphaMon color=col1Mon visible=visMon&vis1 w=wid
+segment: betaAqr alphaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: alphaAqr gammaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: gammaAqr zetaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: zetaAqr etaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: etaAqr lambdaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: lambdaAqr psi1Aqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: psi1Aqr b01Aqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: alphaAqr thetaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: thetaAqr iotaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: thetaAqr sigmaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: sigmaAqr tauAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: tauAqr deltaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: deltaAqr c02Aqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: epsilonAqr betaAqr color=col1Aqr visible=visAqr&vis1 w=wid
+segment: etaHya sigmaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: sigmaHya deltaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: deltaHya epsilonHya color=col1Hya visible=visHya&vis1 w=wid
+segment: epsilonHya rhoHya color=col1Hya visible=visHya&vis1 w=wid
+segment: rhoHya etaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: rhoHya zetaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: zetaHya thetaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: thetaHya tau2Hya color=col1Hya visible=visHya&vis1 w=wid
+segment: tau2Hya tau1Hya color=col1Hya visible=visHya&vis1 w=wid
+segment: tau1Hya alphaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: alphaHya f26Hya color=col1Hya visible=visHya&vis1 w=wid
+segment: f26Hya kappaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: kappaHya upsilon1Hya color=col1Hya visible=visHya&vis1 w=wid
+segment: upsilon1Hya lambdaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: lambdaHya muHya color=col1Hya visible=visHya&vis1 w=wid
+segment: muHya nuHya color=col1Hya visible=visHya&vis1 w=wid
+segment: nuHya chi1Hya color=col1Hya visible=visHya&vis1 w=wid
+segment: chi1Hya xiHya color=col1Hya visible=visHya&vis1 w=wid
+segment: xiHya betaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: betaHya psiHya color=col1Hya visible=visHya&vis1 w=wid
+segment: psiHya gammaHya color=col1Hya visible=visHya&vis1 w=wid
+segment: gammaHya piHya color=col1Hya visible=visHya&vis1 w=wid
+segment: piHya f50Hya color=col1Hya visible=visHya&vis1 w=wid
+segment: f50Hya kHya color=col1Hya visible=visHya&vis1 w=wid
+segment: kHya EHya color=col1Hya visible=visHya&vis1 w=wid
+segment: xi1Cet xi2Cet color=col1Cet visible=visCet&vis1 w=wid
+segment: tauCet betaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: betaCet iotaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: betaCet etaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: etaCet thetaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: thetaCet zetaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: zetaCet rhoCet color=col1Cet visible=visCet&vis1 w=wid
+segment: rhoCet epsilonCet color=col1Cet visible=visCet&vis1 w=wid
+segment: epsilonCet piCet color=col1Cet visible=visCet&vis1 w=wid
+segment: piCet sigmaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: sigmaCet tauCet color=col1Cet visible=visCet&vis1 w=wid
+segment: omicronCet epsilonCet color=col1Cet visible=visCet&vis1 w=wid
+segment: omicronCet deltaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: deltaCet gammaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: gammaCet alphaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: alphaCet lambdaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: lambdaCet muCet color=col1Cet visible=visCet&vis1 w=wid
+segment: muCet xi2Cet color=col1Cet visible=visCet&vis1 w=wid
+segment: xi2Cet nuCet color=col1Cet visible=visCet&vis1 w=wid
+segment: nuCet gammaCet color=col1Cet visible=visCet&vis1 w=wid
+segment: chiLup HD144415 color=col1Lup visible=visLup&vis1 w=wid
+segment: HD144415 etaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: etaLup chiLup color=col1Lup visible=visLup&vis1 w=wid
+segment: etaLup gammaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: gammaLup deltaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: deltaLup phi1Lup color=col1Lup visible=visLup&vis1 w=wid
+segment: deltaLup betaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: gammaLup omegaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: omegaLup zetaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: zetaLup alphaLup color=col1Lup visible=visLup&vis1 w=wid
+segment: zetaLup rhoLup color=col1Lup visible=visLup&vis1 w=wid
+segment: alphaLup tau2Lup color=col1Lup visible=visLup&vis1 w=wid
+segment: alphaLup betaLup color=col1Lup visible=visLup&vis1 w=wid
 
-#-------- FACES --------
 
-set face: color=#4d4d4d
-set face: visible=true
-set face: naming=F
-
-#======== AUXILIARY FUNCTIONS ========
-
-#-------- CURVES --------
-
-set curve: color=#4d4d4d
-set curve: visible=true
-set curve: naming=C
-
-curve C0: x=\\cos(t)*\\sin(\\pi*1/6)*s ; y=\\sin(t)*\\sin(\\pi*1/6)*s ; z=\\cos(\\pi*1/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C1: x=\\cos(t)*\\sin(\\pi*2/6)*s ; y=\\sin(t)*\\sin(\\pi*2/6)*s ; z=\\cos(\\pi*2/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C2: x=\\cos(t)*\\sin(\\pi*3/6)*s ; y=\\sin(t)*\\sin(\\pi*3/6)*s ; z=\\cos(\\pi*3/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C3: x=\\cos(t)*\\sin(\\pi*4/6)*s ; y=\\sin(t)*\\sin(\\pi*4/6)*s ; z=\\cos(\\pi*4/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C4: x=\\cos(t)*\\sin(\\pi*5/6)*s ; y=\\sin(t)*\\sin(\\pi*5/6)*s ; z=\\cos(\\pi*5/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C5: x=\\cos(t)*s ; y=0 ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C6: x=\\cos(t)*\\cos(1*\\pi/6)*s ; y=\\cos(t)*\\sin(1*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C7: x=\\cos(t)*\\cos(2*\\pi/6)*s ; y=\\cos(t)*\\sin(2*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C8: x=\\cos(t)*\\cos(3*\\pi/6)*s ; y=\\cos(t)*\\sin(3*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C9: x=\\cos(t)*\\cos(4*\\pi/6)*s ; y=\\cos(t)*\\sin(4*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-curve C10: x=\\cos(t)*\\cos(5*\\pi/6)*s ; y=\\cos(t)*\\sin(5*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
-
-#----------------------------------------
+curve: x=\\cos(t)*\\sin(\\pi*1/6)*s ; y=\\sin(t)*\\sin(\\pi*1/6)*s ; z=\\cos(\\pi*1/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\sin(\\pi*2/6)*s ; y=\\sin(t)*\\sin(\\pi*2/6)*s ; z=\\cos(\\pi*2/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\sin(\\pi*3/6)*s ; y=\\sin(t)*\\sin(\\pi*3/6)*s ; z=\\cos(\\pi*3/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\sin(\\pi*4/6)*s ; y=\\sin(t)*\\sin(\\pi*4/6)*s ; z=\\cos(\\pi*4/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\sin(\\pi*5/6)*s ; y=\\sin(t)*\\sin(\\pi*5/6)*s ; z=\\cos(\\pi*5/6)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*s ; y=0 ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\cos(1*\\pi/6)*s ; y=\\cos(t)*\\sin(1*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\cos(2*\\pi/6)*s ; y=\\cos(t)*\\sin(2*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\cos(3*\\pi/6)*s ; y=\\cos(t)*\\sin(3*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\cos(4*\\pi/6)*s ; y=\\cos(t)*\\sin(4*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
+curve: x=\\cos(t)*\\cos(5*\\pi/6)*s ; y=\\cos(t)*\\sin(5*\\pi/6)*s ; z=\\sin(t)*s ; t in [0, 2*\\pi]  color=gridCol  visible=ShowGrid
 ` },
 ];
 
