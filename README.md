@@ -97,7 +97,7 @@ Six scenes ship with the app:
 | **Loxodrome Spiral Ribbon** | a spiral on a sphere |
 | **Constellations** | the prominent stars of the night sky |
 
-## Running it locally
+## Running CubeParam locally
 
 No build step and no dependencies to install. Clone and serve the directory:
 
