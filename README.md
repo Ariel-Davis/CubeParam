@@ -17,31 +17,32 @@ So none of the three is an orthographic projection of a cube. Then what *is*?
 
 ### The answer
 
-A fair approximation of light hitting the retina is orthographic projection. We consider parallelepipeds in $\mathbb{R}^2$ as defined by their three sides, and so the question becomes more tractable: Given $v_k = \left[\begin{smallmatrix} x_k \\ y_k\end{smallmatrix}\right] \in \mathbb{R}^2$ ($k = 1, 2, 3$), when are the $v_k$ orthographic projections of three perpendicular vectors of equal length in $\mathbb{R}^3$?
+A fair approximation of light hitting the retina is orthographic projection. We consider parallelepipeds in $\mathbb{R}^2$ as defined by their three sides, and so the question becomes more tractable: Given $v_k = (x_k,y_k) \in \mathbb{R}^2$ ($k = 1, 2, 3$), when are the $v_k$ orthographic projections of three perpendicular vectors of equal length in $\mathbb{R}^3$?
 This turns into a lovely little exercise in linear algebra, and the answer is: if and only if
+
 $$x_1^2 + x_2^2 + x_3^2 = y_1^2 + y_2^2 + y_3^2 \quad \text{and} \quad x_1y_1 + x_2y_2 + x_3y_3 = 0.$$
+
 A little finessing reveals that the $v_k$ are best thought of as complex numbers. Writing $u_k = x_k + y_k i \in \mathbb{C}$, the parallelepiped spanned by the $v_k$ is the orthographic projection of a cube if and only if
 
-$$u_1^2 + u_2^2 + u_3^2 = 0 \tag{1}$$
+$$u_1^2 + u_2^2 + u_3^2 = 0$$
 
 \- two real conditions collapse into one complex polynomial equation.
 
 ### Projective algebraic geometry over $\mathbb{C}$
 
-If $(u_1, u_2, u_3)$ is a solution for $(1)$, then so is $(\lambda u_1, \lambda u_2, \lambda u_3)$ for any $\lambda \in \mathbb{C}$. This is no coincidence, for two reasons: algebraically, $\lambda^2$ pops out of the left-hand side; geometrically, multiplying by a non-zero complex number is simply a combined rotation and rescaling, so what was a cube drawing *remains* a cube drawing.
-So the set of cube drawings, up to rotation and rescaling, is the complex projective curve
+If $(u_1, u_2, u_3)$ is a solution, then so is $(\lambda u_1, \lambda u_2, \lambda u_3)$ for any $\lambda \in \mathbb{C}$. This is no coincidence, for two reasons: algebraically, $\lambda^2$ pops out of the left-hand side; geometrically, multiplying by a non-zero complex number is simply a combined rotation and rescaling, so what was a cube drawing *remains* a cube drawing.
+So the set of cube drawings, up to rotation and rescaling, correspond to the points of the complex projective curve
 
 $$X = \lbrace (u_1, u_2, u_3) \in \mathbb{C}^3 - \lbrace 0 \rbrace \mid u_1^2 + u_2^2 + u_3^2 = 0 \rbrace \big/ \mathbb{C}^\times \subseteq \mathbb{P}^2_{\mathbb{C}}.$$
 
 This is a well-understood object: $X$ is a smooth conic, isomorphic to $\mathbb{P}^1_{\mathbb{C}}$, the Riemann sphere $\mathbb{C} \cup \lbrace \infty \rbrace$. An isomorphism $\mathbb{P}^1_{\mathbb{C}} \to X$ is given by a triple of polynomials of degree $\le 2$:
 
-$$\alpha \longmapsto \big(f_x(\alpha),\, f_y(\alpha),\, f_z(\alpha)\big).$$
+$$\alpha \longmapsto \big(f_x(\alpha)\, f_y(\alpha)\, f_z(\alpha)\big).$$
 
-**Up to rotation and dilation, orthographic drawings of a cube correspond to the point of $\mathbb{P}^1(\mathbb{C})$.**
 
 ## What CubeParam does
 
-You define a 3D object and view it from any angle. The angle is controlled by a complex parameter $\alpha\in\CC$ which determines the projection in $\RR^2$ of points $(a,b,c)\in\RR^3$. The user controls $\alpha$ by moving a pointer on screen.
+You define a 3D object and view it from any angle. The angle is controlled by a complex parameter $\alpha\in\mathbb{C}$ which determines the projection in $\mathbb{R}^2$ of points $(a,b,c)\in\mathbb{R}^3$. The user controls $\alpha$ by moving a pointer on screen.
 
 ### Basic viewing options
 
@@ -53,7 +54,7 @@ In Polynomial mode the pointer *is* $\alpha$, and $x_\alpha, y_\alpha, z_\alpha$
 
 | | Polynomial + z-Axis | Polynomial + Diagonal |
 |---|---|---|
-| $\begin{bmatrix} x_\alpha \\\\ y_\alpha \\\\ z_\alpha \end{bmatrix} =$ | $\dfrac{1}{2}\begin{bmatrix} 1 - \alpha^2 \\\\ i(1 + \alpha^2) \\\\ 2\alpha \end{bmatrix}$ | $-\dfrac{i}{3\sqrt{2}}\begin{bmatrix} 1 + \sqrt{2}i\alpha + \alpha^2 \\\\ \zeta^2 + \sqrt{2}i\alpha + \zeta\alpha^2 \\\\ \zeta + \sqrt{2}i\alpha + \zeta^2\alpha^2 \end{bmatrix}$ |
+| $`\begin{bmatrix} x_\alpha \\\\ y_\alpha \\\\ z_\alpha \end{bmatrix} =`$ | $`\dfrac{1}{2}\begin{bmatrix} 1 - \alpha^2 \\\\ i(1 + \alpha^2) \\\\ 2\alpha \end{bmatrix}`$ | $`-\dfrac{i}{3\sqrt{2}}\begin{bmatrix} 1 + \sqrt{2}i\alpha + \alpha^2 \\\\ \zeta^2 + \sqrt{2}i\alpha + \zeta\alpha^2 \\\\ \zeta + \sqrt{2}i\alpha + \zeta^2\alpha^2 \end{bmatrix}`$ |
 
 Compact mode differs in two ways. First, the pointer lives in the open unit disk; The pointer - let's call it $\alpha'$ - relates to $\alpha$ by
 
@@ -73,7 +74,7 @@ Perspective is available to aid depth perception, using the depth coordinate $h_
 
 | | Polynomial + z-Axis | Polynomial + Diagonal |
 |---|---|---|
-| $\begin{bmatrix} h_{x,\alpha} \\\\ h_{y,\alpha} \\\\ h_{z,\alpha}\end{bmatrix} =$ | $\begin{bmatrix} -\Re(\alpha) \\\\ -\Im(\alpha) \\\\ \frac{1 - \lvert\alpha\rvert^2}{2} \end{bmatrix}$ | $\dfrac{1}{6}\begin{bmatrix} 1 - \lvert\alpha\rvert^2 + 2\sqrt{2}\,\Im(\alpha) \\\\ 1 - \lvert\alpha\rvert^2 + 2\sqrt{2}\,\Im(\zeta\alpha) \\\\ 1 - \lvert\alpha\rvert^2 + 2\sqrt{2}\,\Im(\zeta^2\alpha) \end{bmatrix}$ |
+| $`\begin{bmatrix} h_{x,\alpha} \\\\ h_{y,\alpha} \\\\ h_{z,\alpha}\end{bmatrix} =`$ | $`\begin{bmatrix} -\Re(\alpha) \\\\ -\Im(\alpha) \\\\ \frac{1 - \lvert\alpha\rvert^2}{2} \end{bmatrix}`$ | $`\dfrac{1}{6}\begin{bmatrix} 1 - \lvert\alpha\rvert^2 + 2\sqrt{2}\,\Im(\alpha) \\\\ 1 - \lvert\alpha\rvert^2 + 2\sqrt{2}\,\Im(\zeta\alpha) \\\\ 1 - \lvert\alpha\rvert^2 + 2\sqrt{2}\,\Im(\zeta^2\alpha) \end{bmatrix}`$ |
 
 When perspective is enabled the user controls the scaling factor $P$. In Compact mode the focal distance is $F = 1/P$; in Polynomial mode it scales with $r_\alpha$, giving $F = r_\alpha / P$. Either way — taking $r_\alpha := 1$ in Compact mode — the point $r_\alpha(u, h) = (r_\alpha u, r_\alpha h) \in \mathbb{C} \times \mathbb{R}$ is projected onto $r_\alpha \frac{1}{1 - Ph} u \in \mathbb{C}$.
 
