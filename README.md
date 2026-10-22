@@ -8,7 +8,7 @@ A browser-based tool for defining 3D objects and viewing them from any conceivab
 
 ## Motivation
 ### Question: which of these looks like a cube?
-![Three parallelepipeds](three-parallelepipeds.png)
+![Three parallelepipeds](three_parallelepipeds.png)
 
 The one on the left is too *stretched*, the one on the right too *squished*. This we know from experience, or maybe intuition.
 The middle one is tricky, in part because this is how most of us were taught to draw cubes. But think about it: if one face of a cube is projected to look like a perfect square, then the opposing face must be *directly behind it*. That's not the case here.
